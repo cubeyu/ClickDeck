@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ClickDeck",
+  "description": "Visually fine-tune the current HTML page and export it.",
+  "version": "0.0.1",
+  "action": {
+    "default_title": "Toggle ClickDeck"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
