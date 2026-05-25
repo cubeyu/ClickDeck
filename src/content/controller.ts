@@ -13,6 +13,7 @@ import { createPanel, type ClickDeckPanel, type PanelAction } from "./panel";
 import { getEditableTarget } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
+import { exportPdfSnapshot } from "../export/pdf";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -154,9 +155,18 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
-    if (action === "export-pdf") {
-      logger.info("Triggering PDF export via window.print()");
-      window.print();
+    if (action === "export-pdf-long") {
+      exportPdfSnapshot("long-page", logger);
+      return;
+    }
+
+    if (action === "export-pdf-a4") {
+      exportPdfSnapshot("a4", logger);
+      return;
+    }
+
+    if (action === "export-pdf-slides") {
+      exportPdfSnapshot("slides", logger);
       return;
     }
 

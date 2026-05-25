@@ -1,6 +1,6 @@
 import type { StyleAction } from "./style-actions";
 
-export type PanelAction = StyleAction | "undo" | "redo" | "close" | "copy-diagnostics" | "export-html" | "export-pdf";
+export type PanelAction = StyleAction | "undo" | "redo" | "close" | "copy-diagnostics" | "export-html" | "export-pdf-long" | "export-pdf-a4" | "export-pdf-slides";
 
 export type ClickDeckPanel = {
   element: HTMLDivElement;
@@ -65,10 +65,17 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       </div>
     </div>
     <div class="clickdeck-panel__section">
-      <div class="clickdeck-panel__section-title">Export</div>
+      <div class="clickdeck-panel__section-title">Export HTML</div>
       <div class="clickdeck-panel__group">
-        ${buttonMarkup("export-html", "Export HTML")}
-        ${buttonMarkup("export-pdf", "Export PDF")}
+        ${buttonMarkup("export-html", "Export")}
+      </div>
+    </div>
+    <div class="clickdeck-panel__section">
+      <div class="clickdeck-panel__section-title">Export PDF</div>
+      <div class="clickdeck-panel__group">
+        ${buttonMarkup("export-pdf-long", "Long")}
+        ${buttonMarkup("export-pdf-a4", "A4")}
+        ${buttonMarkup("export-pdf-slides", "16:9")}
       </div>
     </div>
     <div class="clickdeck-panel__section">
