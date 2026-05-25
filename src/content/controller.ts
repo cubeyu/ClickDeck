@@ -44,15 +44,29 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   const pageHref = window.location.href;
   const storageKey = buildStorageKey(pageHref);
 
+  function getEffectivePatches(): EditorPatch[] {
+    // Effective edits are exactly the patches currently in the undo stack.
+    // Patches moved to redoStack have been "undone" and must not appear in
+    // AI prompts, persisted storage, or restore flows.
+    return [...history.undoStack];
+  }
+
   function persistPatches(): void {
     if (typeof chrome === "undefined" || !chrome.storage?.local) {
+      return;
+    }
+
+    const effective = getEffectivePatches();
+    if (effective.length === 0) {
+      // Nothing effective left – clear the stored entry so restore won't fire.
+      clearPersistedPatches();
       return;
     }
 
     const payload: PersistedPageEdits = {
       version: 1,
       href: pageHref,
-      patches: serializePatches(state.patches),
+      patches: serializePatches(effective),
       savedAt: Date.now()
     };
 
@@ -195,6 +209,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     logger.info("Undo applied", { patchId: patch.id, target: patch.targetDescriptor });
     updateOutline();
     refreshHistoryButtons();
+    persistPatches();
   }
 
   function redoLastPatch(): void {
@@ -208,6 +223,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     logger.info("Redo applied", { patchId: patch.id, target: patch.targetDescriptor });
     updateOutline();
     refreshHistoryButtons();
+    persistPatches();
   }
 
   function handleMouseMove(event: MouseEvent): void {
@@ -381,9 +397,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     }
 
     if (action === "copy-ai-prompt") {
-      const result = buildAiEditPrompt(state.patches, chrome.i18n?.getUILanguage?.() ?? navigator.language ?? "");
+      const effective = getEffectivePatches();
+      const result = buildAiEditPrompt(effective, chrome.i18n?.getUILanguage?.() ?? navigator.language ?? "");
       if (!result.ok) {
-        logger.info("No edits to summarize for AI prompt");
+        logger.info("No effective edits to summarize for AI prompt");
         alert(labels.noEdits);
         return;
       }
