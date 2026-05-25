@@ -23,6 +23,7 @@ import { getEditableTarget, getTabSwitchTarget } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
 import { exportPdfSnapshot } from "../export/pdf";
+import { buildAiEditPrompt } from "../export/change-summary";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -376,6 +377,21 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     if (action === "copy-diagnostics") {
       void navigator.clipboard.writeText(JSON.stringify(getRecentLogs(), null, 2));
       logger.info("Diagnostics copied to clipboard");
+      return;
+    }
+
+    if (action === "copy-ai-prompt") {
+      const result = buildAiEditPrompt(state.patches, chrome.i18n?.getUILanguage?.() ?? navigator.language ?? "");
+      if (!result.ok) {
+        logger.info("No edits to summarize for AI prompt");
+        alert(labels.noEdits);
+        return;
+      }
+
+      navigator.clipboard
+        .writeText(result.prompt)
+        .then(() => logger.info("AI edit prompt copied to clipboard"))
+        .catch((error) => logger.error("Failed to copy AI edit prompt", { error }));
       return;
     }
 

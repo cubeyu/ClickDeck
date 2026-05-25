@@ -7,6 +7,7 @@ export type PanelAction =
   | "redo"
   | "close"
   | "copy-diagnostics"
+  | "copy-ai-prompt"
   | "export-html"
   | "export-pdf-long"
   | "export-pdf-a4"
@@ -162,6 +163,12 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       <div class="clickdeck-panel__section-title">${labels.diagnostics}</div>
       <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
         ${buttonMarkup("copy-diagnostics", labels.copyDiagnostics)}
+      </div>
+    </div>
+    <div class="clickdeck-panel__section">
+      <div class="clickdeck-panel__section-title">${labels.ai}</div>
+      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
+        ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
       </div>
     </div>
   `;

@@ -36,6 +36,9 @@ export type PanelLabels = {
   larger: string;
   round: string;
   replaceImage: string;
+  ai: string;
+  copyAiPrompt: string;
+  noEdits: string;
   left: string;
   center: string;
   right: string;
@@ -87,6 +90,9 @@ const englishLabels: PanelLabels = {
   larger: "Larger",
   round: "Round",
   replaceImage: "Replace image",
+  ai: "AI",
+  copyAiPrompt: "Copy AI edit prompt",
+  noEdits: "No edits to summarize yet.",
   left: "Left",
   center: "Center",
   right: "Right",
@@ -138,6 +144,9 @@ const chineseLabels: PanelLabels = {
   larger: "变大",
   round: "圆形",
   replaceImage: "替换图片",
+  ai: "AI",
+  copyAiPrompt: "复制修改意图 Prompt",
+  noEdits: "当前没有可总结的修改。",
   left: "左",
   center: "居中",
   right: "右",
