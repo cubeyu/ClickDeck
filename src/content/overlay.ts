@@ -181,6 +181,12 @@ function injectBaseStyles(rootId: string): void {
       color: #111827;
       border-color: transparent;
     }
+
+    @media print {
+      [data-clickdeck="true"] {
+        display: none !important;
+      }
+    }
   `;
   document.documentElement.append(style);
 }

@@ -154,6 +154,12 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
+    if (action === "export-pdf") {
+      logger.info("Triggering PDF export via window.print()");
+      window.print();
+      return;
+    }
+
     if (action === "undo") {
       undoLastPatch();
       return;
