@@ -1,5 +1,19 @@
 import type { StyleProperty } from "./style-token";
 
+export type ElementLocator = {
+  descriptor: string;
+  tagName: string;
+  roleHint?: string;
+  textSnippet?: string;
+  imageHint?: string;
+  classHint?: string;
+  idHint?: string;
+  cssPath: string;
+  nthOfTypePath: string;
+  siblingIndex: number;
+  parentDescriptor?: string;
+};
+
 export type SelectedElementState = {
   element: HTMLElement;
   descriptor: string;
@@ -10,6 +24,7 @@ export type StylePatch = {
   kind: "style";
   targetElement: HTMLElement;
   targetDescriptor: string;
+  targetLocator?: ElementLocator;
   property: StyleProperty;
   before: string;
   after: string;
@@ -21,6 +36,7 @@ export type ContentPatch = {
   kind: "content";
   targetElement: HTMLElement;
   targetDescriptor: string;
+  targetLocator?: ElementLocator;
   before: string;
   after: string;
   createdAt: number;

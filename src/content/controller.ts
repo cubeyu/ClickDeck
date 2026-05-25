@@ -10,7 +10,7 @@ import {
   type EditorPatch
 } from "../state/editor-state";
 import { createEditHistory } from "../state/history";
-import { describeElement } from "./dom-utils";
+import { createElementLocator, describeElement } from "./dom-utils";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel, type PanelAction } from "./panel";
 import { getEditableTarget } from "./selection";
@@ -43,11 +43,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const newText = editingElement.textContent ?? "";
 
     if (newText !== originalText) {
+      const locator = createElementLocator(editingElement);
       const patch: ContentPatch = {
         id: `${Date.now()}-${state.patches.length + 1}`,
         kind: "content",
         targetElement: editingElement,
         targetDescriptor: describeElement(editingElement),
+        targetLocator: locator,
         before: originalText,
         after: newText,
         createdAt: Date.now()
@@ -177,6 +179,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       kind: "style",
       targetElement: selectedElement,
       targetDescriptor: describeElement(selectedElement),
+      targetLocator: createElementLocator(selectedElement),
       property: change.property,
       before: change.before,
       after: change.after,
@@ -251,6 +254,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         kind: "style",
         targetElement: selectedElement,
         targetDescriptor: describeElement(selectedElement),
+        targetLocator: createElementLocator(selectedElement),
         property: "color",
         before,
         after: colorValue,
