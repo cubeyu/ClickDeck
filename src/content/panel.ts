@@ -1,6 +1,6 @@
 import type { StyleAction } from "./style-actions";
 
-export type PanelAction = StyleAction | "undo" | "redo" | "close" | "copy-diagnostics";
+export type PanelAction = StyleAction | "undo" | "redo" | "close" | "copy-diagnostics" | "export-html";
 
 export type ClickDeckPanel = {
   element: HTMLDivElement;
@@ -62,6 +62,12 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       <div class="clickdeck-panel__group">
         ${buttonMarkup("undo", "Undo", true)}
         ${buttonMarkup("redo", "Redo", true)}
+      </div>
+    </div>
+    <div class="clickdeck-panel__section">
+      <div class="clickdeck-panel__section-title">Export</div>
+      <div class="clickdeck-panel__group">
+        ${buttonMarkup("export-html", "Export HTML")}
       </div>
     </div>
     <div class="clickdeck-panel__section">

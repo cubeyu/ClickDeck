@@ -12,6 +12,7 @@ import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel, type PanelAction } from "./panel";
 import { getEditableTarget } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
+import { exportHtmlSnapshot } from "../export/html";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -145,6 +146,11 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     if (action === "copy-diagnostics") {
       void navigator.clipboard.writeText(JSON.stringify(getRecentLogs(), null, 2));
       logger.info("Diagnostics copied to clipboard");
+      return;
+    }
+
+    if (action === "export-html") {
+      exportHtmlSnapshot(logger);
       return;
     }
 
