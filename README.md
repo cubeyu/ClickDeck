@@ -2,6 +2,8 @@
 
 English | [中文](#clickdeck-中文)
 
+![ClickDeck demo: edit an HTML presentation page directly in the browser](docs/assets/clickdeck-demo.gif)
+
 ClickDeck is an open-source Chrome/Edge extension for visual HTML page editing. It helps you fine-tune AI-generated pages, HTML presentations, project briefs, and other browser-rendered documents directly in the browser without opening DevTools.
 
 Select an element, adjust typography, spacing, alignment, color, and text in place, then export the edited page as an HTML snapshot or through the browser PDF print flow.
@@ -55,6 +57,12 @@ Load the built `dist/` directory in Chrome or Edge via the extensions page with 
 
 For screenshots or GIF recording, open `fixtures/showcase-page.html`, enable ClickDeck with `Alt+Shift+C`, select the hero title or metric cards, and demonstrate a few small typography/color changes.
 
+To regenerate the demo assets locally after building the extension:
+
+```bash
+node scripts/capture-demo.mjs
+```
+
 ## Privacy
 
 ClickDeck runs locally in the browser. It does not upload page content or diagnostics by default. The diagnostics button copies recent local logs to your clipboard so you can choose what to share in an issue.
@@ -73,6 +81,8 @@ MIT
 ---
 
 # ClickDeck 中文
+
+![ClickDeck 演示：直接在浏览器里编辑 HTML 演示页面](docs/assets/clickdeck-demo.gif)
 
 ClickDeck 是一个开源 Chrome/Edge 插件，用于对当前 HTML 页面进行可视化编辑和微调。它适合微调 AI 生成的网页、HTML 演示文稿、项目简报和其他浏览器渲染出来的文档，不需要打开 DevTools。
 
@@ -126,6 +136,12 @@ npm run e2e
 构建后，在 Chrome 或 Edge 的扩展管理页面开启开发者模式，并加载 `dist/` 目录。
 
 如果要录制截图或 GIF，可以打开 `fixtures/showcase-page.html`，用 `Alt+Shift+C` 启用 ClickDeck，选择首屏标题或指标卡片，演示少量字号、颜色和文本微调。
+
+构建插件后，可以用下面的命令重新生成演示素材：
+
+```bash
+node scripts/capture-demo.mjs
+```
 
 ## 隐私
 

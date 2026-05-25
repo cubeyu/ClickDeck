@@ -20,9 +20,9 @@ This checklist is for preparing a GitHub alpha release. It is not a Chrome Web S
 ## Demo Assets
 
 - [x] A stable local demo page exists at `fixtures/showcase-page.html`.
-- [ ] Record an English UI GIF using the showcase page.
-- [ ] Add the GIF to the README once the recording looks clean.
-- [ ] Capture at least one still screenshot for social posts or issues.
+- [x] Record an English UI GIF using the showcase page.
+- [x] Add the GIF to the README once the recording looks clean.
+- [x] Capture at least one still screenshot for social posts or issues.
 
 ## Validation
 
