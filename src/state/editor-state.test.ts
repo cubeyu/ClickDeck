@@ -7,6 +7,7 @@ import {
   hydratePersistedPatches,
   serializePatches,
   type ContentPatch,
+  type AttributePatch,
   type PersistedPatch,
   type StylePatch
 } from "./editor-state";
@@ -44,6 +45,34 @@ describe("serializePatches", () => {
     expect(persisted).toHaveLength(1);
     // @ts-expect-error intentional runtime check
     expect(persisted[0].targetElement).toBeUndefined();
+  });
+
+  it("serializes attribute patches with attribute name", () => {
+    document.body.innerHTML = `<main><img id="img" src="a.png" /></main>`;
+    const el = document.getElementById("img") as HTMLElement;
+
+    const patch: AttributePatch = {
+      id: "a1",
+      kind: "attribute",
+      targetElement: el,
+      targetDescriptor: "img#img",
+      targetLocator: {
+        descriptor: "img #img",
+        tagName: "img",
+        cssPath: "#img",
+        nthOfTypePath: "img:nth-of-type(1)",
+        siblingIndex: 0
+      },
+      attribute: "src",
+      before: "a.png",
+      after: "data:image/png;base64,AA==",
+      createdAt: 1
+    };
+
+    const persisted = serializePatches([patch]);
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0].kind).toBe("attribute");
+    expect(persisted[0].attribute).toBe("src");
   });
 });
 
@@ -121,4 +150,3 @@ describe("hydratePersistedPatches", () => {
     expect((hydrated[1] as ContentPatch).targetElement).toBeInstanceOf(HTMLElement);
   });
 });
-

@@ -42,7 +42,19 @@ export type ContentPatch = {
   createdAt: number;
 };
 
-export type EditorPatch = StylePatch | ContentPatch;
+export type AttributePatch = {
+  id: string;
+  kind: "attribute";
+  targetElement: HTMLElement;
+  targetDescriptor: string;
+  targetLocator?: ElementLocator;
+  attribute: "src";
+  before: string;
+  after: string;
+  createdAt: number;
+};
+
+export type EditorPatch = StylePatch | ContentPatch | AttributePatch;
 
 export type PersistedPatch = {
   id: string;
@@ -50,6 +62,7 @@ export type PersistedPatch = {
   targetDescriptor: string;
   targetLocator: ElementLocator;
   property?: StyleProperty;
+  attribute?: "src";
   before: string;
   after: string;
   createdAt: number;
@@ -123,6 +136,19 @@ export function serializePatches(patches: EditorPatch[]): PersistedPatch[] {
       });
       continue;
     }
+    if (patch.kind === "attribute") {
+      persisted.push({
+        id: patch.id,
+        kind: patch.kind,
+        targetDescriptor: patch.targetDescriptor,
+        targetLocator: locator,
+        attribute: patch.attribute,
+        before: patch.before,
+        after: patch.after,
+        createdAt: patch.createdAt
+      });
+      continue;
+    }
     persisted.push({
       id: patch.id,
       kind: patch.kind,
@@ -182,6 +208,21 @@ export function hydratePersistedPatches(
         targetDescriptor: entry.targetDescriptor,
         targetLocator: entry.targetLocator,
         property: entry.property as StyleProperty,
+        before: entry.before,
+        after: entry.after,
+        createdAt: entry.createdAt
+      });
+      continue;
+    }
+
+    if (entry.kind === "attribute") {
+      patches.push({
+        id: entry.id,
+        kind: "attribute",
+        targetElement: target,
+        targetDescriptor: entry.targetDescriptor,
+        targetLocator: entry.targetLocator,
+        attribute: (entry.attribute as "src") ?? "src",
         before: entry.before,
         after: entry.after,
         createdAt: entry.createdAt

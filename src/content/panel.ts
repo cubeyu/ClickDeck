@@ -1,13 +1,25 @@
 import type { StyleAction } from "./style-actions";
 import { getPanelLabels } from "./i18n";
 
-export type PanelAction = StyleAction | "undo" | "redo" | "close" | "copy-diagnostics" | "export-html" | "export-pdf-long" | "export-pdf-a4" | "export-pdf-slides" | `color:${string}`;
+export type PanelAction =
+  | StyleAction
+  | "undo"
+  | "redo"
+  | "close"
+  | "copy-diagnostics"
+  | "export-html"
+  | "export-pdf-long"
+  | "export-pdf-a4"
+  | "export-pdf-slides"
+  | "replace-image"
+  | `color:${string}`;
 
 export type ClickDeckPanel = {
   element: HTMLDivElement;
   destroy: () => void;
   setHint: (text: string) => void;
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void;
+  setReplaceImageAvailability: (enabled: boolean) => void;
 };
 
 export function createPanel(onAction: (action: PanelAction) => void): ClickDeckPanel {
@@ -128,6 +140,9 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
     <div class="clickdeck-panel__section">
       <div class="clickdeck-panel__section-title">${labels.image}</div>
       <div class="clickdeck-panel__group">
+        ${buttonMarkup("replace-image", labels.replaceImage, true)}
+      </div>
+      <div class="clickdeck-panel__group">
         ${buttonMarkup("image-width-smaller", labels.smaller)}
         ${buttonMarkup("image-width-larger", labels.larger)}
         ${buttonMarkup("image-maxwidth-100", "Max 100%")}
@@ -221,6 +236,12 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       }
       if (redoButton) {
         redoButton.disabled = !canRedo;
+      }
+    },
+    setReplaceImageAvailability: (enabled) => {
+      const replaceButton = element.querySelector<HTMLButtonElement>("[data-action='replace-image']");
+      if (replaceButton) {
+        replaceButton.disabled = !enabled;
       }
     }
   };

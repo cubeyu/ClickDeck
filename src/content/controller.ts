@@ -11,6 +11,7 @@ import {
   type PersistedPageEdits,
   type StylePatch,
   type ContentPatch,
+  type AttributePatch,
   type EditorPatch
 } from "../state/editor-state";
 import { createEditHistory } from "../state/history";
@@ -171,6 +172,12 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   function applyPatchValue(patch: EditorPatch, value: string): void {
     if (patch.kind === "style") {
       patch.targetElement.style[patch.property] = value;
+    } else if (patch.kind === "attribute") {
+      if (patch.attribute === "src" && patch.targetElement instanceof HTMLImageElement) {
+        patch.targetElement.src = value;
+      } else {
+        patch.targetElement.setAttribute(patch.attribute, value);
+      }
     } else {
       patch.targetElement.textContent = value;
     }
@@ -244,6 +251,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const descriptor = describeElement(target);
     setSelectedElement(state, { element: target, descriptor });
     panel?.setHint(descriptor);
+    panel?.setReplaceImageAvailability(target.tagName.toLowerCase() === "img");
 
     // Only auto-start in-place text editing for text-like elements.
     // Non-text elements (img/button/input/...) must not be forced into contenteditable.
@@ -266,6 +274,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     selectedElement = null;
     setSelectedElement(state, null);
     panel?.setHint(labels.selectHint);
+    panel?.setReplaceImageAvailability(false);
     updateOutline();
     logger.info("Selection cleared", { reason });
   }
@@ -276,6 +285,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const descriptor = describeElement(target);
     setSelectedElement(state, { element: target, descriptor });
     panel?.setHint(descriptor);
+    panel?.setReplaceImageAvailability(target.tagName.toLowerCase() === "img");
     updateOutline();
     logger.info("Element selected", { descriptor, reason });
   }
@@ -399,6 +409,77 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
+    if (action === "replace-image") {
+      if (!(selectedElement instanceof HTMLImageElement)) {
+        logger.warn("Replace image is only available for img elements");
+        return;
+      }
+
+      const img = selectedElement;
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.style.display = "none";
+      input.dataset.clickdeck = "true";
+      document.body.appendChild(input);
+
+      input.addEventListener(
+        "change",
+        () => {
+          const file = input.files?.[0];
+          if (!file) {
+            input.remove();
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onerror = () => {
+            logger.error("Failed to read image file", { fileName: file.name });
+            input.remove();
+          };
+          reader.onload = () => {
+            const result = reader.result;
+            if (typeof result !== "string") {
+              logger.error("Unexpected FileReader result when replacing image");
+              input.remove();
+              return;
+            }
+
+            const before = img.src;
+            img.src = result;
+
+            const patch: AttributePatch = {
+              id: `${Date.now()}-${state.patches.length + 1}`,
+              kind: "attribute",
+              targetElement: img,
+              targetDescriptor: describeElement(img),
+              targetLocator: createElementLocator(img),
+              attribute: "src",
+              before,
+              after: result,
+              createdAt: Date.now()
+            };
+
+            state.patches.push(patch);
+            history.undoStack.push(patch);
+            history.redoStack.length = 0;
+            refreshHistoryButtons();
+            updateOutline();
+            persistPatches();
+
+            logger.info("Image replaced", { target: patch.targetDescriptor, fileName: file.name });
+            input.remove();
+          };
+
+          reader.readAsDataURL(file);
+        },
+        { once: true }
+      );
+
+      input.click();
+      return;
+    }
+
     if (typeof action === "string" && action.startsWith("color:")) {
       if (!selectedElement) {
         return;
@@ -460,6 +541,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     panel = createPanel(handlePanelAction);
     overlay.root.append(panel.element);
     refreshHistoryButtons();
+    panel.setReplaceImageAvailability(false);
 
     window.addEventListener("mousemove", handleMouseMove, true);
     window.addEventListener("click", handleClick, true);
@@ -482,6 +564,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     hoveredElement = null;
     selectedElement = null;
     setSelectedElement(state, null);
+    panel?.setReplaceImageAvailability(false);
 
     window.removeEventListener("mousemove", handleMouseMove, true);
     window.removeEventListener("click", handleClick, true);

@@ -35,6 +35,7 @@ export type PanelLabels = {
   smaller: string;
   larger: string;
   round: string;
+  replaceImage: string;
   left: string;
   center: string;
   right: string;
@@ -85,6 +86,7 @@ const englishLabels: PanelLabels = {
   smaller: "Smaller",
   larger: "Larger",
   round: "Round",
+  replaceImage: "Replace image",
   left: "Left",
   center: "Center",
   right: "Right",
@@ -135,6 +137,7 @@ const chineseLabels: PanelLabels = {
   smaller: "变小",
   larger: "变大",
   round: "圆形",
+  replaceImage: "替换图片",
   left: "左",
   center: "居中",
   right: "右",
