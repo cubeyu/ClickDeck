@@ -398,17 +398,31 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
     if (action === "copy-ai-prompt") {
       const effective = getEffectivePatches();
-      const result = buildAiEditPrompt(effective, chrome.i18n?.getUILanguage?.() ?? navigator.language ?? "");
-      if (!result.ok) {
+      const page = { url: pageHref, title: document.title };
+
+      const resultEn = buildAiEditPrompt(effective, { language: "en", page });
+      if (!resultEn.ok) {
         logger.info("No effective edits to summarize for AI prompt");
         alert(labels.noEdits);
         return;
       }
 
-      navigator.clipboard
-        .writeText(result.prompt)
-        .then(() => logger.info("AI edit prompt copied to clipboard"))
-        .catch((error) => logger.error("Failed to copy AI edit prompt", { error }));
+      const resultZh = buildAiEditPrompt(effective, { language: "zh", page });
+
+      panel?.showPromptPreview({
+        promptEn: resultEn.prompt,
+        promptZh: resultZh.ok ? resultZh.prompt : resultEn.prompt,
+        onCopy: (value, lang) => {
+          if (!value.trim()) {
+            logger.info("Copy cancelled: empty prompt");
+            return;
+          }
+          navigator.clipboard
+            .writeText(value)
+            .then(() => logger.info("AI edit prompt copied to clipboard", { lang }))
+            .catch((error) => logger.error("Failed to copy AI edit prompt", { error }));
+        }
+      });
       return;
     }
 

@@ -50,6 +50,12 @@ export type PanelLabels = {
   long: string;
   copyDiagnostics: string;
   pickColor: string;
+  promptPreviewTitle: string;
+  promptLangEn: string;
+  promptLangZh: string;
+  promptCopy: string;
+  promptCopied: string;
+  promptClose: string;
 };
 
 const englishLabels: PanelLabels = {
@@ -103,7 +109,13 @@ const englishLabels: PanelLabels = {
   export: "Export",
   long: "Long",
   copyDiagnostics: "Copy diagnostics",
-  pickColor: "Pick color"
+  pickColor: "Pick color",
+  promptPreviewTitle: "AI edit prompt",
+  promptLangEn: "English",
+  promptLangZh: "中文",
+  promptCopy: "Copy",
+  promptCopied: "Copied!",
+  promptClose: "Close"
 };
 
 const chineseLabels: PanelLabels = {
@@ -157,7 +169,13 @@ const chineseLabels: PanelLabels = {
   export: "导出",
   long: "长页",
   copyDiagnostics: "复制诊断",
-  pickColor: "选择颜色"
+  pickColor: "选择颜色",
+  promptPreviewTitle: "AI 修改意图 Prompt",
+  promptLangEn: "English",
+  promptLangZh: "中文",
+  promptCopy: "复制",
+  promptCopied: "已复制！",
+  promptClose: "关闭"
 };
 
 export function getPanelLabels(): PanelLabels {

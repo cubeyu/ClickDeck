@@ -207,6 +207,91 @@ function injectBaseStyles(rootId: string): void {
       border-color: transparent;
     }
 
+    .clickdeck-button--primary {
+      background: #8a6a4e;
+      color: #fff;
+      border-color: #8a6a4e;
+    }
+
+    .clickdeck-button--primary:hover {
+      background: #6b4e35;
+      border-color: #6b4e35;
+    }
+
+    .clickdeck-button--active {
+      background: #fff3df;
+      border-color: #c8a47a;
+      font-weight: 600;
+    }
+
+    .clickdeck-prompt-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(62, 45, 32, 0.45);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .clickdeck-prompt-modal {
+      background: #fffaf3;
+      border: 1px solid #e8d5b0;
+      border-radius: 10px;
+      padding: 14px;
+      width: calc(100% - 24px);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 4px 16px rgba(62, 45, 32, 0.18);
+    }
+
+    .clickdeck-prompt-modal__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .clickdeck-prompt-modal__title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #3d2f24;
+    }
+
+    .clickdeck-prompt-modal__lang {
+      display: flex;
+      gap: 4px;
+    }
+
+    .clickdeck-prompt-modal__textarea {
+      width: 100%;
+      min-height: 160px;
+      max-height: 280px;
+      padding: 8px;
+      border: 1px solid #e8d5b0;
+      border-radius: 6px;
+      background: #fff;
+      color: #3d2f24;
+      font-size: 11px;
+      font-family: "Menlo", "Consolas", monospace;
+      line-height: 1.5;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .clickdeck-prompt-modal__textarea:focus {
+      outline: 2px solid #c8a47a;
+      outline-offset: -1px;
+    }
+
+    .clickdeck-prompt-modal__footer {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
     @media print {
       [data-clickdeck="true"] {
         display: none !important;

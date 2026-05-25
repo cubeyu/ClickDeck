@@ -15,12 +15,19 @@ export type PanelAction =
   | "replace-image"
   | `color:${string}`;
 
+export type PromptPreviewOptions = {
+  promptEn: string;
+  promptZh: string;
+  onCopy: (value: string, lang: "en" | "zh") => void;
+};
+
 export type ClickDeckPanel = {
   element: HTMLDivElement;
   destroy: () => void;
   setHint: (text: string) => void;
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void;
   setReplaceImageAvailability: (enabled: boolean) => void;
+  showPromptPreview: (options: PromptPreviewOptions) => void;
 };
 
 export function createPanel(onAction: (action: PanelAction) => void): ClickDeckPanel {
@@ -250,10 +257,88 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       if (replaceButton) {
         replaceButton.disabled = !enabled;
       }
+    },
+    showPromptPreview: (options: PromptPreviewOptions) => {
+      // Remove any existing preview
+      element.querySelector(".clickdeck-prompt-overlay")?.remove();
+
+      let currentLang: "en" | "zh" = "en";
+      let isDirty = false;
+
+      const overlay = document.createElement("div");
+      overlay.className = "clickdeck-prompt-overlay";
+      overlay.dataset.clickdeck = "true";
+
+      const render = (): void => {
+        const promptText = currentLang === "zh" ? options.promptZh : options.promptEn;
+        overlay.innerHTML = `
+          <div class="clickdeck-prompt-modal">
+            <div class="clickdeck-prompt-modal__header">
+              <span class="clickdeck-prompt-modal__title">${labels.promptPreviewTitle}</span>
+              <div class="clickdeck-prompt-modal__lang">
+                <button class="clickdeck-button${currentLang === "en" ? " clickdeck-button--active" : ""}" data-lang="en" type="button">${labels.promptLangEn}</button>
+                <button class="clickdeck-button${currentLang === "zh" ? " clickdeck-button--active" : ""}" data-lang="zh" type="button">${labels.promptLangZh}</button>
+              </div>
+            </div>
+            <textarea class="clickdeck-prompt-modal__textarea">${escapeHtml(promptText)}</textarea>
+            <div class="clickdeck-prompt-modal__footer">
+              <button class="clickdeck-button clickdeck-button--primary" data-prompt-action="copy" type="button">${labels.promptCopy}</button>
+              <button class="clickdeck-button" data-prompt-action="close" type="button">${labels.promptClose}</button>
+            </div>
+          </div>
+        `;
+
+        overlay.querySelector("textarea")?.addEventListener("input", () => {
+          isDirty = true;
+        });
+
+        overlay.querySelectorAll<HTMLButtonElement>("[data-lang]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const newLang = btn.dataset.lang as "en" | "zh";
+            if (newLang === currentLang) return;
+            if (isDirty) {
+              const confirmMsg = currentLang === "zh"
+                ? "你已手动编辑了 prompt，切换语言将丢失这些编辑，确定继续吗？"
+                : "You have manually edited the prompt. Switching language will discard your changes. Continue?";
+              if (!confirm(confirmMsg)) return;
+            }
+            currentLang = newLang;
+            isDirty = false;
+            render();
+          });
+        });
+
+        const copyBtn = overlay.querySelector<HTMLButtonElement>("[data-prompt-action='copy']");
+        copyBtn?.addEventListener("click", () => {
+          const textarea = overlay.querySelector<HTMLTextAreaElement>("textarea");
+          const value = textarea?.value ?? "";
+          options.onCopy(value, currentLang);
+          if (copyBtn) {
+            const original = copyBtn.textContent ?? "";
+            copyBtn.textContent = labels.promptCopied;
+            setTimeout(() => { copyBtn.textContent = original; }, 1500);
+          }
+        });
+
+        overlay.querySelector<HTMLButtonElement>("[data-prompt-action='close']")?.addEventListener("click", () => {
+          overlay.remove();
+        });
+      };
+
+      render();
+      element.appendChild(overlay);
     }
   };
 }
 
 function buttonMarkup(action: PanelAction, label: string, disabled = false): string {
   return `<button class="clickdeck-button" data-action="${action}" type="button"${disabled ? " disabled" : ""}>${label}</button>`;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

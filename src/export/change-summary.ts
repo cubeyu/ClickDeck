@@ -4,12 +4,26 @@ export type PromptBuildResult =
   | { ok: true; prompt: string }
   | { ok: false; reason: "empty"; message: string };
 
+export type PromptLanguage = "en" | "zh";
+
+export type PromptPageContext = {
+  url: string;
+  title: string;
+};
+
+export type PromptBuildOptions = {
+  language: PromptLanguage;
+  page: PromptPageContext;
+};
+
 const EMPTY_MESSAGE_EN = "No edits to summarize yet. Make some changes first.";
 const EMPTY_MESSAGE_ZH = "当前没有可总结的修改，请先在页面上做一些调整。";
 
-export function buildAiEditPrompt(patches: EditorPatch[], languageHint: string): PromptBuildResult {
+export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOptions): PromptBuildResult {
+  const isZh = options.language === "zh";
+
   if (!patches || patches.length === 0) {
-    return { ok: false, reason: "empty", message: pickLang(languageHint, EMPTY_MESSAGE_ZH, EMPTY_MESSAGE_EN) };
+    return { ok: false, reason: "empty", message: isZh ? EMPTY_MESSAGE_ZH : EMPTY_MESSAGE_EN };
   }
 
   const lines: string[] = [];
@@ -17,7 +31,16 @@ export function buildAiEditPrompt(patches: EditorPatch[], languageHint: string):
   lines.push("Keep all unrelated content, layout, and behavior unchanged.");
   lines.push("Apply the smallest possible code changes.");
   lines.push("");
-  lines.push("Changes:");
+  lines.push("Page:");
+  lines.push(`- URL: ${options.page.url}`);
+  lines.push(`- Title: ${options.page.title || "(untitled)"}`);
+  lines.push("- Scope: Current active browser page only.");
+  lines.push("");
+  if (isZh) {
+    lines.push("修改列表（Changes）：");
+  } else {
+    lines.push("Changes:");
+  }
   lines.push("");
 
   let index = 0;
@@ -34,13 +57,21 @@ export function buildAiEditPrompt(patches: EditorPatch[], languageHint: string):
     lines.push(`   Locator: ${locatorText}`);
 
     if (patch.kind === "content") {
-      lines.push(`   Text changed from ${quoteSnippet(patch.before)} to ${quoteSnippet(patch.after)}.`);
+      if (isZh) {
+        lines.push(`   文本修改：从 ${quoteSnippet(patch.before)} 改为 ${quoteSnippet(patch.after)}。`);
+      } else {
+        lines.push(`   Text changed from ${quoteSnippet(patch.before)} to ${quoteSnippet(patch.after)}.`);
+      }
       lines.push("");
       continue;
     }
 
     if (patch.kind === "style") {
-      lines.push(`   Style: ${patch.property} changed from ${quoteSnippet(patch.before)} to ${quoteSnippet(patch.after)}.`);
+      if (isZh) {
+        lines.push(`   样式修改：${patch.property} 从 ${quoteSnippet(patch.before)} 改为 ${quoteSnippet(patch.after)}。`);
+      } else {
+        lines.push(`   Style: ${patch.property} changed from ${quoteSnippet(patch.before)} to ${quoteSnippet(patch.after)}.`);
+      }
       lines.push("");
       continue;
     }
@@ -55,7 +86,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], languageHint: string):
   }
 
   if (index === 0) {
-    return { ok: false, reason: "empty", message: pickLang(languageHint, EMPTY_MESSAGE_ZH, EMPTY_MESSAGE_EN) };
+    return { ok: false, reason: "empty", message: isZh ? EMPTY_MESSAGE_ZH : EMPTY_MESSAGE_EN };
   }
 
   lines.push(
@@ -63,11 +94,6 @@ export function buildAiEditPrompt(patches: EditorPatch[], languageHint: string):
   );
 
   return { ok: true, prompt: lines.join("\n") };
-}
-
-function pickLang(languageHint: string, zh: string, en: string): string {
-  const lang = (languageHint || "").toLowerCase();
-  return lang.startsWith("zh") ? zh : en;
 }
 
 function quoteSnippet(value: string): string {
