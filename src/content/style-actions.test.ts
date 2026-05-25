@@ -118,4 +118,46 @@ describe("applyStyleAction", () => {
     applyStyleAction(logger, element, "radius-lg");
     expect(element.style.borderRadius).toBe("16px");
   });
+
+  it("applies safe image width/maxWidth/objectFit actions", () => {
+    const img = document.createElement("img");
+    document.body.appendChild(img);
+
+    img.style.width = "200px";
+    applyStyleAction(logger, img, "image-width-larger");
+    expect(img.style.width).toBe("220px");
+
+    applyStyleAction(logger, img, "image-width-smaller");
+    expect(img.style.width).toBe("200px");
+
+    applyStyleAction(logger, img, "image-maxwidth-100");
+    expect(img.style.maxWidth).toBe("100%");
+
+    applyStyleAction(logger, img, "image-fit-contain");
+    expect(img.style.objectFit).toBe("contain");
+
+    applyStyleAction(logger, img, "image-fit-cover");
+    expect(img.style.objectFit).toBe("cover");
+
+    img.remove();
+  });
+
+  it("applies image radius presets including round", () => {
+    const img = document.createElement("img");
+    document.body.appendChild(img);
+
+    applyStyleAction(logger, img, "image-radius-none");
+    expect(img.style.borderRadius).toBe("0px");
+
+    applyStyleAction(logger, img, "image-radius-sm");
+    expect(img.style.borderRadius).toBe("8px");
+
+    applyStyleAction(logger, img, "image-radius-lg");
+    expect(img.style.borderRadius).toBe("16px");
+
+    applyStyleAction(logger, img, "image-radius-round");
+    expect(img.style.borderRadius).toBe("9999px");
+
+    img.remove();
+  });
 });

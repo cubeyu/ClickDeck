@@ -32,7 +32,16 @@ export type StyleAction =
   | "radius-none"
   | "radius-sm"
   | "radius-md"
-  | "radius-lg";
+  | "radius-lg"
+  | "image-width-smaller"
+  | "image-width-larger"
+  | "image-maxwidth-100"
+  | "image-fit-contain"
+  | "image-fit-cover"
+  | "image-radius-none"
+  | "image-radius-sm"
+  | "image-radius-lg"
+  | "image-radius-round";
 
 export type AppliedStyleChange = {
   property: StyleProperty;
@@ -276,6 +285,75 @@ export function applyStyleAction(
         after: "16px"
       };
       break;
+    case "image-width-smaller": {
+      const current = element.style.width || computed.width;
+      const next = stepSize(current, -1);
+      change = {
+        property: "width",
+        before: element.style.width,
+        after: next
+      };
+      break;
+    }
+    case "image-width-larger": {
+      const current = element.style.width || computed.width;
+      const next = stepSize(current, +1);
+      change = {
+        property: "width",
+        before: element.style.width,
+        after: next
+      };
+      break;
+    }
+    case "image-maxwidth-100":
+      change = {
+        property: "maxWidth",
+        before: element.style.maxWidth,
+        after: "100%"
+      };
+      break;
+    case "image-fit-contain":
+      change = {
+        property: "objectFit",
+        before: element.style.objectFit,
+        after: "contain"
+      };
+      break;
+    case "image-fit-cover":
+      change = {
+        property: "objectFit",
+        before: element.style.objectFit,
+        after: "cover"
+      };
+      break;
+    case "image-radius-none":
+      change = {
+        property: "borderRadius",
+        before: element.style.borderRadius,
+        after: "0"
+      };
+      break;
+    case "image-radius-sm":
+      change = {
+        property: "borderRadius",
+        before: element.style.borderRadius,
+        after: "8px"
+      };
+      break;
+    case "image-radius-lg":
+      change = {
+        property: "borderRadius",
+        before: element.style.borderRadius,
+        after: "16px"
+      };
+      break;
+    case "image-radius-round":
+      change = {
+        property: "borderRadius",
+        before: element.style.borderRadius,
+        after: "9999px"
+      };
+      break;
   }
 
   if (!change) {
@@ -285,4 +363,37 @@ export function applyStyleAction(
   element.style[change.property] = change.after;
   logger.info("Style action applied", { action, target: describeElement(element) });
   return change;
+}
+
+function stepSize(value: string, direction: -1 | 1): string {
+  const trimmed = (value || "").toString().trim();
+  const percentMatch = trimmed.match(/^(-?\\d+(?:\\.\\d+)?)%$/);
+  if (percentMatch) {
+    const current = Number(percentMatch[1]);
+    const delta = 5 * direction;
+    const next = clamp(current + delta, 10, 200);
+    return `${next}%`;
+  }
+
+  const pxMatch = trimmed.match(/^(-?\\d+(?:\\.\\d+)?)px$/);
+  if (pxMatch) {
+    const current = Number(pxMatch[1]);
+    const delta = 20 * direction;
+    const next = clamp(current + delta, 20, 2000);
+    return `${next}px`;
+  }
+
+  // Fallback: try parse float and treat as px.
+  const parsed = Number.parseFloat(trimmed);
+  if (Number.isFinite(parsed)) {
+    const next = clamp(parsed + 20 * direction, 20, 2000);
+    return `${next}px`;
+  }
+
+  // Last resort: set a reasonable default.
+  return direction > 0 ? "320px" : "160px";
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

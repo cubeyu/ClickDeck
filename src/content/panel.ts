@@ -126,6 +126,24 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       </div>
     </div>
     <div class="clickdeck-panel__section">
+      <div class="clickdeck-panel__section-title">${labels.image}</div>
+      <div class="clickdeck-panel__group">
+        ${buttonMarkup("image-width-smaller", labels.smaller)}
+        ${buttonMarkup("image-width-larger", labels.larger)}
+        ${buttonMarkup("image-maxwidth-100", "Max 100%")}
+      </div>
+      <div class="clickdeck-panel__group">
+        ${buttonMarkup("image-fit-contain", "Contain")}
+        ${buttonMarkup("image-fit-cover", "Cover")}
+      </div>
+      <div class="clickdeck-panel__group">
+        ${buttonMarkup("image-radius-none", labels.none)}
+        ${buttonMarkup("image-radius-sm", labels.small)}
+        ${buttonMarkup("image-radius-lg", labels.large)}
+        ${buttonMarkup("image-radius-round", labels.round)}
+      </div>
+    </div>
+    <div class="clickdeck-panel__section">
       <div class="clickdeck-panel__section-title">${labels.diagnostics}</div>
       <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
         ${buttonMarkup("copy-diagnostics", labels.copyDiagnostics)}

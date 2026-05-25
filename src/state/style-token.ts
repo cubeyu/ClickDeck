@@ -8,4 +8,7 @@ export type StyleProperty =
   | "fontWeight"
   | "lineHeight"
   | "letterSpacing"
-  | "borderRadius";
+  | "borderRadius"
+  | "width"
+  | "maxWidth"
+  | "objectFit";

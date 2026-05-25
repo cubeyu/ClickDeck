@@ -31,6 +31,10 @@ export type PanelLabels = {
   warm: string;
   white: string;
   transparent: string;
+  image: string;
+  smaller: string;
+  larger: string;
+  round: string;
   left: string;
   center: string;
   right: string;
@@ -77,6 +81,10 @@ const englishLabels: PanelLabels = {
   warm: "Warm",
   white: "White",
   transparent: "Transparent",
+  image: "Image",
+  smaller: "Smaller",
+  larger: "Larger",
+  round: "Round",
   left: "Left",
   center: "Center",
   right: "Right",
@@ -123,6 +131,10 @@ const chineseLabels: PanelLabels = {
   warm: "暖",
   white: "白",
   transparent: "透明",
+  image: "图片",
+  smaller: "变小",
+  larger: "变大",
+  round: "圆形",
   left: "左",
   center: "居中",
   right: "右",
