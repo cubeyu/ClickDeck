@@ -1,4 +1,5 @@
 import type { ClickDeckLogger } from "../diagnostics/logger";
+import type { StyleProperty } from "../state/style-token";
 import { describeElement } from "./dom-utils";
 
 export type StyleAction =
@@ -9,30 +10,70 @@ export type StyleAction =
   | "align-right"
   | "accent";
 
-export function applyStyleAction(logger: ClickDeckLogger, element: HTMLElement, action: StyleAction): void {
+export type AppliedStyleChange = {
+  property: StyleProperty;
+  before: string;
+  after: string;
+};
+
+export function applyStyleAction(
+  logger: ClickDeckLogger,
+  element: HTMLElement,
+  action: StyleAction
+): AppliedStyleChange | null {
   const computed = window.getComputedStyle(element);
+  let change: AppliedStyleChange | null = null;
 
   switch (action) {
     case "font-smaller":
-      element.style.fontSize = `${Math.max(10, parseFloat(computed.fontSize) - 2)}px`;
+      change = {
+        property: "fontSize",
+        before: element.style.fontSize,
+        after: `${Math.max(10, parseFloat(computed.fontSize) - 2)}px`
+      };
       break;
     case "font-larger":
-      element.style.fontSize = `${parseFloat(computed.fontSize) + 2}px`;
+      change = {
+        property: "fontSize",
+        before: element.style.fontSize,
+        after: `${parseFloat(computed.fontSize) + 2}px`
+      };
       break;
     case "align-left":
-      element.style.textAlign = "left";
+      change = {
+        property: "textAlign",
+        before: element.style.textAlign,
+        after: "left"
+      };
       break;
     case "align-center":
-      element.style.textAlign = "center";
+      change = {
+        property: "textAlign",
+        before: element.style.textAlign,
+        after: "center"
+      };
       break;
     case "align-right":
-      element.style.textAlign = "right";
+      change = {
+        property: "textAlign",
+        before: element.style.textAlign,
+        after: "right"
+      };
       break;
     case "accent":
-      element.style.color = "#2563eb";
+      change = {
+        property: "color",
+        before: element.style.color,
+        after: "#2563eb"
+      };
       break;
   }
 
-  logger.info("Style action applied", { action, target: describeElement(element) });
-}
+  if (!change) {
+    return null;
+  }
 
+  element.style[change.property] = change.after;
+  logger.info("Style action applied", { action, target: describeElement(element) });
+  return change;
+}

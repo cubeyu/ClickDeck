@@ -1,4 +1,10 @@
 import type { ClickDeckLogger } from "../diagnostics/logger";
+import {
+  createEditorState,
+  recordStylePatch,
+  setEditorActive,
+  setSelectedElement
+} from "../state/editor-state";
 import { describeElement } from "./dom-utils";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel } from "./panel";
@@ -11,6 +17,7 @@ export type ClickDeckController = {
 };
 
 export function createController(logger: ClickDeckLogger, rootId: string): ClickDeckController {
+  const state = createEditorState();
   let active = false;
   let hoveredElement: HTMLElement | null = null;
   let selectedElement: HTMLElement | null = null;
@@ -54,9 +61,11 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     event.preventDefault();
     event.stopPropagation();
     selectedElement = target;
-    panel?.setHint(describeElement(target));
+    const descriptor = describeElement(target);
+    setSelectedElement(state, { element: target, descriptor });
+    panel?.setHint(descriptor);
     updateOutline();
-    logger.info("Element selected", describeElement(target));
+    logger.info("Element selected", descriptor);
   }
 
   function handleStyleAction(action: StyleAction): void {
@@ -64,12 +73,32 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
-    applyStyleAction(logger, selectedElement, action);
+    const change = applyStyleAction(logger, selectedElement, action);
+    if (!change) {
+      return;
+    }
+
+    const patch = {
+      id: `${Date.now()}-${state.patches.length + 1}`,
+      targetElement: selectedElement,
+      targetDescriptor: describeElement(selectedElement),
+      property: change.property,
+      before: change.before,
+      after: change.after,
+      createdAt: Date.now()
+    };
+    recordStylePatch(state, patch);
+    logger.info("Style patch recorded", {
+      patchId: patch.id,
+      property: patch.property,
+      target: patch.targetDescriptor
+    });
     updateOutline();
   }
 
   function activate(): void {
     active = true;
+    setEditorActive(state, true);
     overlay = createOverlay(rootId);
     panel = createPanel(handleStyleAction);
     overlay.root.append(panel.element);
@@ -83,8 +112,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
   function deactivate(): void {
     active = false;
+    setEditorActive(state, false);
     hoveredElement = null;
     selectedElement = null;
+    setSelectedElement(state, null);
 
     window.removeEventListener("mousemove", handleMouseMove, true);
     window.removeEventListener("click", handleClick, true);
@@ -110,4 +141,3 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     isActive: () => active
   };
 }
-
