@@ -5,6 +5,10 @@ import {
   recordContentPatch,
   setEditorActive,
   setSelectedElement,
+  buildStorageKey,
+  hydratePersistedPatches,
+  serializePatches,
+  type PersistedPageEdits,
   type StylePatch,
   type ContentPatch,
   type EditorPatch
@@ -35,6 +39,90 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let panel: ClickDeckPanel | null = null;
   let editingElement: HTMLElement | null = null;
   let originalText: string = "";
+  const pageHref = window.location.href;
+  const storageKey = buildStorageKey(pageHref);
+
+  function persistPatches(): void {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) {
+      return;
+    }
+
+    const payload: PersistedPageEdits = {
+      version: 1,
+      href: pageHref,
+      patches: serializePatches(state.patches),
+      savedAt: Date.now()
+    };
+
+    chrome.storage.local.set({ [storageKey]: payload }, () => {
+      const lastError = chrome.runtime?.lastError;
+      if (lastError) {
+        logger.warn("Failed to persist page edits", { message: lastError.message });
+        return;
+      }
+      logger.info("Page edits persisted", { key: storageKey, count: payload.patches.length });
+    });
+  }
+
+  function clearPersistedPatches(): void {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) {
+      return;
+    }
+
+    chrome.storage.local.remove(storageKey, () => {
+      const lastError = chrome.runtime?.lastError;
+      if (lastError) {
+        logger.warn("Failed to clear persisted page edits", { message: lastError.message });
+        return;
+      }
+      logger.info("Cleared persisted page edits", { key: storageKey });
+    });
+  }
+
+  function tryRestorePersistedPatches(): void {
+    if (typeof chrome === "undefined" || !chrome.storage?.local) {
+      return;
+    }
+
+    chrome.storage.local.get(storageKey, (result) => {
+      const lastError = chrome.runtime?.lastError;
+      if (lastError) {
+        logger.warn("Failed to load persisted page edits", { message: lastError.message });
+        return;
+      }
+
+      const payload = result?.[storageKey] as PersistedPageEdits | undefined;
+      if (!payload || !Array.isArray(payload.patches) || payload.patches.length === 0) {
+        return;
+      }
+
+      const restoreMessage = labels.active.startsWith("已")
+        ? "检测到此页面有上次保存的 ClickDeck 修改，是否恢复？"
+        : "Found saved ClickDeck edits for this page. Restore now?";
+      const shouldRestore = confirm(restoreMessage);
+      if (!shouldRestore) {
+        return;
+      }
+
+      const hydrated = hydratePersistedPatches(payload.patches, logger);
+      if (hydrated.length === 0) {
+        logger.warn("No persisted patches could be restored");
+        return;
+      }
+
+      // Apply patches in order and rebuild history so undo can step back.
+      for (const patch of hydrated) {
+        applyPatchValue(patch, patch.after);
+        state.patches.push(patch);
+        history.undoStack.push(patch);
+      }
+      history.redoStack.length = 0;
+      refreshHistoryButtons();
+      updateOutline();
+
+      logger.info("Restored persisted page edits", { restored: hydrated.length, total: payload.patches.length });
+    });
+  }
 
   function stopEditing(): void {
     if (!editingElement) {
@@ -61,6 +149,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       history.redoStack.length = 0;
       logger.info("In-place text editing completed", { target: patch.targetDescriptor });
       refreshHistoryButtons();
+      persistPatches();
     }
 
     editingElement = null;
@@ -262,6 +351,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     });
     updateOutline();
     refreshHistoryButtons();
+    persistPatches();
   }
 
   function handlePanelAction(action: PanelAction): void {
@@ -333,6 +423,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       logger.info("Color picker applied", { color: colorValue, target: patch.targetDescriptor });
       updateOutline();
       refreshHistoryButtons();
+      persistPatches();
       return;
     }
 
@@ -377,6 +468,11 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     window.addEventListener("keydown", handleHistoryShortcut, true);
     window.addEventListener("keydown", handleSelectionShortcut, true);
     logger.info("ClickDeck activated");
+
+    // Minimal internal hook for clearing saved edits without adding UI.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).__clickdeckClearSavedEdits = clearPersistedPatches;
+    tryRestorePersistedPatches();
   }
 
   function deactivate(): void {
