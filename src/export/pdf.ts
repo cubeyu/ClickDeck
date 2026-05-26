@@ -63,6 +63,12 @@ export function buildPrintHtml(mode: PdfExportMode, doc: Document): string {
     "[data-clickdeck='true'], #clickdeck-pdf-style, #clickdeck-style"
   ).forEach(el => el.remove());
 
+  // IMPORTANT: Remove all <script> tags.
+  // The cloned HTML is placed into an about:srcdoc iframe. Scripts like Vite's HMR
+  // client or other extensions (e.g., Immersive Translate) will throw errors
+  // (like wss://srcdoc/ws failed) and can hang the print pipeline or cause 0MB PDFs.
+  clone.querySelectorAll("script").forEach(el => el.remove());
+
   let head = clone.querySelector("head");
   if (!head) {
     head = document.createElement("head");
