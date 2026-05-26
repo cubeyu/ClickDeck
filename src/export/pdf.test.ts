@@ -6,7 +6,7 @@ import { buildPrintHtml, exportPdfSnapshot } from "./pdf";
 import type { ClickDeckLogger } from "../diagnostics/logger";
 
 // ---------------------------------------------------------------------------
-// buildPrintHtml — unit tests (pure function, no mocks needed)
+// buildPrintHtml — pure-function unit tests
 // ---------------------------------------------------------------------------
 describe("buildPrintHtml", () => {
   afterEach(() => {
@@ -14,7 +14,7 @@ describe("buildPrintHtml", () => {
     document.body.innerHTML = "";
   });
 
-  it("a4 mode: contains A4 page size and base print CSS", () => {
+  it("a4 mode: contains A4 page size and base print CSS, not 16:9", () => {
     const html = buildPrintHtml("a4", document);
     expect(html).toContain("size: A4");
     expect(html).toContain("margin: 16mm");
@@ -22,7 +22,7 @@ describe("buildPrintHtml", () => {
     expect(html).not.toContain("size: 16in 9in");
   });
 
-  it("slides mode: contains 16:9 @page, .slide constraints, .deck overflow reset, and .nav-dots hide", () => {
+  it("slides mode: contains 16:9 @page, .slide constraints, .deck overflow reset, .nav-dots hide", () => {
     const html = buildPrintHtml("slides", document);
     expect(html).toContain("size: 16in 9in");
     expect(html).toContain("width: 16in !important");
@@ -34,21 +34,15 @@ describe("buildPrintHtml", () => {
     expect(html).toContain("break-inside: avoid");
   });
 
-  it("long-page mode: does NOT include 16:9 slide CSS, but still has base print CSS", () => {
+  it("long-page mode: no 16:9 CSS, base print CSS still present", () => {
     const html = buildPrintHtml("long-page", document);
     expect(html).not.toContain("size: 16in 9in");
     expect(html).not.toContain("width: 16in !important");
     expect(html).toContain("break-inside: avoid");
   });
 
-  it("includes auto-print script", () => {
-    const html = buildPrintHtml("a4", document);
-    expect(html).toContain("window.print()");
-    expect(html).toContain("afterprint");
-  });
-
-  it("removes ClickDeck UI elements from the output", () => {
-    document.body.innerHTML = '<div data-clickdeck="true" id="ui">UI</div><p id="content">Content</p>';
+  it("removes ClickDeck UI elements from output", () => {
+    document.body.innerHTML = '<div data-clickdeck="true">UI</div><p id="content">Content</p>';
     const html = buildPrintHtml("long-page", document);
     expect(html).not.toContain('data-clickdeck="true"');
     expect(html).toContain("Content");
@@ -56,27 +50,47 @@ describe("buildPrintHtml", () => {
 });
 
 // ---------------------------------------------------------------------------
-// exportPdfSnapshot — integration smoke tests
+// exportPdfSnapshot — smoke tests with iframe mock
 // ---------------------------------------------------------------------------
 describe("exportPdfSnapshot", () => {
   let logger: ClickDeckLogger;
-  let openSpy: ReturnType<typeof vi.spyOn>;
+
+  // Minimal iframe stub
+  const mockContentWindow = {
+    print: vi.fn(),
+    addEventListener: vi.fn(),
+  };
+  const mockIframeDoc = {
+    open: vi.fn(),
+    write: vi.fn(),
+    close: vi.fn(),
+  };
 
   beforeEach(() => {
-    logger = {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    };
+    logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     vi.useFakeTimers();
-    // Mock window.open so no real popup is created
-    openSpy = vi.spyOn(window, "open").mockReturnValue(null);
-    // Mock URL.createObjectURL / revokeObjectURL (not available in jsdom)
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn().mockReturnValue("blob:fake-url"),
-      revokeObjectURL: vi.fn(),
+    mockContentWindow.print.mockClear();
+    mockContentWindow.addEventListener.mockClear();
+    mockIframeDoc.open.mockClear();
+    mockIframeDoc.write.mockClear();
+    mockIframeDoc.close.mockClear();
+
+    // Stub createElement to intercept iframe creation
+    const origCreate = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "iframe") {
+        const el = origCreate("div"); // use div as stand-in
+        Object.defineProperty(el, "contentDocument", { get: () => mockIframeDoc });
+        Object.defineProperty(el, "contentWindow", { get: () => mockContentWindow });
+        // Immediately fire load event when listener is added
+        el.addEventListener = (event: string, cb: EventListenerOrEventListenerObject) => {
+          if (event === "load") {
+            Promise.resolve().then(() => (cb as EventListener)(new Event("load")));
+          }
+        };
+        return el as unknown as HTMLIFrameElement;
+      }
+      return origCreate(tag);
     });
   });
 
@@ -87,30 +101,29 @@ describe("exportPdfSnapshot", () => {
     document.body.innerHTML = "";
   });
 
-  it("opens a new window for a4 mode", () => {
+  it("writes HTML into iframe document for a4 mode", async () => {
     exportPdfSnapshot("a4", logger);
-    expect(openSpy).toHaveBeenCalledWith("blob:fake-url", "_blank");
+    await Promise.resolve(); // let load microtask fire
+    expect(mockIframeDoc.write).toHaveBeenCalledWith(expect.stringContaining("size: A4"));
   });
 
-  it("opens a new window for slides mode", () => {
+  it("writes HTML into iframe document for slides mode", async () => {
     exportPdfSnapshot("slides", logger);
-    expect(openSpy).toHaveBeenCalledWith("blob:fake-url", "_blank");
+    await Promise.resolve();
+    expect(mockIframeDoc.write).toHaveBeenCalledWith(expect.stringContaining("16in 9in"));
   });
 
-  it("opens a new window for long-page mode", () => {
+  it("writes HTML into iframe document for long-page mode", async () => {
     exportPdfSnapshot("long-page", logger);
-    expect(openSpy).toHaveBeenCalledWith("blob:fake-url", "_blank");
+    await Promise.resolve();
+    expect(mockIframeDoc.open).toHaveBeenCalled();
+    expect(mockIframeDoc.write).toHaveBeenCalled();
+    expect(mockIframeDoc.close).toHaveBeenCalled();
   });
 
-  it("logs a warning when popup is blocked", () => {
-    openSpy.mockReturnValue(null);
+  it("calls contentWindow.print() after load", async () => {
     exportPdfSnapshot("a4", logger);
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining("blocked"));
-  });
-
-  it("revokes the blob URL after 30 seconds", () => {
-    exportPdfSnapshot("a4", logger);
-    vi.advanceTimersByTime(30_000);
-    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:fake-url");
+    await Promise.resolve();
+    expect(mockContentWindow.print).toHaveBeenCalled();
   });
 });

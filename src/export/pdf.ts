@@ -4,9 +4,7 @@ export type PdfExportMode = "long-page" | "a4" | "slides";
 
 function buildModeCss(mode: PdfExportMode): string {
   if (mode === "a4") {
-    return `
-      @page { size: A4; margin: 16mm; }
-    `.trim();
+    return "@page { size: A4; margin: 16mm; }";
   }
   if (mode === "slides") {
     return `
@@ -32,14 +30,10 @@ function buildModeCss(mode: PdfExportMode): string {
           break-after: auto !important; page-break-after: auto !important;
         }
         .nav-dots, .nav-dot { display: none !important; }
-        * {
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       }
     `.trim();
   }
-  // long-page: relies on default browser behavior
   return "";
 }
 
@@ -61,38 +55,27 @@ const BASE_PRINT_CSS = `
 export function buildPrintHtml(mode: PdfExportMode, doc: Document): string {
   const clone = doc.documentElement.cloneNode(true) as HTMLElement;
 
-  // Remove ClickDeck UI elements and any previously injected styles
+  // Remove ClickDeck UI and any previously injected print styles
   clone.querySelectorAll(
     "[data-clickdeck='true'], #clickdeck-pdf-style, #clickdeck-style"
   ).forEach(el => el.remove());
 
-  // Ensure <head> exists
   let head = clone.querySelector("head");
   if (!head) {
     head = document.createElement("head");
     clone.insertBefore(head, clone.firstChild);
   }
 
-  // Inject <base> tag so relative URLs (images, CSS) resolve correctly
+  // <base> tag so relative URLs resolve against the original page
   const baseEl = document.createElement("base");
   baseEl.href = doc.location?.href ?? "";
   head.prepend(baseEl);
 
-  // Inject combined print CSS
+  // Inject print CSS
   const css = [buildModeCss(mode), BASE_PRINT_CSS].filter(Boolean).join("\n");
   const styleEl = document.createElement("style");
   styleEl.textContent = css;
   head.appendChild(styleEl);
-
-  // Inject auto-print script; closes the window after the dialog is dismissed
-  const scriptEl = document.createElement("script");
-  scriptEl.textContent = [
-    "window.addEventListener('load', function () {",
-    "  window.print();",
-    "  window.addEventListener('afterprint', function () { window.close(); });",
-    "});"
-  ].join("\n");
-  head.appendChild(scriptEl);
 
   const doctype = doc.doctype
     ? `<!DOCTYPE ${doc.doctype.name}>`
@@ -101,12 +84,16 @@ export function buildPrintHtml(mode: PdfExportMode, doc: Document): string {
 }
 
 /**
- * Opens the current page in a new popup window with print CSS embedded,
- * then auto-triggers the browser print dialog from that window.
+ * Prints by writing into a hidden iframe.
  *
- * Each invocation creates a fresh window, so there is no shared print-pipeline
- * state between successive exports — the root cause of the "corrupted PDF on
- * second export" bug when using executeScript + window.print().
+ * Why iframe instead of window.open() or executeScript + window.print():
+ *  - window.open(): Chrome blocks auto window.print() in popups (non-user-gesture), → 0 MB PDF.
+ *  - executeScript + same-tab window.print(): Chrome's print pipeline retains state after the
+ *    first dialog; the second call corrupts the generated PDF.
+ *  - Hidden iframe: each call creates a fresh iframe document written directly, with no
+ *    cross-origin restrictions and no state shared across invocations.
+ *    iframe.contentWindow.print() IS treated as a user-gesture-proxied call because
+ *    it originates from the same user action that triggered the content script handler.
  */
 export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger): void {
   logger.info("PDF export note: enable background graphics/colors in the print dialog for best results.");
@@ -114,16 +101,39 @@ export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger):
 
   try {
     const html = buildPrintHtml(mode, document);
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
 
-    const printWin = window.open(url, "_blank");
-    if (!printWin) {
-      logger.warn("PDF export: the browser blocked the print popup. Please allow popups for this page and try again.");
+    // Create a hidden iframe
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("data-clickdeck", "true"); // so HTML export skips it
+    iframe.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;border:none;opacity:0;";
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument;
+    if (!iframeDoc) {
+      logger.error("PDF export: could not access iframe document");
+      iframe.remove();
+      return;
     }
 
-    // Revoke the blob URL after 30 s — the window should have printed by then
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    // Write the content directly — bypasses all blob/cross-origin restrictions
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+
+    // Wait for the iframe to finish loading, then print it
+    iframe.addEventListener("load", () => {
+      try {
+        iframe.contentWindow?.print();
+      } catch (printErr) {
+        logger.error("PDF export: iframe print failed", { printErr });
+      }
+      // Clean up after the dialog is dismissed
+      const cleanup = () => iframe.remove();
+      iframe.contentWindow?.addEventListener("afterprint", cleanup, { once: true });
+      // Safety fallback in case afterprint never fires
+      setTimeout(cleanup, 60_000);
+    }, { once: true });
+
   } catch (err) {
     logger.error("PDF export failed", { err });
   }
