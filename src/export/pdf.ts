@@ -105,13 +105,16 @@ export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger):
   // The correct MV3 approach: ask the background service worker to call window.print()
   // via chrome.scripting.executeScript({ world: "MAIN" }), which bypasses both limitations.
   //
-  // We use requestAnimationFrame to let the browser apply the injected @page CSS
-  // before handing control to the background for printing.
-  requestAnimationFrame(() => {
+  // We use setTimeout instead of requestAnimationFrame to give the browser 
+  // ample time to parse and apply the new CSS. The service worker IPC can be 
+  // very fast on subsequent runs, and calling window.print() before the layout 
+  // is updated can corrupt the PDF generation in Chrome.
+  setTimeout(() => {
     chrome.runtime.sendMessage({ type: "CLICKDECK_PRINT" });
-    // The cleanup of this style element is securely handled by the background service worker.
-    // It injects an 'afterprint' event listener into the MAIN world right before calling window.print().
-    // This ensures the CSS is removed ONLY after the print dialog is completely closed,
-    // avoiding the race condition that corrupts PDFs if the DOM is modified during PDF generation.
-  });
+    // We intentionally DO NOT remove the style element here or via afterprint.
+    // Removing the style element during or immediately after the print dialog
+    // can cause layout recalculations that corrupt the resulting PDF file.
+    // The CSS is strictly isolated to @media print and @page, so it is safe to leave in the DOM.
+    // It will be cleaned up the next time exportPdfSnapshot is called.
+  }, 250);
 }
