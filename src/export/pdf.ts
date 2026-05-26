@@ -139,11 +139,25 @@ export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger):
       } catch (printErr) {
         logger.error("PDF export: iframe print failed", { printErr });
       }
-      // Clean up after the dialog is dismissed
-      const cleanup = () => iframe.remove();
-      iframe.contentWindow?.addEventListener("afterprint", cleanup, { once: true });
-      // Safety fallback in case afterprint never fires (e.g. user cancelled)
-      setTimeout(cleanup, 60_000);
+
+      // IMPORTANT: Do NOT remove the iframe immediately on afterprint.
+      // Chrome fires afterprint when the print dialog CLOSES, not when the PDF file
+      // is finished being written to disk. Removing the iframe too early causes
+      // Chrome to lose the document reference mid-write, producing a 0 MB file.
+      // Edge fires afterprint after the file is written (hence the delay users notice).
+      // We delay removal by 30 s to give Chrome enough time to complete the write.
+      let cleaned = false;
+      const cleanup = () => {
+        if (!cleaned) {
+          cleaned = true;
+          iframe.remove();
+        }
+      };
+      iframe.contentWindow?.addEventListener("afterprint", () => {
+        setTimeout(cleanup, 30_000);
+      }, { once: true });
+      // Hard fallback: remove after 3 minutes regardless
+      setTimeout(cleanup, 180_000);
     }, { once: true });
 
   } catch (err) {
