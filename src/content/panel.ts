@@ -384,7 +384,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
                 <button class="clickdeck-button${currentLang === "zh" ? " clickdeck-button--active" : ""}" data-lang="zh" type="button">${labels.promptLangZh}</button>
               </div>
             </div>
-            ${options.hasImageReplacement ? `<div class="clickdeck-prompt-modal__warning" style="margin: 8px 16px 0; padding: 10px; background: #fff1f0; border-left: 4px solid #ff4d4f; color: #cf1322; font-size: 13px; line-height: 1.4; border-radius: 4px;">${labels.promptImageUIReminder}</div>` : ""}
+            ${options.hasImageReplacement ? `<div class="clickdeck-prompt-modal__warning">${labels.promptImageUIReminder}</div>` : ""}
             <textarea class="clickdeck-prompt-modal__textarea">${escapeHtml(promptText)}</textarea>
             <div class="clickdeck-prompt-modal__footer">
               <button class="clickdeck-button clickdeck-button--primary" data-prompt-action="copy" type="button">${labels.promptCopy}</button>

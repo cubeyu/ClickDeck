@@ -322,14 +322,13 @@ function injectBaseStyles(rootId: string): void {
     }
 
     .clickdeck-prompt-overlay {
-      position: absolute;
+      position: fixed;
       inset: 0;
       background: rgba(62, 45, 32, 0.45);
-      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 10;
+      z-index: 10000;
     }
 
     .clickdeck-prompt-modal {
@@ -337,7 +336,8 @@ function injectBaseStyles(rootId: string): void {
       border: 1px solid #e8d5b0;
       border-radius: 10px;
       padding: 14px;
-      width: calc(100% - 24px);
+      width: min(760px, calc(100vw - 32px));
+      max-height: min(760px, calc(100vh - 32px));
       display: flex;
       flex-direction: column;
       gap: 10px;
@@ -358,24 +358,35 @@ function injectBaseStyles(rootId: string): void {
     }
 
     .clickdeck-prompt-modal__lang {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(72px, 1fr));
       gap: 4px;
     }
 
     .clickdeck-prompt-modal__textarea {
       width: 100%;
-      min-height: 160px;
-      max-height: 280px;
+      min-height: 320px;
+      max-height: calc(100vh - 220px);
       padding: 8px;
       border: 1px solid #e8d5b0;
       border-radius: 6px;
       background: #fff;
       color: #3d2f24;
-      font-size: 11px;
+      font-size: 13px;
       font-family: "Menlo", "Consolas", monospace;
       line-height: 1.5;
       resize: vertical;
       box-sizing: border-box;
+    }
+
+    .clickdeck-prompt-modal__warning {
+      padding: 10px;
+      background: #fff1f0;
+      border-left: 4px solid #ff4d4f;
+      color: #cf1322;
+      font-size: 13px;
+      line-height: 1.4;
+      border-radius: 4px;
     }
 
     .clickdeck-prompt-modal__textarea:focus {
