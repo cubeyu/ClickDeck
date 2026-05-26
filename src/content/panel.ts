@@ -49,14 +49,22 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
   element.className = "clickdeck-panel";
   element.dataset.clickdeck = "true";
   element.innerHTML = `
-    <div class="clickdeck-panel__header">
-      <span class="clickdeck-panel__title">
-        <img class="clickdeck-panel__logo" src="${logoUrl}" alt="" />
-        <span>ClickDeck</span>
-        <span class="clickdeck-panel__status">${labels.active}</span>
-      </span>
-      <button class="clickdeck-button clickdeck-button--icon" data-action="close" type="button" aria-label="${labels.close}" title="${labels.close}">✕</button>
+    <div class="clickdeck-panel__floating-button" data-internal-action="restore" title="${labels.restorePanel}" aria-label="${labels.restorePanel}">
+      <img src="${logoUrl}" alt="ClickDeck" />
     </div>
+    <div class="clickdeck-panel__content-wrapper">
+      <div class="clickdeck-panel__header">
+        <span class="clickdeck-panel__title">
+          <img class="clickdeck-panel__logo" src="${logoUrl}" alt="" />
+          <span>ClickDeck</span>
+          <span class="clickdeck-panel__status">${labels.active}</span>
+        </span>
+        <span class="clickdeck-panel__header-actions">
+          <button class="clickdeck-button clickdeck-button--icon" data-internal-action="transparency" type="button" aria-label="${labels.transparency}" title="${labels.transparency}">◐</button>
+          <button class="clickdeck-button clickdeck-button--icon" data-internal-action="collapse" type="button" aria-label="${labels.collapse}" title="${labels.collapse}">−</button>
+          <button class="clickdeck-button clickdeck-button--icon" data-action="close" type="button" aria-label="${labels.close}" title="${labels.close}">✕</button>
+        </span>
+      </div>
     <div class="clickdeck-panel__hint">${labels.selectHint}</div>
     <div class="clickdeck-panel__section" data-section="typography" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.typography}</div>
@@ -184,10 +192,34 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("copy-diagnostics", labels.copyDiagnostics)}
       </div>
     </div>
+    </div>
+    </div>
   `;
 
   element.addEventListener("click", (event) => {
-    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
+    const target = event.target as HTMLElement;
+    const internalButton = target.closest<HTMLButtonElement | HTMLDivElement>("[data-internal-action]");
+    
+    if (internalButton) {
+      const action = internalButton.dataset.internalAction;
+      if (action === "collapse") {
+        element.classList.add("clickdeck-panel--collapsed");
+      } else if (action === "restore") {
+        element.classList.remove("clickdeck-panel--collapsed");
+      } else if (action === "transparency") {
+        if (element.classList.contains("clickdeck-panel--opacity-70")) {
+          element.classList.remove("clickdeck-panel--opacity-70");
+          element.classList.add("clickdeck-panel--opacity-40");
+        } else if (element.classList.contains("clickdeck-panel--opacity-40")) {
+          element.classList.remove("clickdeck-panel--opacity-40");
+        } else {
+          element.classList.add("clickdeck-panel--opacity-70");
+        }
+      }
+      return;
+    }
+
+    const button = target.closest<HTMLButtonElement>("[data-action]");
     if (!button) {
       return;
     }
@@ -204,26 +236,34 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
 
   // --- Drag logic start ---
   const header = element.querySelector<HTMLElement>(".clickdeck-panel__header");
-  if (header) {
+  const floatingBtn = element.querySelector<HTMLElement>(".clickdeck-panel__floating-button");
+  
+  if (header && floatingBtn) {
     let isDragging = false;
     let offsetX = 0;
     let offsetY = 0;
+    let hasMoved = false;
 
-    header.addEventListener("mousedown", (e: MouseEvent) => {
+    const onMouseDown = (e: MouseEvent) => {
       // Ignore if clicking a button inside the header
       if ((e.target as HTMLElement).closest("button")) {
         return;
       }
       isDragging = true;
+      hasMoved = false;
       offsetX = e.clientX - element.getBoundingClientRect().left;
       offsetY = e.clientY - element.getBoundingClientRect().top;
       e.preventDefault();
-    });
+    };
+
+    header.addEventListener("mousedown", onMouseDown);
+    floatingBtn.addEventListener("mousedown", onMouseDown);
 
     window.addEventListener("mousemove", (e: MouseEvent) => {
       if (!isDragging) {
         return;
       }
+      hasMoved = true;
       const x = e.clientX - offsetX;
       const y = e.clientY - offsetY;
       element.style.left = `${x}px`;
@@ -234,6 +274,14 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
     window.addEventListener("mouseup", () => {
       isDragging = false;
     });
+
+    // Prevent click on floating button if we were dragging
+    floatingBtn.addEventListener("click", (e: MouseEvent) => {
+      if (hasMoved) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    }, { capture: true });
   }
   // --- Drag logic end ---
 

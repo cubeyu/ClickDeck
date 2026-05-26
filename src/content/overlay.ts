@@ -88,6 +88,56 @@ function injectBaseStyles(rootId: string): void {
       max-height: calc(100vh - 32px);
       overflow-y: auto;
       pointer-events: auto;
+      transition: opacity 0.2s ease, width 0.2s ease, height 0.2s ease, padding 0.2s ease, border-radius 0.2s ease;
+    }
+
+    .clickdeck-panel--collapsed {
+      width: 48px;
+      height: 48px;
+      padding: 0;
+      border-radius: 24px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: grab;
+    }
+
+    .clickdeck-panel--collapsed:active {
+      cursor: grabbing;
+    }
+
+    .clickdeck-panel--collapsed .clickdeck-panel__content-wrapper,
+    .clickdeck-panel--collapsed .clickdeck-notice {
+      display: none !important;
+    }
+
+    .clickdeck-panel__floating-button {
+      display: none;
+    }
+
+    .clickdeck-panel--collapsed .clickdeck-panel__floating-button {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+      cursor: inherit;
+    }
+
+    .clickdeck-panel__floating-button img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .clickdeck-panel--opacity-70 {
+      opacity: 0.7;
+    }
+
+    .clickdeck-panel--opacity-40 {
+      opacity: 0.4;
     }
 
     .clickdeck-panel__header {
@@ -100,6 +150,11 @@ function injectBaseStyles(rootId: string): void {
 
     .clickdeck-panel__header:active {
       cursor: grabbing;
+    }
+
+    .clickdeck-panel__header-actions {
+      display: flex;
+      gap: 4px;
     }
 
     .clickdeck-panel__title {

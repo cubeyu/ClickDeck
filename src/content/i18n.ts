@@ -61,6 +61,9 @@ export type PanelLabels = {
   restore: string;
   dismiss: string;
   clear: string;
+  collapse: string;
+  restorePanel: string;
+  transparency: string;
 };
 
 const englishLabels: PanelLabels = {
@@ -125,7 +128,10 @@ const englishLabels: PanelLabels = {
   savedEditsFound: "Saved edits found",
   restore: "Restore",
   dismiss: "Dismiss",
-  clear: "Clear"
+  clear: "Clear",
+  collapse: "Collapse",
+  restorePanel: "Restore Panel",
+  transparency: "Transparency"
 };
 
 const chineseLabels: PanelLabels = {
@@ -190,7 +196,10 @@ const chineseLabels: PanelLabels = {
   savedEditsFound: "发现已保存的修改",
   restore: "恢复",
   dismiss: "忽略",
-  clear: "清空"
+  clear: "清空",
+  collapse: "折叠",
+  restorePanel: "展开",
+  transparency: "透明度"
 };
 
 export function getPanelLabels(): PanelLabels {

@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http";
+import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { AddressInfo } from "node:net";
@@ -255,5 +255,53 @@ test.describe("ClickDeck core editing workflows", () => {
     
     // Notice should be gone
     await expect(notice).toBeHidden();
+  });
+
+  test("7. Panel collapse and transparency", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    const root = page.locator("#clickdeck-root");
+    const panel = root.locator(".clickdeck-panel");
+    const content = panel.locator(".clickdeck-panel__content-wrapper");
+    const floatBtn = panel.locator(".clickdeck-panel__floating-button");
+
+    // Initially, content is visible, float btn is hidden
+    await expect(content).toBeVisible();
+    await expect(floatBtn).toBeHidden();
+    await expect(panel).not.toHaveClass(/clickdeck-panel--collapsed/);
+
+    // Click transparency twice
+    const transBtn = panel.locator("[data-internal-action='transparency']");
+    await transBtn.click();
+    await expect(panel).toHaveClass(/clickdeck-panel--opacity-70/);
+    await transBtn.click();
+    await expect(panel).toHaveClass(/clickdeck-panel--opacity-40/);
+    await transBtn.click();
+    await expect(panel).not.toHaveClass(/clickdeck-panel--opacity-70/);
+    await expect(panel).not.toHaveClass(/clickdeck-panel--opacity-40/);
+
+    // Click collapse
+    await panel.locator("[data-internal-action='collapse']").click();
+    await expect(panel).toHaveClass(/clickdeck-panel--collapsed/);
+    // Use evaluate to check display:none because playwright's toBeHidden might check bounding box, but floatBtn is visible inside it.
+    await expect(content).not.toBeVisible();
+    await expect(floatBtn).toBeVisible();
+
+    // Verify keyboard tools still work while collapsed
+    const heading = page.getByRole("heading", { name: "Quarterly Product Review" });
+    await heading.click();
+    
+    // Select and press Esc
+    await page.keyboard.press("Escape");
+    await page.mouse.move(0, 0); // Move mouse away
+    const outline = root.locator(".clickdeck-outline");
+    await expect(outline).toBeHidden(); // Esc works!
+
+    // Click floating button to restore
+    await floatBtn.click();
+    await expect(panel).not.toHaveClass(/clickdeck-panel--collapsed/);
+    await expect(content).toBeVisible();
+    await expect(floatBtn).toBeHidden();
   });
 });
