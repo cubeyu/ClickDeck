@@ -18,7 +18,7 @@ import { createEditHistory } from "../state/history";
 import { canAutoStartTextEditing, createElementLocator, describeElement } from "./dom-utils";
 import { getPanelLabels } from "./i18n";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
-import { createPanel, type ClickDeckPanel, type PanelAction } from "./panel";
+import { createPanel, type ClickDeckPanel, type PanelAction, type SelectionContext } from "./panel";
 import { getEditableTarget, getTabSwitchTarget } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
@@ -43,6 +43,25 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let originalText: string = "";
   const pageHref = window.location.href;
   const storageKey = buildStorageKey(pageHref);
+  const textTags = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "a", "li", "strong", "em"]);
+  const containerTags = new Set(["div", "section", "article", "main", "header", "footer", "nav", "aside"]);
+
+  function getSelectionContext(target: HTMLElement | null): SelectionContext {
+    if (!target) {
+      return "none";
+    }
+    const tag = target.tagName.toLowerCase();
+    if (tag === "img") {
+      return "image";
+    }
+    if (textTags.has(tag) || canAutoStartTextEditing(target)) {
+      return "text";
+    }
+    if (containerTags.has(tag)) {
+      return "container";
+    }
+    return "container";
+  }
 
   function getEffectivePatches(): EditorPatch[] {
     // Effective edits are exactly the patches currently in the undo stack.
@@ -269,6 +288,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     setSelectedElement(state, { element: target, descriptor });
     panel?.setHint(descriptor);
     panel?.setReplaceImageAvailability(target.tagName.toLowerCase() === "img");
+    panel?.setSelectionContext(getSelectionContext(target));
 
     // Only auto-start in-place text editing for text-like elements.
     // Non-text elements (img/button/input/...) must not be forced into contenteditable.
@@ -292,6 +312,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     setSelectedElement(state, null);
     panel?.setHint(labels.selectHint);
     panel?.setReplaceImageAvailability(false);
+    panel?.setSelectionContext("none");
     updateOutline();
     logger.info("Selection cleared", { reason });
   }
@@ -303,6 +324,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     setSelectedElement(state, { element: target, descriptor });
     panel?.setHint(descriptor);
     panel?.setReplaceImageAvailability(target.tagName.toLowerCase() === "img");
+    panel?.setSelectionContext(getSelectionContext(target));
     updateOutline();
     logger.info("Element selected", { descriptor, reason });
   }
@@ -589,6 +611,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     overlay.root.append(panel.element);
     refreshHistoryButtons();
     panel.setReplaceImageAvailability(false);
+    panel.setSelectionContext("none");
 
     window.addEventListener("mousemove", handleMouseMove, true);
     window.addEventListener("click", handleClick, true);
@@ -612,6 +635,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     selectedElement = null;
     setSelectedElement(state, null);
     panel?.setReplaceImageAvailability(false);
+    panel?.setSelectionContext("none");
 
     window.removeEventListener("mousemove", handleMouseMove, true);
     window.removeEventListener("click", handleClick, true);

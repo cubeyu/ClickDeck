@@ -21,18 +21,21 @@ export type PromptPreviewOptions = {
   onCopy: (value: string, lang: "en" | "zh") => void;
 };
 
+export type SelectionContext = "none" | "text" | "image" | "container";
+
 export type ClickDeckPanel = {
   element: HTMLDivElement;
   destroy: () => void;
   setHint: (text: string) => void;
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void;
   setReplaceImageAvailability: (enabled: boolean) => void;
+  setSelectionContext: (context: SelectionContext) => void;
   showPromptPreview: (options: PromptPreviewOptions) => void;
 };
 
 export function createPanel(onAction: (action: PanelAction) => void): ClickDeckPanel {
   const labels = getPanelLabels();
-  const logoUrl = chrome.runtime.getURL("brand/logo2-panel.png");
+  const logoUrl = typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("brand/logo2-panel.png") : "brand/logo2-panel.png";
   const element = document.createElement("div");
   element.className = "clickdeck-panel";
   element.dataset.clickdeck = "true";
@@ -46,14 +49,14 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       <button class="clickdeck-button clickdeck-button--icon" data-action="close" type="button" aria-label="${labels.close}" title="${labels.close}">✕</button>
     </div>
     <div class="clickdeck-panel__hint">${labels.selectHint}</div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="typography" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.typography}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("font-smaller", "A-")}
         ${buttonMarkup("font-larger", "A+")}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="weight" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.weight}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("weight-light", labels.light)}
@@ -61,7 +64,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("weight-bold", labels.bold)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="line-height" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.lineHeight}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("lineheight-compact", labels.compact)}
@@ -69,7 +72,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("lineheight-loose", labels.loose)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="letter-spacing" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.letterSpacing}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("letterspacing-tight", labels.tight)}
@@ -77,7 +80,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("letterspacing-wide", labels.wide)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="alignment" data-context="text,container">
       <div class="clickdeck-panel__section-title">${labels.alignment}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("align-left", labels.left)}
@@ -85,7 +88,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("align-right", labels.right)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="color" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.color}</div>
       <div class="clickdeck-panel__group">
         <input type="color" class="clickdeck-color-picker" value="#2563eb" title="${labels.pickColor}" />
@@ -93,7 +96,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         <button class="clickdeck-button" data-action="reset-color" type="button">${labels.reset}</button>
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="background" data-context="container">
       <div class="clickdeck-panel__section-title">${labels.background}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("bg-warm", labels.warm)}
@@ -102,7 +105,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("bg-reset", labels.reset)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="radius" data-context="container">
       <div class="clickdeck-panel__section-title">${labels.radius}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("radius-none", labels.none)}
@@ -111,41 +114,41 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("radius-lg", labels.large)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="spacing" data-context="text,container,image">
       <div class="clickdeck-panel__section-title">${labels.spacing}</div>
-      <div class="clickdeck-panel__group">
+      <div class="clickdeck-panel__group" data-spacing-group="margin">
         ${buttonMarkup("margin-compact", `${labels.margin} ${labels.compact}`)}
         ${buttonMarkup("margin-normal", `${labels.margin} ${labels.normal}`)}
         ${buttonMarkup("margin-loose", `${labels.margin} ${labels.loose}`)}
       </div>
-      <div class="clickdeck-panel__group">
+      <div class="clickdeck-panel__group" data-spacing-group="padding">
         ${buttonMarkup("padding-compact", `${labels.padding} ${labels.compact}`)}
         ${buttonMarkup("padding-normal", `${labels.padding} ${labels.normal}`)}
         ${buttonMarkup("padding-loose", `${labels.padding} ${labels.loose}`)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="history" data-context="text,container,image">
       <div class="clickdeck-panel__section-title">${labels.history}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("undo", labels.undo, true)}
         ${buttonMarkup("redo", labels.redo, true)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
-      <div class="clickdeck-panel__section-title">${labels.exportHtml}</div>
+    <div class="clickdeck-panel__section" data-section="finish">
+      <div class="clickdeck-panel__section-title">${labels.finish}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("export-html", labels.export)}
       </div>
-    </div>
-    <div class="clickdeck-panel__section">
-      <div class="clickdeck-panel__section-title">${labels.exportPdf}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("export-pdf-long", labels.long)}
         ${buttonMarkup("export-pdf-a4", "A4")}
         ${buttonMarkup("export-pdf-slides", "16:9")}
       </div>
+      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
+        ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
+      </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="image" data-context="image">
       <div class="clickdeck-panel__section-title">${labels.image}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("replace-image", labels.replaceImage, true)}
@@ -166,16 +169,10 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("image-radius-round", labels.round)}
       </div>
     </div>
-    <div class="clickdeck-panel__section">
+    <div class="clickdeck-panel__section" data-section="diagnostics">
       <div class="clickdeck-panel__section-title">${labels.diagnostics}</div>
       <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
         ${buttonMarkup("copy-diagnostics", labels.copyDiagnostics)}
-      </div>
-    </div>
-    <div class="clickdeck-panel__section">
-      <div class="clickdeck-panel__section-title">${labels.ai}</div>
-      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
-        ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
       </div>
     </div>
   `;
@@ -231,6 +228,50 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
   }
   // --- Drag logic end ---
 
+  let undoAvailable = false;
+  let redoAvailable = false;
+  let canReplaceImage = false;
+  let currentContext: SelectionContext = "none";
+
+  const updateContextUI = (): void => {
+    element.querySelectorAll<HTMLElement>(".clickdeck-panel__section[data-context]").forEach((section) => {
+      const allowedContexts = (section.dataset.context ?? "").split(",").map((value) => value.trim());
+      section.hidden = !allowedContexts.includes(currentContext);
+    });
+
+    const paddingGroup = element.querySelector<HTMLElement>("[data-spacing-group='padding']");
+    if (paddingGroup) {
+      paddingGroup.hidden = currentContext === "image";
+    }
+
+    const colorPickerEl = element.querySelector<HTMLInputElement>(".clickdeck-color-picker");
+    if (colorPickerEl) {
+      colorPickerEl.disabled = currentContext !== "text";
+    }
+
+    element.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
+      const action = button.dataset.action as PanelAction;
+      if (action === "close" || action === "copy-diagnostics" || action === "copy-ai-prompt" || action === "export-html" || action.startsWith("export-pdf-")) {
+        return;
+      }
+      if (action === "undo") {
+        button.disabled = currentContext === "none" || !undoAvailable;
+        return;
+      }
+      if (action === "redo") {
+        button.disabled = currentContext === "none" || !redoAvailable;
+        return;
+      }
+      if (action === "replace-image") {
+        button.disabled = currentContext !== "image" || !canReplaceImage;
+        return;
+      }
+      button.disabled = currentContext === "none";
+    });
+  };
+
+  updateContextUI();
+
   return {
     element,
     destroy: () => {
@@ -243,20 +284,17 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       }
     },
     setHistoryAvailability: (canUndo, canRedo) => {
-      const undoButton = element.querySelector<HTMLButtonElement>("[data-action='undo']");
-      const redoButton = element.querySelector<HTMLButtonElement>("[data-action='redo']");
-      if (undoButton) {
-        undoButton.disabled = !canUndo;
-      }
-      if (redoButton) {
-        redoButton.disabled = !canRedo;
-      }
+      undoAvailable = canUndo;
+      redoAvailable = canRedo;
+      updateContextUI();
     },
     setReplaceImageAvailability: (enabled) => {
-      const replaceButton = element.querySelector<HTMLButtonElement>("[data-action='replace-image']");
-      if (replaceButton) {
-        replaceButton.disabled = !enabled;
-      }
+      canReplaceImage = enabled;
+      updateContextUI();
+    },
+    setSelectionContext: (context) => {
+      currentContext = context;
+      updateContextUI();
     },
     showPromptPreview: (options: PromptPreviewOptions) => {
       // Remove any existing preview

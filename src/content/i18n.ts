@@ -56,6 +56,7 @@ export type PanelLabels = {
   promptCopy: string;
   promptCopied: string;
   promptClose: string;
+  finish: string;
 };
 
 const englishLabels: PanelLabels = {
@@ -115,7 +116,8 @@ const englishLabels: PanelLabels = {
   promptLangZh: "中文",
   promptCopy: "Copy",
   promptCopied: "Copied!",
-  promptClose: "Close"
+  promptClose: "Close",
+  finish: "Finish"
 };
 
 const chineseLabels: PanelLabels = {
@@ -175,7 +177,8 @@ const chineseLabels: PanelLabels = {
   promptLangZh: "中文",
   promptCopy: "复制",
   promptCopied: "已复制！",
-  promptClose: "关闭"
+  promptClose: "关闭",
+  finish: "完成"
 };
 
 export function getPanelLabels(): PanelLabels {
