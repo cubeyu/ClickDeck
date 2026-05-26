@@ -146,4 +146,115 @@ describe("buildAiEditPrompt", () => {
       expect(resultZh.prompt).toContain("所属页面/Slide: Slide 4");
     }
   });
+
+  it("squashes multiple fontSize changes on the same element into one", () => {
+    document.body.innerHTML = `<main><h1 id="t">Hello</h1></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const baseLocator = { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 };
+    
+    const patch1: StylePatch = { id: "1", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "16px", after: "18px", createdAt: 1 };
+    const patch2: StylePatch = { id: "2", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "18px", after: "20px", createdAt: 2 };
+    const patch3: StylePatch = { id: "3", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "20px", after: "22px", createdAt: 3 };
+
+    const result = buildAiEditPrompt([patch1, patch2, patch3], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain('fontSize changed from "16px" to "22px"');
+      expect(result.prompt).not.toContain("18px");
+      expect(result.prompt).not.toContain("20px");
+    }
+  });
+
+  it("groups fontSize and color changes under the same target number", () => {
+    document.body.innerHTML = `<main><h1 id="t">Hello</h1></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const baseLocator = { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 };
+    
+    const patch1: StylePatch = { id: "1", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "16px", after: "20px", createdAt: 1 };
+    const patch2: StylePatch = { id: "2", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "color", before: "#222", after: "#fff", createdAt: 2 };
+
+    const result = buildAiEditPrompt([patch1, patch2], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt.match(/^1\. Target:/gm)).toHaveLength(1);
+      expect(result.prompt.match(/^2\. Target:/gm)).toBeNull();
+      expect(result.prompt).toContain("Style: fontSize changed");
+      expect(result.prompt).toContain("Style: color changed");
+    }
+  });
+
+  it("does not output a property if it was changed and then changed back to original", () => {
+    document.body.innerHTML = `<main><h1 id="t">Hello</h1></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const baseLocator = { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 };
+    
+    const patch1: StylePatch = { id: "1", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "16px", after: "18px", createdAt: 1 };
+    const patch2: StylePatch = { id: "2", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "18px", after: "16px", createdAt: 2 };
+
+    const result = buildAiEditPrompt([patch1, patch2], PAGE_EN);
+    expect(result.ok).toBe(false);
+  });
+
+  it("squashes multiple text changes into one and hides intermediate changes", () => {
+    document.body.innerHTML = `<main><h1 id="t">Hello</h1></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const baseLocator = { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 };
+    
+    const patch1: ContentPatch = { id: "1", kind: "content", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, before: "old", after: "mid", createdAt: 1 };
+    const patch2: ContentPatch = { id: "2", kind: "content", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, before: "mid", after: "new", createdAt: 2 };
+
+    const result = buildAiEditPrompt([patch1, patch2], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain('Text changed from "old" to "new"');
+      expect(result.prompt).not.toContain("mid");
+    }
+  });
+
+  it("squashes multiple image replacements and keeps data URL hidden", () => {
+    document.body.innerHTML = `<main><img id="img" src="a.png" /></main>`;
+    const el = document.getElementById("img") as HTMLImageElement;
+    const baseLocator = { descriptor: "img #img", tagName: "img", cssPath: "#img", nthOfTypePath: "img:nth-of-type(1)", siblingIndex: 0 };
+
+    const patch1: AttributePatch = { id: "1", kind: "attribute", targetElement: el, targetDescriptor: "img#img", targetLocator: baseLocator, attribute: "src", before: "a.png", after: "data:image/png;base64,111", createdAt: 1 };
+    const patch2: AttributePatch = { id: "2", kind: "attribute", targetElement: el, targetDescriptor: "img#img", targetLocator: baseLocator, attribute: "src", before: "data:image/png;base64,111", after: "data:image/png;base64,222", createdAt: 2 };
+
+    const result = buildAiEditPrompt([patch1, patch2], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain('Attribute: src should be replaced with "[data URL image]"');
+      expect(result.prompt).not.toContain("data:image/png;base64");
+    }
+  });
+
+  it("outputs two numbered targets for changes on different elements", () => {
+    document.body.innerHTML = `<main><h1 id="t1">1</h1><h1 id="t2">2</h1></main>`;
+    const el1 = document.getElementById("t1") as HTMLElement;
+    const el2 = document.getElementById("t2") as HTMLElement;
+    
+    const patch1: StylePatch = { id: "1", kind: "style", targetElement: el1, targetDescriptor: "h1#t1", targetLocator: { descriptor: "h1", tagName: "h1", cssPath: "#t1", nthOfTypePath: "h1", siblingIndex: 0 }, property: "fontSize", before: "16px", after: "20px", createdAt: 1 };
+    const patch2: StylePatch = { id: "2", kind: "style", targetElement: el2, targetDescriptor: "h1#t2", targetLocator: { descriptor: "h1", tagName: "h1", cssPath: "#t2", nthOfTypePath: "h2", siblingIndex: 1 }, property: "fontSize", before: "16px", after: "20px", createdAt: 2 };
+
+    const result = buildAiEditPrompt([patch1, patch2], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt.match(/^\d+\. Target:/gm)).toHaveLength(2);
+    }
+  });
+
+  it("groups and squashes Chinese prompt correctly", () => {
+    document.body.innerHTML = `<main><h1 id="t">Hello</h1></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const baseLocator = { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 };
+    
+    const patch1: StylePatch = { id: "1", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "16px", after: "18px", createdAt: 1 };
+    const patch2: StylePatch = { id: "2", kind: "style", targetElement: el, targetDescriptor: "h1#t", targetLocator: baseLocator, property: "fontSize", before: "18px", after: "22px", createdAt: 2 };
+
+    const result = buildAiEditPrompt([patch1, patch2], PAGE_ZH);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain('样式修改：fontSize 从 "16px" 改为 "22px"');
+      expect(result.prompt).not.toContain("18px");
+    }
+  });
 });
