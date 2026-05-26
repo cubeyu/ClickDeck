@@ -137,6 +137,31 @@ function isLikelyStableToken(value: string): boolean {
   return true;
 }
 
+export function getSlideContext(element: HTMLElement): string | undefined {
+  const container = element.closest('section, .slide, .page, [data-slide], [data-page], [aria-roledescription="slide"]');
+  if (!container || !(container instanceof HTMLElement)) {
+    return undefined;
+  }
+  
+  const dataSlide = container.getAttribute("data-slide");
+  const dataPage = container.getAttribute("data-page");
+  const ariaLabel = container.getAttribute("aria-label");
+  const id = container.id;
+  
+  if (dataSlide) return `Slide ${dataSlide}`;
+  if (dataPage) return `Page ${dataPage}`;
+  if (ariaLabel) return ariaLabel;
+  if (id) return `Slide #${id}`;
+
+  const firstHeading = container.querySelector('h1, h2, h3');
+  if (firstHeading && firstHeading.textContent?.trim()) {
+    const headingText = firstHeading.textContent.trim();
+    return `Slide "${headingText.length > 30 ? headingText.slice(0, 27) + "..." : headingText}"`;
+  }
+  
+  return describeElement(container);
+}
+
 function looksLikeHash(value: string): boolean {
   // Hex-like or base64-like long tokens usually come from build pipelines.
   if (value.length >= 16 && /^[a-f0-9]+$/i.test(value)) return true;

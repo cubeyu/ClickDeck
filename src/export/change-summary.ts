@@ -1,7 +1,8 @@
 import type { EditorPatch } from "../state/editor-state";
+import { getSlideContext } from "../content/dom-utils";
 
 export type PromptBuildResult =
-  | { ok: true; prompt: string }
+  | { ok: true; prompt: string; hasImageReplacement: boolean }
   | { ok: false; reason: "empty"; message: string };
 
 export type PromptLanguage = "en" | "zh";
@@ -44,6 +45,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
   lines.push("");
 
   let index = 0;
+  let hasImageReplacement = false;
   for (const patch of patches) {
     // Persist/restore may yield patches without locator in edge cases; skip them to keep prompt actionable.
     const locator = patch.targetLocator;
@@ -55,6 +57,15 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
 
     lines.push(`${index}. Target: ${target}`);
     lines.push(`   Locator: ${locatorText}`);
+
+    const slideContext = getSlideContext(patch.targetElement);
+    if (slideContext) {
+      if (isZh) {
+        lines.push(`   所属页面/Slide: ${slideContext}`);
+      } else {
+        lines.push(`   Slide/Page Context: ${slideContext}`);
+      }
+    }
 
     if (patch.kind === "content") {
       if (isZh) {
@@ -80,6 +91,14 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
       const after = normalizeAttributeValue(patch.attribute, patch.after);
       const before = normalizeAttributeValue(patch.attribute, patch.before);
       lines.push(`   Attribute: ${patch.attribute} changed from ${quoteSnippet(before)} to ${quoteSnippet(after)}.`);
+      if (patch.attribute === "src") {
+        hasImageReplacement = true;
+        if (isZh) {
+          lines.push(`   如果这份 prompt 没有同时提供图片文件或资源路径，请先向用户索要替换图片，再修改这个 src。`);
+        } else {
+          lines.push(`   If this prompt does not include an image file or asset path, please ask the user for the replacement image before changing this src.`);
+        }
+      }
       lines.push("");
       continue;
     }
@@ -93,7 +112,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
     "If multiple elements match the description, use the CSS path or surrounding parent context to identify the target."
   );
 
-  return { ok: true, prompt: lines.join("\n") };
+  return { ok: true, prompt: lines.join("\n"), hasImageReplacement };
 }
 
 function quoteSnippet(value: string): string {

@@ -64,6 +64,8 @@ export type PanelLabels = {
   collapse: string;
   restorePanel: string;
   transparency: string;
+  promptImageAIHint: string;
+  promptImageUIReminder: string;
 };
 
 const englishLabels: PanelLabels = {
@@ -131,7 +133,9 @@ const englishLabels: PanelLabels = {
   clear: "Clear",
   collapse: "Collapse",
   restorePanel: "Restore Panel",
-  transparency: "Transparency"
+  transparency: "Transparency",
+  promptImageAIHint: "If this prompt does not include an image file or asset path, please ask the user for the replacement image before changing this src.",
+  promptImageUIReminder: "Image reminder: This prompt references a replaced image. When sending it to AI, attach the image file or provide the asset path. The full data URL is intentionally not copied."
 };
 
 const chineseLabels: PanelLabels = {
@@ -199,7 +203,9 @@ const chineseLabels: PanelLabels = {
   clear: "清空",
   collapse: "折叠",
   restorePanel: "展开",
-  transparency: "透明度"
+  transparency: "透明度",
+  promptImageAIHint: "如果这份 prompt 没有同时提供图片文件或资源路径，请先向用户索要替换图片，再修改这个 src。",
+  promptImageUIReminder: "图片提醒：这份 prompt 提到了替换图片。发送给 AI 时，请额外附上图片文件，或提供项目中的图片路径。完整 data URL 已刻意不复制。"
 };
 
 export function getPanelLabels(): PanelLabels {

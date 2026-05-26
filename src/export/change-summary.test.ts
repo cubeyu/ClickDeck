@@ -122,4 +122,28 @@ describe("buildAiEditPrompt", () => {
       expect(effectiveOnly.prompt).toContain("fontSize");
     }
   });
+
+  it("includes slide context when target is inside a slide container", () => {
+    document.body.innerHTML = `<main><section class="slide" data-slide="4"><h1 id="t">Hello</h1></section></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const patch: StylePatch = {
+      id: "1", kind: "style", targetElement: el, targetDescriptor: "h1#t",
+      targetLocator: { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 },
+      property: "fontSize", before: "16px", after: "20px", createdAt: 1
+    };
+    
+    // EN
+    const resultEn = buildAiEditPrompt([patch], PAGE_EN);
+    expect(resultEn.ok).toBe(true);
+    if (resultEn.ok) {
+      expect(resultEn.prompt).toContain("Slide/Page Context: Slide 4");
+    }
+
+    // ZH
+    const resultZh = buildAiEditPrompt([patch], PAGE_ZH);
+    expect(resultZh.ok).toBe(true);
+    if (resultZh.ok) {
+      expect(resultZh.prompt).toContain("所属页面/Slide: Slide 4");
+    }
+  });
 });

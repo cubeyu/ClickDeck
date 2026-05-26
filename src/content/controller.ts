@@ -436,6 +436,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       panel?.showPromptPreview({
         promptEn: resultEn.prompt,
         promptZh: resultZh.ok ? resultZh.prompt : resultEn.prompt,
+        hasImageReplacement: resultEn.hasImageReplacement,
         onCopy: (value, lang) => {
           if (!value.trim()) {
             logger.info("Copy cancelled: empty prompt");
