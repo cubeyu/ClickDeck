@@ -45,8 +45,13 @@ function buildModeCss(mode: PdfExportMode): string {
 
 const BASE_PRINT_CSS = `
   @media print {
+    * {
+      background-image: none !important;
+    }
     html, body {
-      /* Removed print-color-adjust to test fast print speed */
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
     section, article, figure, blockquote,
     .card, .panel, .page, .slide,
