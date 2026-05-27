@@ -292,7 +292,7 @@ export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger):
         });
         console.log(`[TRACE_PDF] ${afterprintTime.toFixed(1)}ms - 捕获到 afterprint 事件`);
 
-        // Wait a short moment to allow the browser's download manager to finalize the file.
+        // Wait 4 seconds to allow the browser's download manager to finalize the file.
         // Then query the service worker for the PDF download record to get its final size.
         setTimeout(() => {
           chrome.runtime.sendMessage({ type: "CLICKDECK_QUERY_DOWNLOADS" })
@@ -314,7 +314,7 @@ export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger):
             .finally(() => {
               downloadReport();
             });
-        }, 1500);
+        }, 4000);
 
         // Still delay iframe removal to let Chrome finish writing the PDF
         setTimeout(cleanup, 30_000);
