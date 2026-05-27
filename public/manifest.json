@@ -28,7 +28,7 @@
       "matches": ["<all_urls>"]
     }
   ],
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "downloads"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
