@@ -37,7 +37,7 @@ function buildModeCss(mode: PdfExportMode): string {
 
 const BASE_PRINT_CSS = `
   @media print {
-    * {
+    html, body {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
       color-adjust: exact !important;
@@ -125,6 +125,7 @@ export function exportPdfSnapshot(mode: PdfExportMode, logger: ClickDeckLogger):
 
   try {
     const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+    console.log(`[TRACE_PDF] getComputedStyle(body).backgroundColor = "${bodyBg}" (如果是 rgba(0,0,0,0) 则变量解析失败)`);
     const html = buildPrintHtml(mode, document, bodyBg);
     console.log(`[TRACE_PDF] ${(performance.now() - t0).toFixed(1)}ms - buildPrintHtml 完成 (HTML 长度: ${html.length})`);
 
