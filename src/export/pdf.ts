@@ -45,7 +45,9 @@ function buildModeCss(mode: PdfExportMode): string {
 
 const BASE_PRINT_CSS = `
   @media print {
-    * {
+    *,
+    *::before,
+    *::after {
       background-image: none !important;
     }
     html, body {
