@@ -177,8 +177,7 @@
           <div class="hd">
             <h2>New Entry</h2>
             <div class="btns">
-              <button id="btnNow">填入当前时间</button>
-              <button id="btnAdd" class="primary">添加记录</button>
+              <button id="btnAdd" class="primary">添加空记录</button>
             </div>
           </div>
           <div class="bd">
@@ -200,31 +199,37 @@
               </div>
             </div>
             <div class="row">
-              <label>开始时间</label>
+              <label>耗时（人工）</label>
               <div>
-                <input id="startAt" class="mono" type="text" placeholder="YYYY-MM-DD HH:mm:ss" />
-                <div class="hint">可在你点击导出按钮那一刻填入。</div>
-              </div>
-            </div>
-            <div class="row">
-              <label>结束时间</label>
-              <div>
-                <input id="endAt" class="mono" type="text" placeholder="YYYY-MM-DD HH:mm:ss" />
-                <div class="hint">可在 PDF 真正生成并保存完成后填入。</div>
-              </div>
-            </div>
-            <div class="row">
-              <label>结果（人工）</label>
-              <div>
-                <select id="manualResult">
-                  <option value="ok">ok（可交付）</option>
-                  <option value="slow">slow（很慢但可出）</option>
-                  <option value="color-lost">color-lost（颜色/背景丢失）</option>
-                  <option value="pagination-bad">pagination-bad（分页不对）</option>
-                  <option value="freeze">freeze（卡死/无响应）</option>
-                  <option value="empty">empty（0MB / 空白）</option>
-                  <option value="cancelled">cancelled（取消）</option>
+                <select id="timeFeel">
+                  <option value="unknown">unknown</option>
+                  <option value="short">short（短）</option>
+                  <option value="long">long（长）</option>
                 </select>
+                <div class="hint">拖入 debug JSON 会自动按 `totalDuration` 估一个值，你也可以手动改。</div>
+              </div>
+            </div>
+            <div class="row">
+              <label>是否导出</label>
+              <div>
+                <select id="fileOutcome">
+                  <option value="unknown">unknown</option>
+                  <option value="generated">generated（有文件）</option>
+                  <option value="empty">empty（0B/空白）</option>
+                  <option value="cancelled">cancelled（取消/未生成）</option>
+                </select>
+                <div class="hint">拖入 debug JSON 会根据 downloads 观测自动填充（有时会是 unknown）。</div>
+              </div>
+            </div>
+            <div class="row">
+              <label>视觉效果</label>
+              <div>
+                <select id="visualOk">
+                  <option value="unknown">unknown</option>
+                  <option value="ok">ok（可用）</option>
+                  <option value="bad">bad（不可用）</option>
+                </select>
+                <div class="hint">视觉效果目前只能人工判断。</div>
               </div>
             </div>
             <div class="row">
@@ -301,7 +306,9 @@
                 <th>对象</th>
                 <th class="nowrap">模式</th>
                 <th class="nowrap">耗时</th>
-                <th class="nowrap">结果</th>
+                <th class="nowrap">长/短</th>
+                <th class="nowrap">有/无</th>
+                <th class="nowrap">好/坏</th>
                 <th>sessionId</th>
                 <th class="nowrap">下载</th>
                 <th class="nowrap right">操作</th>
@@ -362,9 +369,9 @@
       const els = {
         fixtureName: document.getElementById("fixtureName"),
         mode: document.getElementById("mode"),
-        startAt: document.getElementById("startAt"),
-        endAt: document.getElementById("endAt"),
-        manualResult: document.getElementById("manualResult"),
+        timeFeel: document.getElementById("timeFeel"),
+        fileOutcome: document.getElementById("fileOutcome"),
+        visualOk: document.getElementById("visualOk"),
         pdfFileName: document.getElementById("pdfFileName"),
         pdfSizeBytes: document.getElementById("pdfSizeBytes"),
         bgGraphics: document.getElementById("bgGraphics"),
@@ -380,9 +387,9 @@
       function clearForm() {
         els.fixtureName.value = "";
         els.mode.value = "long-page";
-        els.startAt.value = "";
-        els.endAt.value = "";
-        els.manualResult.value = "ok";
+        els.timeFeel.value = "unknown";
+        els.fileOutcome.value = "unknown";
+        els.visualOk.value = "unknown";
         els.pdfFileName.value = "";
         els.pdfSizeBytes.value = "";
         els.bgGraphics.value = "unknown";
@@ -392,18 +399,15 @@
       }
 
       function buildEntry() {
-        const start = parseTime(els.startAt.value);
-        const end = parseTime(els.endAt.value);
-        const durationMs = (start && end) ? (end.getTime() - start.getTime()) : null;
         return {
           id: "E_" + Date.now() + "_" + Math.random().toString(16).slice(2),
           createdAt: nowStr(),
           fixtureName: els.fixtureName.value.trim(),
           mode: els.mode.value,
-          startAt: els.startAt.value.trim(),
-          endAt: els.endAt.value.trim(),
-          durationMs,
-          manualResult: els.manualResult.value,
+          durationMs: null,
+          timeFeel: els.timeFeel.value,
+          fileOutcome: els.fileOutcome.value,
+          visualOk: els.visualOk.value,
           pdfFileName: els.pdfFileName.value.trim(),
           pdfSizeBytes: els.pdfSizeBytes.value ? Number(els.pdfSizeBytes.value) : null,
           bgGraphics: els.bgGraphics.value.trim() || "unknown",
@@ -421,15 +425,19 @@
           const dtag = e.debug && e.debug.download
             ? (e.debug.download.fileSize === 0 ? '<span class="tag bad">0B</span>' : '<span class="tag good">' + (e.debug.download.fileSize || 0) + "B</span>")
             : (e.debug ? '<span class="tag warn">no-rec</span>' : '<span class="tag">—</span>');
-          const resultTag = '<span class="tag ' + tagClass(e.manualResult) + '">' + e.manualResult + "</span>";
-          const when = [e.startAt || e.createdAt, e.endAt ? ("→ " + e.endAt) : ""].filter(Boolean).join(" ");
+          const timeTag = '<span class="tag">' + escapeHtml(e.timeFeel || "unknown") + "</span>";
+          const fileTag = '<span class="tag ' + (e.fileOutcome === "generated" ? "good" : e.fileOutcome === "unknown" ? "" : "bad") + '">' + escapeHtml(e.fileOutcome || "unknown") + "</span>";
+          const visTag = '<span class="tag ' + (e.visualOk === "ok" ? "good" : e.visualOk === "unknown" ? "" : "bad") + '">' + escapeHtml(e.visualOk || "unknown") + "</span>";
+          const when = e.createdAt;
           return [
             "<tr>",
             '<td class="nowrap"><div class="mono">' + escapeHtml(when) + "</div></td>",
             "<td>" + escapeHtml(e.fixtureName || "") + (e.debug && e.debug.html ? ('<div class="faint mono" style="margin-top:6px;">' + escapeHtml(e.debug.html.title || "") + "</div>") : "") + "</td>",
             '<td class="nowrap"><span class="tag">' + escapeHtml(e.mode) + "</span></td>",
             '<td class="nowrap"><span class="mono">' + escapeHtml(duration) + "</span></td>",
-            '<td class="nowrap">' + resultTag + "</td>",
+            '<td class="nowrap">' + timeTag + "</td>",
+            '<td class="nowrap">' + fileTag + "</td>",
+            '<td class="nowrap">' + visTag + "</td>",
             '<td class="mono">' + escapeHtml(e.sessionId || "") + "</td>",
             '<td class="nowrap">' + dtag + "</td>",
             '<td class="right nowrap"><button data-del="' + e.id + '" class="danger">删除</button></td>",
@@ -461,7 +469,7 @@
 
       function toCsv(entries) {
         const cols = [
-          "createdAt","fixtureName","mode","startAt","endAt","durationMs","manualResult",
+          "createdAt","fixtureName","mode","durationMs","timeFeel","fileOutcome","visualOk",
           "pdfFileName","pdfSizeBytes","bgGraphics","sessionId","debugFileName",
           "debug_url","debug_title","debug_domNodeCount","debug_canvasCount","debug_tableCount",
           "download_filename","download_fileSize","download_state","download_error",
@@ -476,10 +484,10 @@
             createdAt: e.createdAt,
             fixtureName: e.fixtureName,
             mode: e.mode,
-            startAt: e.startAt,
-            endAt: e.endAt,
             durationMs: e.durationMs == null ? "" : String(e.durationMs),
-            manualResult: e.manualResult,
+            timeFeel: e.timeFeel || "unknown",
+            fileOutcome: e.fileOutcome || "unknown",
+            visualOk: e.visualOk || "unknown",
             pdfFileName: e.pdfFileName,
             pdfSizeBytes: e.pdfSizeBytes == null ? "" : String(e.pdfSizeBytes),
             bgGraphics: e.bgGraphics,
@@ -507,43 +515,59 @@
 
       function applyDebugJsonToForm(fileName, report) {
         if (!report || typeof report !== "object") return;
+        // Keep the form as an optional "blank entry editor". Primary flow is: drop JSON -> auto entry.
         els.debugFileName.value = fileName || "";
         if (report.sessionId) els.sessionId.value = report.sessionId;
         if (report.exportMode) els.mode.value = report.exportMode;
-        if (report.html) {
-          const h = report.html;
-          if (!els.fixtureName.value) {
-            const guess = h.fileName || h.url || "";
-            els.fixtureName.value = String(guess);
-          }
-        }
+        if (!els.fixtureName.value && report.html) els.fixtureName.value = String(report.html.fileName || report.html.url || "");
       }
 
-      function attachDebugToEntry(entry, report) {
-        entry.debug = report;
-        if (report && report.sessionId && !entry.sessionId) entry.sessionId = report.sessionId;
-        if (report && report.exportMode && !entry.mode) entry.mode = report.exportMode;
-        if (report && report.download) {
-          // Auto-fill PDF size when available; fileName is not reliable for PDFs (user can change it)
-          if (entry.pdfSizeBytes == null && typeof report.download.fileSize === "number") entry.pdfSizeBytes = report.download.fileSize;
+      function deriveTimeFeel(durationMs) {
+        if (typeof durationMs !== "number" || !isFinite(durationMs) || durationMs < 0) return "unknown";
+        return durationMs >= 30000 ? "long" : "short"; // 30s as a pragmatic threshold
+      }
+
+      function deriveFileOutcome(report) {
+        const dl = report && report.download ? report.download : null;
+        if (dl && typeof dl.fileSize === "number") {
+          if (dl.fileSize === 0) return "empty";
+          if (dl.fileSize > 0) return "generated";
         }
+        // If user cancelled, afterprint may not fire; the report still exists but may miss download record.
+        const warnings = Array.isArray(report && report.warnings) ? report.warnings : [];
+        if (warnings.some(w => w && w.code === "DOWNLOAD_RECORD_MISSING")) return "unknown";
+        return "unknown";
+      }
+
+      function newEntryFromDebug(fileName, report) {
+        const h = report && report.html ? report.html : {};
+        const durationMs = typeof report.totalDuration === "number" ? report.totalDuration : null;
+        const entry = {
+          id: "E_" + Date.now() + "_" + Math.random().toString(16).slice(2),
+          createdAt: nowStr(),
+          fixtureName: String(h.fileName || h.url || ""),
+          mode: report && report.exportMode ? String(report.exportMode) : "long-page",
+          durationMs,
+          timeFeel: deriveTimeFeel(durationMs),
+          fileOutcome: deriveFileOutcome(report),
+          visualOk: "unknown",
+          pdfFileName: "",
+          pdfSizeBytes: report && report.download && typeof report.download.fileSize === "number" ? report.download.fileSize : null,
+          bgGraphics: "unknown",
+          sessionId: report && report.sessionId ? String(report.sessionId) : "",
+          debugFileName: fileName || "",
+          notes: "",
+          debug: report || null,
+        };
+        return entry;
       }
 
       let entries = loadEntries();
       render(entries);
 
-      document.getElementById("btnNow").addEventListener("click", () => {
-        const t = nowStr();
-        if (!els.startAt.value) els.startAt.value = t;
-        else els.endAt.value = t;
-      });
-
       document.getElementById("btnAdd").addEventListener("click", () => {
         const entry = buildEntry();
-        if (!entry.fixtureName && !entry.sessionId) {
-          alert("至少填写“测试对象”或 sessionId。");
-          return;
-        }
+        if (!entry.fixtureName && !entry.sessionId) return;
         entries.unshift(entry);
         saveEntries(entries);
         render(entries);
@@ -576,14 +600,14 @@
         reader.onload = () => {
           try {
             const report = JSON.parse(String(reader.result || ""));
+            // Primary flow: drop debug JSON -> auto create an entry.
+            const entry = newEntryFromDebug(file.name, report);
+            entries.unshift(entry);
+            saveEntries(entries);
+            render(entries);
+            // Optional: reflect into the form for quick edits
+            clearForm();
             applyDebugJsonToForm(file.name, report);
-            // If the latest entry matches sessionId, attach it automatically.
-            const sid = report && report.sessionId ? String(report.sessionId) : "";
-            if (sid && entries.length && entries[0].sessionId === sid) {
-              attachDebugToEntry(entries[0], report);
-              saveEntries(entries);
-              render(entries);
-            }
           } catch (e) {
             alert("解析失败：不是合法 JSON。");
           }
