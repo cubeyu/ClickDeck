@@ -111,3 +111,16 @@ describe("createPanel saved edits notice", () => {
   });
 });
 
+describe("createPanel export controls", () => {
+  it("hides legacy PDF export buttons by default but keeps HTML export", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    expect(panel.element.querySelector("[data-action='export-html']")).not.toBeNull();
+    expect(panel.element.querySelector("[data-action='export-pdf-long']")).toBeNull();
+    expect(panel.element.querySelector("[data-action='export-pdf-a4']")).toBeNull();
+    expect(panel.element.querySelector("[data-action='export-pdf-slides']")).toBeNull();
+
+    panel.destroy();
+  });
+});

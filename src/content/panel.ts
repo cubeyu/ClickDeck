@@ -47,6 +47,9 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
   const labels = getPanelLabels();
   const panelLogoUrl = typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("brand/logo2-panel.png") : "brand/logo2-panel.png";
   const collapsedLogoUrl = typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("icons/icon48.png") : "icons/icon48.png";
+  // Legacy browser-print PDF export is paused. Keep the code path for debugging/rollback,
+  // but hide the end-user buttons by default. See roadmap task 44A.
+  const SHOW_LEGACY_PDF_EXPORT = false;
   const element = document.createElement("div");
   element.className = "clickdeck-panel";
   element.dataset.clickdeck = "true";
@@ -186,11 +189,15 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       <div class="clickdeck-panel__group">
         ${buttonMarkup("export-html", labels.exportHtmlButton)}
       </div>
-      <div class="clickdeck-panel__group">
+      ${
+        SHOW_LEGACY_PDF_EXPORT
+          ? `<div class="clickdeck-panel__group">
         ${buttonMarkup("export-pdf-long", labels.exportPdfLong)}
         ${buttonMarkup("export-pdf-a4", labels.exportPdfA4)}
         ${buttonMarkup("export-pdf-slides", labels.exportPdfSlides)}
-      </div>
+      </div>`
+          : ""
+      }
       <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
         ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
       </div>
