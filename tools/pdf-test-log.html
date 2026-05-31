@@ -573,7 +573,10 @@
 
       document.getElementById("btnAdd").addEventListener("click", () => {
         const entry = buildEntry();
-        if (!entry.fixtureName && !entry.sessionId) return;
+        if (!entry.fixtureName && !entry.sessionId) {
+          entry.fixtureName = "(empty)";
+          entry.notes = "Created as an empty placeholder. Drag or pick a clickdeck-debug-*.json to auto-fill, then adjust the 3 fields: time/file/visual.";
+        }
         entries.unshift(entry);
         saveEntries(entries);
         render(entries);
