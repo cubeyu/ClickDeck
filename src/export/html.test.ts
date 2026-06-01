@@ -32,6 +32,8 @@ describe("exportHtmlSnapshot", () => {
       </body>
     `;
 
+    document.documentElement.classList.add("clickdeck-presenting", "clickdeck-exporting");
+
     // Mock URL.createObjectURL and URL.revokeObjectURL
     global.URL.createObjectURL = vi.fn(() => "blob:test-url");
     global.URL.revokeObjectURL = vi.fn();
@@ -69,8 +71,13 @@ describe("exportHtmlSnapshot", () => {
     const parts = (blobArgs?.[0] as unknown[]) ?? [];
     const html = parts.join("");
     expect(html).toContain("<base");
+    expect(html).toContain('charset="utf-8"');
+    expect(html).toContain('<!-- Exported by ClickDeck Snapshot');
     expect(html).not.toContain("data-clickdeck=\"true\"");
     expect(html).not.toContain("clickdeck-style");
+    expect(html).not.toContain("clickdeck-presenting");
+    expect(html).not.toContain("clickdeck-exporting");
+    expect(html).not.toContain("clickdeck-panel");
     // data URL images are preserved.
     expect(html).toContain("data:image/svg+xml;base64,PHN2Zy8+");
 

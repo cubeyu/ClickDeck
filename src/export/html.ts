@@ -5,15 +5,20 @@ function ensureBaseTag(clone: HTMLElement): void {
   // Note: external resources still depend on their original URLs; this is not an offline packager.
   const baseEl = document.createElement("base");
   baseEl.href = window.location.href;
-  const head = clone.querySelector("head");
-  if (head) {
-    head.prepend(baseEl);
-    return;
+  
+  let head = clone.querySelector("head");
+  if (!head) {
+    head = document.createElement("head");
+    clone.insertBefore(head, clone.firstChild);
   }
-
-  const newHead = document.createElement("head");
-  newHead.appendChild(baseEl);
-  clone.insertBefore(newHead, clone.firstChild);
+  head.prepend(baseEl);
+  
+  // Ensure charset is set to utf-8 to avoid encoding issues
+  if (!head.querySelector("meta[charset]")) {
+    const metaCharset = document.createElement("meta");
+    metaCharset.setAttribute("charset", "utf-8");
+    head.prepend(metaCharset);
+  }
 }
 
 export function exportHtmlSnapshot(logger: ClickDeckLogger): void {
@@ -21,8 +26,15 @@ export function exportHtmlSnapshot(logger: ClickDeckLogger): void {
     const clone = document.documentElement.cloneNode(true) as HTMLElement;
     
     // Remove ClickDeck UI
-    const elementsToRemove = clone.querySelectorAll("[data-clickdeck='true'], #clickdeck-style");
+    const elementsToRemove = clone.querySelectorAll("[data-clickdeck='true'], #clickdeck-style, .clickdeck-panel, .clickdeck-outline");
     elementsToRemove.forEach(el => el.remove());
+
+    // Remove ClickDeck specific state classes
+    clone.classList.remove("clickdeck-presenting", "clickdeck-exporting");
+    const body = clone.querySelector("body");
+    if (body) {
+      body.classList.remove("clickdeck-presenting", "clickdeck-exporting");
+    }
 
     ensureBaseTag(clone);
 
@@ -32,7 +44,8 @@ export function exportHtmlSnapshot(logger: ClickDeckLogger): void {
       ? `<!DOCTYPE ${document.doctype.name}>` 
       : "<!DOCTYPE html>";
 
-    const fullHtml = `${doctype}\n${htmlContent}`;
+    const comment = "\n<!-- Exported by ClickDeck Snapshot. Modifications applied to DOM are preserved. Original source files are not rewritten. -->\n";
+    const fullHtml = `${doctype}${comment}${htmlContent}`;
 
     const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);

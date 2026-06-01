@@ -193,7 +193,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("export-long-image", labels.exportLongImage)}
       </div>
       <div class="clickdeck-panel__group">
-        ${buttonMarkup("export-html", labels.exportHtmlButton)}
+        ${buttonMarkup("export-html", labels.exportHtmlButton, false, labels.exportHtmlDesc)}
         ${buttonMarkup("present", labels.present, true)}
       </div>
       ${
@@ -489,8 +489,9 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
   };
 }
 
-function buttonMarkup(action: PanelAction, label: string, disabled = false): string {
-  return `<button class="clickdeck-button" data-action="${action}" type="button"${disabled ? " disabled" : ""}>${label}</button>`;
+function buttonMarkup(action: PanelAction, label: string, disabled = false, title?: string): string {
+  const titleAttr = title ? ` title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"` : "";
+  return `<button class="clickdeck-button" data-action="${action}" type="button"${disabled ? " disabled" : ""}${titleAttr}>${label}</button>`;
 }
 
 function iconButtonMarkup(action: PanelAction, icon: string, label: string, disabled = false): string {

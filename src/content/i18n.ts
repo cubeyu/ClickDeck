@@ -37,6 +37,7 @@ export type PanelLabels = {
   imageFit: string;
   imageRadius: string;
   exportHtmlButton: string;
+  exportHtmlDesc: string;
   exportPdfLong: string;
   exportPdfA4: string;
   exportPdfSlides: string;
@@ -137,6 +138,7 @@ const englishLabels: PanelLabels = {
   imageFit: "Fit",
   imageRadius: "Radius",
   exportHtmlButton: "Export HTML",
+  exportHtmlDesc: "Export the current page snapshot. ClickDeck edits applied to the page are preserved where possible; source files are not rewritten.",
   exportPdfLong: "PDF Long",
   exportPdfA4: "PDF A4",
   exportPdfSlides: "PDF 16:9",
@@ -237,6 +239,7 @@ const chineseLabels: PanelLabels = {
   imageFit: "裁切",
   imageRadius: "圆角",
   exportHtmlButton: "导出 HTML",
+  exportHtmlDesc: "导出当前页面快照。已应用到页面上的 ClickDeck 修改会尽量保留；不会写回原始源代码。",
   exportPdfLong: "PDF 长页",
   exportPdfA4: "PDF A4",
   exportPdfSlides: "PDF 16:9",
