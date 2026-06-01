@@ -437,8 +437,41 @@ function injectBaseStyles(rootId: string): void {
       display: none !important;
     }
 
-    .clickdeck-presenting {
+    .clickdeck-exporting,
+    .clickdeck-exporting body {
+      scrollbar-width: none !important;
+    }
+
+    .clickdeck-exporting::-webkit-scrollbar,
+    .clickdeck-exporting body::-webkit-scrollbar {
+      display: none !important;
+    }
+
+    .clickdeck-presenting,
+    .clickdeck-presenting body {
       overflow: hidden !important;
+      background: #050505 !important;
+    }
+
+    .clickdeck-presenting .clickdeck-presentation-hidden-slide {
+      display: none !important;
+    }
+
+    .clickdeck-presenting .clickdeck-presenting-slide {
+      position: fixed !important;
+      left: 50% !important;
+      top: 50% !important;
+      transform: translate(-50%, -50%) scale(var(--clickdeck-present-scale, 1)) !important;
+      transform-origin: center center !important;
+      z-index: 2147483000 !important;
+      max-width: none !important;
+      max-height: none !important;
+      animation: clickdeckFadeIn 0.3s ease-out;
+    }
+
+    @keyframes clickdeckFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
   `;
   document.documentElement.append(style);

@@ -103,14 +103,42 @@ describe("createPresentationController", () => {
     Element.prototype.scrollIntoView = () => {};
   });
 
-  it("adds and removes clickdeck-presenting class on enter/exit", async () => {
+  it("adds staging classes and CSS variables on enter, updates on navigation, and cleans up on exit", async () => {
     const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    
+    // Mock getBoundingClientRect for scale calculation
+    slides.forEach((s, idx) => {
+      s.getBoundingClientRect = () => ({ width: 800, height: 600, top: idx === 0 ? 0 : 1000 } as any);
+    });
+    
+    Object.defineProperty(window, 'innerWidth', { value: 1600, writable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 900, writable: true });
+
     const controller = createPresentationController({ slides, logger: mockLogger });
     
     await controller.enter();
-    expect(document.documentElement.classList.contains("clickdeck-presenting")).toBe(true);
     
+    expect(document.documentElement.classList.contains("clickdeck-presenting")).toBe(true);
+    expect(slides[0].classList.contains("clickdeck-presenting-slide")).toBe(true);
+    expect(slides[1].classList.contains("clickdeck-presentation-hidden-slide")).toBe(true);
+    
+    // Math.min(1600/800, 900/600) => min(2, 1.5) => 1.5
+    expect(slides[0].style.getPropertyValue("--clickdeck-present-scale")).toBe("1.5");
+    
+    // Navigate next
+    controller.next();
+    
+    expect(slides[0].classList.contains("clickdeck-presenting-slide")).toBe(false);
+    expect(slides[0].classList.contains("clickdeck-presentation-hidden-slide")).toBe(true);
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+    expect(slides[1].classList.contains("clickdeck-presentation-hidden-slide")).toBe(false);
+    
+    // Exit
     controller.exit();
+    
     expect(document.documentElement.classList.contains("clickdeck-presenting")).toBe(false);
+    expect(slides[0].classList.contains("clickdeck-presenting-slide")).toBe(false);
+    expect(slides[1].classList.contains("clickdeck-presentation-hidden-slide")).toBe(false);
+    expect(slides[1].style.getPropertyValue("--clickdeck-present-scale")).toBe("");
   });
 });

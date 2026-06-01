@@ -49,12 +49,24 @@ export function createPresentationController(options: {
   let isPresenting = false;
   let originalScrollY = 0;
 
+  let originalDimensions: { width: number; height: number }[] = [];
+
   function updateSlideVisibility() {
     slides.forEach((slide, index) => {
       if (index === currentIndex) {
+        slide.classList.remove("clickdeck-presentation-hidden-slide");
         slide.classList.add("clickdeck-presenting-slide");
+        
+        // Calculate proportional scale to fit within viewport
+        const dim = originalDimensions[index];
+        if (dim) {
+          const scale = Math.min(window.innerWidth / dim.width, window.innerHeight / dim.height);
+          slide.style.setProperty("--clickdeck-present-scale", String(scale));
+        }
       } else {
         slide.classList.remove("clickdeck-presenting-slide");
+        slide.classList.add("clickdeck-presentation-hidden-slide");
+        slide.style.removeProperty("--clickdeck-present-scale");
       }
     });
   }
@@ -65,7 +77,8 @@ export function createPresentationController(options: {
     if (index >= slides.length) index = slides.length - 1;
     
     currentIndex = index;
-    slides[currentIndex].scrollIntoView({ block: "start", behavior: "smooth" });
+    // We don't scroll anymore because position is fixed, but let's keep it in sync logically
+    // if needed for exit
     updateSlideVisibility();
   }
 
@@ -151,6 +164,15 @@ export function createPresentationController(options: {
     });
     currentIndex = bestIndex;
 
+    // Capture original dimensions before any staging classes are applied
+    originalDimensions = slides.map(slide => {
+      const rect = slide.getBoundingClientRect();
+      return {
+        width: rect.width || window.innerWidth,
+        height: rect.height || window.innerHeight
+      };
+    });
+
     document.documentElement.classList.add("clickdeck-presenting");
     
     document.addEventListener("keydown", onKeyDown, { capture: true });
@@ -173,7 +195,11 @@ export function createPresentationController(options: {
     isPresenting = false;
 
     document.documentElement.classList.remove("clickdeck-presenting");
-    slides.forEach(slide => slide.classList.remove("clickdeck-presenting-slide"));
+    slides.forEach(slide => {
+      slide.classList.remove("clickdeck-presenting-slide");
+      slide.classList.remove("clickdeck-presentation-hidden-slide");
+      slide.style.removeProperty("--clickdeck-present-scale");
+    });
     
     document.removeEventListener("keydown", onKeyDown, { capture: true });
     document.removeEventListener("fullscreenchange", onFullscreenChange);

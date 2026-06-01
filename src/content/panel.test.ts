@@ -123,4 +123,27 @@ describe("createPanel export controls", () => {
 
     panel.destroy();
   });
+
+  it("enables export actions initially when currentContext is none", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    panel.setSelectionContext("none");
+
+    const exportHtml = panel.element.querySelector<HTMLButtonElement>("[data-action='export-html']");
+    const exportLongImage = panel.element.querySelector<HTMLButtonElement>("[data-action='export-long-image']");
+    const exportPdfLong = panel.element.querySelector<HTMLButtonElement>("[data-action='export-image-pdf-long']");
+    const exportPdfA4 = panel.element.querySelector<HTMLButtonElement>("[data-action='export-image-pdf-a4']");
+    const exportPdfSlides = panel.element.querySelector<HTMLButtonElement>("[data-action='export-image-pdf-slides']");
+    const alignLeft = panel.element.querySelector<HTMLButtonElement>("[data-action='align-left']");
+
+    expect(exportHtml?.disabled).toBe(false);
+    expect(exportLongImage?.disabled).toBe(false);
+    expect(exportPdfLong?.disabled).toBe(false);
+    expect(exportPdfA4?.disabled).toBe(false);
+    expect(exportPdfSlides?.disabled).toBe(false);
+    expect(alignLeft?.disabled).toBe(true);
+
+    panel.destroy();
+  });
 });

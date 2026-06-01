@@ -339,9 +339,20 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       colorPickerEl.disabled = currentContext !== "text";
     }
 
+    const pageLevelActions = new Set<PanelAction>([
+      "close",
+      "copy-diagnostics",
+      "copy-ai-prompt",
+      "export-html",
+      "export-long-image",
+      "export-image-pdf-long",
+      "export-image-pdf-a4",
+      "export-image-pdf-slides"
+    ]);
+
     element.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
       const action = button.dataset.action as PanelAction;
-      if (action === "close" || action === "copy-diagnostics" || action === "copy-ai-prompt" || action === "export-html" || action === "export-long-image" || action.startsWith("export-pdf-")) {
+      if (pageLevelActions.has(action) || action.startsWith("export-pdf-")) {
         return;
       }
       if (action === "present") {
