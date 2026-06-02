@@ -53,6 +53,7 @@ export function exportHtmlSnapshot(logger: ClickDeckLogger): void {
     const a = document.createElement("a");
     a.href = url;
     a.download = `clickdeck-snapshot-${Date.now()}.html`;
+    a.dataset.clickdeck = "true";
     a.click();
 
     URL.revokeObjectURL(url);

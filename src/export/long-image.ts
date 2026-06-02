@@ -7,6 +7,7 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
   const a = document.createElement("a");
   a.href = dataUrl;
   a.download = filename;
+  a.dataset.clickdeck = "true";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -40,6 +41,7 @@ function downloadBlob(blob: Blob, filename: string): void {
   const a = document.createElement("a");
   a.href = objectUrl;
   a.download = filename;
+  a.dataset.clickdeck = "true";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

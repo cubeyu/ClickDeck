@@ -571,6 +571,7 @@ export function downloadDebugReport(report: DebugReport): void {
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      a.dataset.clickdeck = "true";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
