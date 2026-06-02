@@ -50,7 +50,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let panel: ClickDeckPanel | null = null;
   let intentOverlay: IntentOverlay | null = null;
   let intentDraftPanel: IntentDraftPanel | null = null;
-  let intentDrafts: { operation: IntentOperation; context: RegionContext }[] = [];
+  let intentDrafts: { operation: IntentOperation; context: RegionContext; targetContext?: RegionContext }[] = [];
   let presentationController: PresentationController | null = null;
   let editingElement: HTMLElement | null = null;
   let originalText: string = "";
@@ -707,12 +707,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 }
               },
               (op) => {
-                // highlight
+                // highlight source
                 const docBox = op.source.documentBox;
                 window.scrollTo({
                   top: docBox.top - window.innerHeight / 2 + docBox.height / 2,
                   behavior: "smooth"
                 });
+                
                 const highlight = document.createElement("div");
                 highlight.style.position = "absolute";
                 highlight.style.left = `${docBox.left}px`;
@@ -724,11 +725,89 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 highlight.style.zIndex = "2147483646";
                 highlight.style.pointerEvents = "none";
                 document.body.appendChild(highlight);
+                
+                // highlight target if exists
+                const draft = intentDrafts.find(d => d.operation.id === op.id);
+                let targetHighlight: HTMLDivElement | null = null;
+                
+                if (op.action === "move" && draft?.targetContext) {
+                  const targetBox = draft.targetContext.region.documentBox;
+                  targetHighlight = document.createElement("div");
+                  targetHighlight.style.position = "absolute";
+                  targetHighlight.style.left = `${targetBox.left}px`;
+                  targetHighlight.style.top = `${targetBox.top}px`;
+                  targetHighlight.style.width = `${targetBox.width}px`;
+                  targetHighlight.style.height = `${targetBox.height}px`;
+                  targetHighlight.style.backgroundColor = "rgba(16, 185, 129, 0.2)"; // green-500
+                  targetHighlight.style.border = "2px solid #10b981";
+                  targetHighlight.style.zIndex = "2147483646";
+                  targetHighlight.style.pointerEvents = "none";
+                  document.body.appendChild(targetHighlight);
+                }
+                
                 setTimeout(() => {
                   highlight.style.transition = "opacity 0.5s";
                   highlight.style.opacity = "0";
-                  setTimeout(() => highlight.remove(), 500);
+                  if (targetHighlight) {
+                    targetHighlight.style.transition = "opacity 0.5s";
+                    targetHighlight.style.opacity = "0";
+                  }
+                  setTimeout(() => {
+                    highlight.remove();
+                    targetHighlight?.remove();
+                  }, 500);
                 }, 1000);
+              },
+              (opId) => {
+                // onDrawTarget
+                if (intentOverlay) return;
+                const draft = intentDrafts.find(d => d.operation.id === opId);
+                if (!draft) return;
+                
+                // Minimize panel if needed, but keeping it is fine as it's fixed.
+                intentOverlay = createIntentOverlay(
+                  "clickdeck-intent-target-overlay-root",
+                  (rect) => {
+                    intentOverlay?.destroy();
+                    intentOverlay = null;
+                    
+                    const units = collectVisualUnits();
+                    const region = createIntentRegion({
+                      action: "move", // not strictly used for target context
+                      userIntent: "",
+                      viewportBox: rect
+                    });
+                    const targetContext = buildRegionContext(region, units);
+                    
+                    const idx = intentDrafts.findIndex(d => d.operation.id === opId);
+                    if (idx !== -1) {
+                      intentDrafts[idx].targetContext = targetContext;
+                      // briefly flash to show success
+                      const targetBox = targetContext.region.documentBox;
+                      const flash = document.createElement("div");
+                      flash.style.position = "absolute";
+                      flash.style.left = `${targetBox.left}px`;
+                      flash.style.top = `${targetBox.top}px`;
+                      flash.style.width = `${targetBox.width}px`;
+                      flash.style.height = `${targetBox.height}px`;
+                      flash.style.backgroundColor = "rgba(16, 185, 129, 0.4)";
+                      flash.style.border = "2px solid #10b981";
+                      flash.style.zIndex = "2147483647";
+                      flash.style.pointerEvents = "none";
+                      document.body.appendChild(flash);
+                      setTimeout(() => {
+                        flash.style.transition = "opacity 0.5s";
+                        flash.style.opacity = "0";
+                        setTimeout(() => flash.remove(), 500);
+                      }, 500);
+                    }
+                  },
+                  () => {
+                    intentOverlay?.destroy();
+                    intentOverlay = null;
+                  },
+                  labels.drawTargetRegionHint
+                );
               }
             );
             document.body.appendChild(intentDraftPanel.element);

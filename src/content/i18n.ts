@@ -111,12 +111,15 @@ export type PanelLabels = {
   intentActionDelete: string;
   intentActionReplace: string;
   intentActionRestyle: string;
+  intentActionMove: string;
   intentPlaceholder: string;
   save: string;
   cancel: string;
   delete: string;
   drawRegionHint: string;
-};
+  drawTargetRegionHint: string;
+  selectTargetRegion: string;
+}
 
 const englishLabels: PanelLabels = {
   active: "Active",
@@ -231,11 +234,14 @@ const englishLabels: PanelLabels = {
   intentActionDelete: "Delete",
   intentActionReplace: "Replace",
   intentActionRestyle: "Restyle",
+  intentActionMove: "Move",
   intentPlaceholder: "Enter your instructions for AI...",
   save: "Save",
   cancel: "Cancel",
   delete: "Delete",
-  drawRegionHint: "Drag to draw a region for AI editing"
+  drawRegionHint: "Drag to draw a region for AI editing",
+  drawTargetRegionHint: "Drag to draw target region",
+  selectTargetRegion: "Select Target Region"
 };
 
 const chineseLabels: PanelLabels = {
@@ -351,11 +357,14 @@ const chineseLabels: PanelLabels = {
   intentActionDelete: "删除",
   intentActionReplace: "替换",
   intentActionRestyle: "调整样式",
+  intentActionMove: "移动",
   intentPlaceholder: "输入你想让 AI 做的操作...",
   save: "保存",
   cancel: "取消",
   delete: "删除",
-  drawRegionHint: "拖拽框选，告诉 AI 在哪操作"
+  drawRegionHint: "拖拽框选，告诉 AI 在哪操作",
+  drawTargetRegionHint: "拖拽框选，告诉 AI 移动到哪",
+  selectTargetRegion: "选择目标区域"
 };
 
 export function getPanelLabels(): PanelLabels {

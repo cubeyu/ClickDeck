@@ -15,7 +15,8 @@ export function createIntentDraftPanel(
   onSave: (operation: IntentOperation) => void,
   onCancel: (operationId: string) => void,
   onDelete: (operationId: string) => void,
-  onHighlight: (operation: IntentOperation) => void
+  onHighlight: (operation: IntentOperation) => void,
+  onDrawTarget?: (operationId: string) => void
 ): IntentDraftPanel {
   injectBaseStyles();
   const labels = getPanelLabels();
@@ -41,7 +42,11 @@ export function createIntentDraftPanel(
           <option value="replace">${labels.intentActionReplace}</option>
           <option value="restyle">${labels.intentActionRestyle}</option>
           <option value="delete">${labels.intentActionDelete}</option>
+          <option value="move">${labels.intentActionMove}</option>
         </select>
+        <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__target-btn" type="button" style="display: none; align-self: flex-start; font-size: 12px; padding: 4px 8px;">
+          ${labels.selectTargetRegion}
+        </button>
         <textarea class="clickdeck-intent-draft__textarea" placeholder="${labels.intentPlaceholder}"></textarea>
         <div class="clickdeck-intent-draft__actions">
           <button class="clickdeck-button clickdeck-button--outline" data-action="cancel" type="button">${labels.cancel}</button>
@@ -69,11 +74,29 @@ export function createIntentDraftPanel(
     const btnCancel = card.querySelector('button[data-action="cancel"]') as HTMLButtonElement;
     const btnSave = card.querySelector('button[data-action="save"]') as HTMLButtonElement;
     const btnDelete = card.querySelector('button[data-action="delete"]') as HTMLButtonElement;
+    const btnTarget = card.querySelector('.clickdeck-intent-draft__target-btn') as HTMLButtonElement;
 
     actionSelect.value = operation.action;
     textarea.value = operation.source.userIntent;
 
     let isSaved = false;
+
+    actionSelect.addEventListener("change", () => {
+      if (actionSelect.value === "move") {
+        btnTarget.style.display = "block";
+      } else {
+        btnTarget.style.display = "none";
+      }
+    });
+    
+    // Initial sync
+    if (operation.action === "move") {
+      btnTarget.style.display = "block";
+    }
+
+    btnTarget.addEventListener("click", () => {
+      onDrawTarget?.(operation.id);
+    });
 
     const updateSavedView = () => {
       let actionLabel = "";
@@ -81,6 +104,7 @@ export function createIntentDraftPanel(
       else if (operation.action === "delete") actionLabel = labels.intentActionDelete;
       else if (operation.action === "replace") actionLabel = labels.intentActionReplace;
       else if (operation.action === "restyle") actionLabel = labels.intentActionRestyle;
+      else if (operation.action === "move") actionLabel = labels.intentActionMove;
 
       savedActionSpan.textContent = `[${actionLabel}]`;
       savedTextSpan.textContent = operation.source.userIntent || actionLabel;
