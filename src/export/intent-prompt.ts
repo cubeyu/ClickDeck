@@ -64,6 +64,24 @@ export function buildIntentPrompt(
   const lines: string[] = [];
   let hasImageReplacement = false;
 
+  lines.push("ClickDeck edit instruction");
+  lines.push("");
+  lines.push("Page:");
+  lines.push(`- URL: ${options.page.url || "unknown"}`);
+  lines.push(`- Title: ${options.page.title || "unknown"}`);
+  lines.push("- Scope: Current active browser page only.");
+  lines.push("");
+  
+  lines.push("Global rules:");
+  lines.push("1. Use the original HTML structure as the source of truth.");
+  lines.push("2. Preserve the user's wording and intent.");
+  lines.push("3. Keep changes limited to the selected region and directly related surrounding layout.");
+  lines.push("4. Match the existing visual style unless the user explicitly asks for another style.");
+  lines.push("5. If the intent or placement is ambiguous, ask the user a clarifying question before editing.");
+  lines.push("");
+  
+  lines.push("Operations:");
+
   for (let i = 0; i < inputs.length; i++) {
     const input = inputs[i];
     const { operation, sourceContext } = input;
@@ -73,129 +91,123 @@ export function buildIntentPrompt(
       return { ok: false, reason: "empty", message: options.language === "zh" ? "移动操作缺少目标区域。" : "Move operation is missing target region." };
     }
 
-    lines.push(`Operation ${i + 1}`);
-    lines.push(`Action: ${operation.action}`);
-    lines.push(`User intent: "${region.userIntent}"`);
-    lines.push("");
+    lines.push(`${i + 1}. Action: ${operation.action}`);
+    lines.push(`   User intent: "${region.userIntent}"`);
 
     if (operation.action === "move") {
-      lines.push("Source region A:");
-      lines.push(`- Page mode: ${region.pageMode}`);
-      lines.push(`- Main anchor: ${region.anchor.kind}${region.anchor.locator?.descriptor ? ` (${region.anchor.locator.descriptor})` : ""}`);
+      lines.push("   Target region A (Source):");
+      lines.push(`   - Page mode: ${region.pageMode}`);
+      lines.push(`   - Anchor: ${region.anchor.kind}${region.anchor.locator?.descriptor ? ` (${region.anchor.locator.descriptor})` : ""}`);
       if (region.relativeBox) {
-        lines.push(`- Region: ${formatRect(region.relativeBox)} (relative to anchor, %)`);
+        lines.push(`   - Box: ${formatRect(region.relativeBox)} (relative to anchor, %)`);
       } else {
-        lines.push(`- Region: ${formatRect(region.viewportBox)} (viewport px)`);
+        lines.push(`   - Box: ${formatRect(region.viewportBox)} (viewport px)`);
       }
       lines.push("");
 
-      lines.push("What is inside Source region A:");
+      lines.push("   Region contents A (Source):");
       if (sourceContext.empty) {
-        lines.push("This appears to be an empty visual area.");
+        lines.push("   - The selected region is an empty visual area. Treat it as the intended placement area, not as an existing element to edit.");
       } else {
         sourceContext.candidates.slice(0, 3).forEach(c => {
-          lines.push(`- ${summarizeVisualUnit(c.unit)}`);
+          lines.push(`   - ${summarizeVisualUnit(c.unit)}`);
           if (c.unit.kind === "image") hasImageReplacement = true;
         });
       }
       lines.push("");
 
       const targetRegion = input.targetContext!.region;
-      lines.push("Target region B:");
-      lines.push(`- Page mode: ${targetRegion.pageMode}`);
-      lines.push(`- Main anchor: ${targetRegion.anchor.kind}${targetRegion.anchor.locator?.descriptor ? ` (${targetRegion.anchor.locator.descriptor})` : ""}`);
+      lines.push("   Target region B (Destination):");
+      lines.push(`   - Page mode: ${targetRegion.pageMode}`);
+      lines.push(`   - Anchor: ${targetRegion.anchor.kind}${targetRegion.anchor.locator?.descriptor ? ` (${targetRegion.anchor.locator.descriptor})` : ""}`);
       if (targetRegion.relativeBox) {
-        lines.push(`- Region: ${formatRect(targetRegion.relativeBox)} (relative to anchor, %)`);
+        lines.push(`   - Box: ${formatRect(targetRegion.relativeBox)} (relative to anchor, %)`);
       } else {
-        lines.push(`- Region: ${formatRect(targetRegion.viewportBox)} (viewport px)`);
+        lines.push(`   - Box: ${formatRect(targetRegion.viewportBox)} (viewport px)`);
       }
       lines.push("");
 
-      lines.push("What is inside Target region B / Nearby references:");
+      lines.push("   Region contents B / Nearby references (Destination):");
       if (input.targetContext!.empty) {
-        lines.push("This appears to be an empty visual area.");
+        lines.push("   - The selected region is an empty visual area. Treat it as the intended placement area, not as an existing element to edit.");
       } else {
         input.targetContext!.candidates.slice(0, 3).forEach(c => {
-          lines.push(`- ${summarizeVisualUnit(c.unit)}`);
+          lines.push(`   - ${summarizeVisualUnit(c.unit)}`);
         });
       }
       input.targetContext!.nearby.slice(0, 4).forEach(n => {
-        lines.push(`- ${n.direction}: ${n.summary}`);
+        lines.push(`   - ${n.direction}: ${n.summary}`);
       });
       lines.push("");
 
     } else {
-      lines.push("Primary target:");
-      lines.push(`- Page mode: ${region.pageMode}`);
-      lines.push(`- Main anchor: ${region.anchor.kind}${region.anchor.locator?.descriptor ? ` (${region.anchor.locator.descriptor})` : ""}`);
+      lines.push("   Target region:");
+      lines.push(`   - Page mode: ${region.pageMode}`);
+      lines.push(`   - Anchor: ${region.anchor.kind}${region.anchor.locator?.descriptor ? ` (${region.anchor.locator.descriptor})` : ""}`);
       
       if (region.relativeBox) {
-        lines.push(`- Region: ${formatRect(region.relativeBox)} (relative to anchor, %)`);
+        lines.push(`   - Box: ${formatRect(region.relativeBox)} (relative to anchor, %)`);
       } else {
-        lines.push(`- Region: ${formatRect(region.viewportBox)} (viewport px)`);
+        lines.push(`   - Box: ${formatRect(region.viewportBox)} (viewport px)`);
       }
       lines.push("");
 
-      lines.push("What is inside the region:");
+      lines.push("   Region contents:");
       if (sourceContext.empty) {
-        lines.push("This appears to be an empty visual area.");
+        lines.push("   - The selected region is an empty visual area. Treat it as the intended placement area, not as an existing element to edit.");
       } else {
         sourceContext.candidates.slice(0, 3).forEach(c => {
-          lines.push(`- ${summarizeVisualUnit(c.unit)}`);
+          lines.push(`   - ${summarizeVisualUnit(c.unit)}`);
           if (c.unit.kind === "image") hasImageReplacement = true;
         });
       }
       lines.push("");
 
-      lines.push("Nearby references:");
+      lines.push("   Nearby references:");
       if (sourceContext.nearby.length === 0) {
-        lines.push("None found.");
+        lines.push("   - None found.");
       } else {
         sourceContext.nearby.slice(0, 4).forEach(n => {
-          lines.push(`- ${n.direction}: ${n.summary}`);
+          lines.push(`   - ${n.direction}: ${n.summary}`);
         });
       }
       lines.push("");
 
-      lines.push("Style reference:");
+      lines.push("   Style reference:");
       const styleFacts = extractStyleFacts(sourceContext);
       if (styleFacts.length === 0) {
-        lines.push("Use surrounding context to match style.");
+        lines.push("   - Use surrounding context to match style.");
       } else {
         styleFacts.forEach(fact => {
-          lines.push(`- ${fact}`);
+          lines.push(`   - ${fact}`);
         });
       }
       lines.push("");
     }
 
     // Action specific instructions
-    lines.push("Allowed changes:");
+    lines.push("   To do:");
     if (operation.action === "add") {
-      lines.push("Add new content near or inside the target region. Match the surrounding style.");
+      lines.push("   - Add new content near or inside the target region. Match the surrounding style.");
     } else if (operation.action === "delete") {
-      lines.push("Delete only the contents inside the source region. You may close the gap layout if necessary.");
+      lines.push("   - Delete only the contents inside the source region. You may close the gap layout if necessary.");
     } else if (operation.action === "replace") {
-      lines.push("Replace the contents inside the source region exactly according to user intent.");
+      lines.push("   - Replace the contents inside the source region exactly according to user intent.");
     } else if (operation.action === "restyle") {
-      lines.push("Modify the CSS styles of the target region or its immediate contents.");
+      lines.push("   - Modify the CSS styles of the target region or its immediate contents.");
     } else if (operation.action === "move") {
-      lines.push("Move the contents of Source region A to Target region B. You may adjust minor local spacing to fit the target area.");
+      lines.push("   - Move the contents of Target region A to Target region B. You may adjust minor local spacing to fit the target area.");
     }
     lines.push("");
 
-    lines.push("Do not change:");
+    lines.push("   Do not:");
     if (operation.action === "delete") {
-      lines.push("Do not redesign the whole slide/page or modify unrelated content.");
+      lines.push("   - Do not redesign the whole slide/page or modify unrelated content.");
     } else if (operation.action === "move") {
-      lines.push("Do not convert this into a full redesign. Do not move unrelated content unless it's strictly necessary to make room. Do not modify other slides/pages.");
+      lines.push("   - Do not convert this into a full redesign. Do not move unrelated content unless it's strictly necessary to make room. Do not modify other slides/pages.");
     } else {
-      lines.push("Do not modify unrelated content or layout outside the target region.");
+      lines.push("   - Do not modify unrelated content or layout outside the target region.");
     }
-    lines.push("");
-
-    lines.push("If uncertain:");
-    lines.push("Prioritize keeping the layout unbroken. Ask the user for clarification if the intent is ambiguous.");
     lines.push("");
   }
 

@@ -49,18 +49,33 @@ describe("Intent Prompt Builder", () => {
       { direction: "above", summary: "[Image]" }
     ]);
 
-    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "test.com", title: "Test" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
       const prompt = result.prompt;
-      expect(prompt).toContain("Operation 1");
-      expect(prompt).toContain('Action: add');
+      // Global and Page sections
+      expect(prompt).toContain("ClickDeck edit instruction");
+      expect(prompt).toContain("Global rules:");
+      expect(prompt).toContain("URL: test.com");
+      
+      // Operation sections
+      expect(prompt).toContain("Operations:");
+      expect(prompt).toContain("1. Action: add");
       expect(prompt).toContain('User intent: "Add a title here"');
-      expect(prompt).toContain("This appears to be an empty visual area.");
+      
+      // Empty area wording
+      expect(prompt).toContain("The selected region is an empty visual area. Treat it as the intended placement area, not as an existing element to edit.");
       expect(prompt).toContain("- above: [Image]");
-      expect(prompt).toContain("Allowed changes:");
+      
+      // Standard ending
+      expect(prompt).toContain("To do:");
       expect(prompt).toContain("Add new content near or inside the target region.");
-      expect(prompt).toContain("Do not change:");
+      expect(prompt).toContain("Do not:");
+      expect(prompt).toContain("Do not modify unrelated content");
+      
+      // Must not contain scattered Allowed changes block
+      expect(prompt).not.toContain("Allowed changes:");
+      expect(prompt).not.toContain("If uncertain:");
     }
   });
 
@@ -98,8 +113,8 @@ describe("Intent Prompt Builder", () => {
     const result = buildIntentPrompt([op1, op2], { language: "en", page: { url: "", title: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.prompt).toContain("Operation 1");
-      expect(result.prompt).toContain("Operation 2");
+      expect(result.prompt).toContain("1. Action: delete");
+      expect(result.prompt).toContain("2. Action: add");
     }
   });
 
@@ -128,12 +143,12 @@ describe("Intent Prompt Builder", () => {
     if (result.ok) {
       const prompt = result.prompt;
       expect(prompt).toContain('Action: move');
-      expect(prompt).toContain('Source region A:');
-      expect(prompt).toContain('What is inside Source region A:');
-      expect(prompt).toContain('Target region B:');
-      expect(prompt).toContain('What is inside Target region B / Nearby references:');
+      expect(prompt).toContain('Target region A (Source):');
+      expect(prompt).toContain('Region contents A (Source):');
+      expect(prompt).toContain('Target region B (Destination):');
+      expect(prompt).toContain('Region contents B / Nearby references (Destination):');
       expect(prompt).toContain('- above: [Title]');
-      expect(prompt).toContain('Move the contents of Source region A to Target region B');
+      expect(prompt).toContain('Move the contents of Target region A to Target region B');
       expect(prompt).toContain('Do not convert this into a full redesign');
     }
   });
