@@ -103,6 +103,7 @@ export type PanelLabels = {
   present: string;
   noSlides: string;
   exportLongImage: string;
+  advanced: string;
 };
 
 const englishLabels: PanelLabels = {
@@ -209,7 +210,8 @@ const englishLabels: PanelLabels = {
   alignRight: "Align right",
   present: "Present",
   noSlides: "No slides detected",
-  exportLongImage: "Export long image"
+  exportLongImage: "Export long image",
+  advanced: "Advanced"
 };
 
 const chineseLabels: PanelLabels = {
@@ -316,7 +318,8 @@ const chineseLabels: PanelLabels = {
   alignRight: "右对齐",
   present: "演示",
   noSlides: "未检测到可演示分页",
-  exportLongImage: "导出长图"
+  exportLongImage: "导出长图",
+  advanced: "高级选项"
 };
 
 export function getPanelLabels(): PanelLabels {

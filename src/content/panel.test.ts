@@ -10,7 +10,7 @@ describe("createPanel selection context", () => {
     panel.setSelectionContext("image");
     panel.setReplaceImageAvailability(true);
 
-    const imageSection = panel.element.querySelector<HTMLElement>("[data-section='image']");
+    const imageSection = panel.element.querySelector<HTMLElement>("[data-section='image-basic']");
     const replaceButton = panel.element.querySelector<HTMLButtonElement>("[data-action='replace-image']");
     expect(imageSection?.hidden).toBe(false);
     expect(replaceButton?.disabled).toBe(false);
@@ -25,7 +25,7 @@ describe("createPanel selection context", () => {
     panel.setSelectionContext("text");
     panel.setReplaceImageAvailability(true);
 
-    const imageSection = panel.element.querySelector<HTMLElement>("[data-section='image']");
+    const imageSection = panel.element.querySelector<HTMLElement>("[data-section='image-basic']");
     const replaceButton = panel.element.querySelector<HTMLButtonElement>("[data-action='replace-image']");
     expect(imageSection?.hidden).toBe(true);
     expect(replaceButton?.disabled).toBe(true);

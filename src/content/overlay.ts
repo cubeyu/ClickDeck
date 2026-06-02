@@ -239,6 +239,27 @@ function injectBaseStyles(rootId: string): void {
       margin-bottom: 4px;
     }
 
+    .clickdeck-panel__advanced {
+      margin-top: 12px;
+      border-top: 1px solid rgba(120, 84, 53, 0.14);
+      padding-top: 12px;
+    }
+
+    .clickdeck-panel__advanced-summary {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8a6a4e;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+    }
+
+    .clickdeck-panel__advanced[hidden] {
+      display: none;
+    }
+
     .clickdeck-button {
       min-height: 32px;
       padding: 0 8px;
@@ -450,7 +471,6 @@ function injectBaseStyles(rootId: string): void {
     .clickdeck-presenting,
     .clickdeck-presenting body {
       overflow: hidden !important;
-      background: #050505 !important;
     }
 
     .clickdeck-presenting .clickdeck-presentation-hidden-slide {
