@@ -34,7 +34,8 @@ export type StyleAction =
   | "image-radius-none"
   | "image-radius-sm"
   | "image-radius-lg"
-  | "image-radius-round";
+  | "image-radius-round"
+  | `bg-custom:${string}`;
 
 export type AppliedStyleChange = {
   property: StyleProperty;
@@ -55,7 +56,7 @@ export function applyStyleAction(
       change = {
         property: "fontSize",
         before: element.style.fontSize,
-        after: `${Math.max(10, parseFloat(computed.fontSize) - 2)}px`
+        after: `${parseFloat(computed.fontSize) - 2}px`
       };
       break;
     case "font-larger":
@@ -234,6 +235,16 @@ export function applyStyleAction(
         before: element.style.backgroundColor,
         after: ""
       };
+      break;
+    default:
+      if (action.startsWith("bg-custom:")) {
+        const bgVal = action.replace("bg-custom:", "");
+        change = {
+          property: "backgroundColor",
+          before: element.style.backgroundColor,
+          after: bgVal
+        };
+      }
       break;
     case "radius-decrease": {
       const current = readPixelValue(computed.borderTopLeftRadius, 0);

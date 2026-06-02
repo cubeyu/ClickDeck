@@ -67,6 +67,7 @@ export type PanelLabels = {
   long: string;
   copyDiagnostics: string;
   pickColor: string;
+  pickBgColor: string;
   promptPreviewTitle: string;
   promptLangEn: string;
   promptLangZh: string;
@@ -173,6 +174,7 @@ const englishLabels: PanelLabels = {
   long: "Long",
   copyDiagnostics: "Copy diagnostics",
   pickColor: "Pick color",
+  pickBgColor: "Pick bg color",
   promptPreviewTitle: "AI edit prompt",
   promptLangEn: "English",
   promptLangZh: "中文",
@@ -279,6 +281,7 @@ const chineseLabels: PanelLabels = {
   long: "长页",
   copyDiagnostics: "复制诊断信息",
   pickColor: "选择颜色",
+  pickBgColor: "自定义背景",
   promptPreviewTitle: "AI edit prompt",
   promptLangEn: "English",
   promptLangZh: "中文",

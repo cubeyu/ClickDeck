@@ -124,6 +124,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
     <div class="clickdeck-panel__section" data-section="background" data-context="container">
       <div class="clickdeck-panel__section-title">${labels.background}</div>
       <div class="clickdeck-panel__group">
+        <input type="color" class="clickdeck-bg-color-picker" value="#ffffff" title="${labels.pickBgColor}" />
         ${buttonMarkup("bg-warm", labels.warm)}
         ${buttonMarkup("bg-white", labels.white)}
         ${buttonMarkup("bg-transparent", labels.transparent)}
@@ -266,6 +267,13 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
     });
   }
 
+  const bgColorPicker = element.querySelector<HTMLInputElement>(".clickdeck-bg-color-picker");
+  if (bgColorPicker) {
+    bgColorPicker.addEventListener("input", () => {
+      onAction(`bg-custom:${bgColorPicker.value}` as PanelAction);
+    });
+  }
+
   // --- Drag logic start ---
   const header = element.querySelector<HTMLElement>(".clickdeck-panel__header");
   const floatingBtn = element.querySelector<HTMLElement>(".clickdeck-panel__floating-button");
@@ -337,6 +345,11 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
     const colorPickerEl = element.querySelector<HTMLInputElement>(".clickdeck-color-picker");
     if (colorPickerEl) {
       colorPickerEl.disabled = currentContext !== "text";
+    }
+
+    const bgColorPickerEl = element.querySelector<HTMLInputElement>(".clickdeck-bg-color-picker");
+    if (bgColorPickerEl) {
+      bgColorPickerEl.disabled = currentContext !== "container";
     }
 
     const pageLevelActions = new Set<PanelAction>([
