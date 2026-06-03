@@ -90,11 +90,11 @@ describe("createPresentationController", () => {
 
   beforeEach(() => {
     mockLogger = {
-      info: () => {},
-      warn: () => {},
-      error: () => {},
-      debug: () => {}
-    } as any;
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn()
+    } as unknown as ClickDeckLogger;
     
     document.body.innerHTML = `
       <div class="slide" id="s1">1</div>
@@ -106,7 +106,10 @@ describe("createPresentationController", () => {
   });
 
   afterEach(() => {
-    delete (window as any).__playSlide;
+    delete window.__playSlide;
+    delete window.__clickdeckSyncPresentationState;
+    delete window.Reveal;
+    delete window.impress;
   });
 
   it("adds staging classes and CSS variables on enter, updates on navigation, and cleans up on exit", async () => {
@@ -218,6 +221,146 @@ describe("createPresentationController", () => {
     expect(hostPlaySlideSpy).toHaveBeenCalledWith(1);
     expect(document.querySelectorAll("#nav .dot")[1].classList.contains("active")).toBe(true);
     expect(document.body.classList.contains("light-bg")).toBe(false);
+  });
+
+
+  it("keeps presenting when the legacy host slide hook throws", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide, index) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: index === 0 ? 0 : 1000 } as any);
+    });
+    window.__playSlide = vi.fn(() => {
+      throw new Error("host failed");
+    });
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+    expect(mockLogger.warn).toHaveBeenCalledWith("Could not trigger host slide hook", expect.any(Error));
+  });
+
+  it("calls the structured ClickDeck host protocol with direction details", async () => {
+    document.body.innerHTML = `
+      <div class="slide" id="s1">1</div>
+      <div class="slide" id="s2">2</div>
+      <div class="slide" id="s3">3</div>
+    `;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    const syncSpy = vi.fn();
+    window.__clickdeckSyncPresentationState = syncSpy;
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+    controller.goTo(0);
+    controller.goTo(2);
+
+    expect(syncSpy).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      index: 0,
+      total: 3,
+      slide: slides[0],
+      direction: "initial"
+    }));
+    expect(syncSpy).toHaveBeenNthCalledWith(2, expect.objectContaining({ index: 1, direction: "next" }));
+    expect(syncSpy).toHaveBeenNthCalledWith(3, expect.objectContaining({ index: 0, direction: "previous" }));
+    expect(syncSpy).toHaveBeenNthCalledWith(4, expect.objectContaining({ index: 2, direction: "jump" }));
+  });
+
+  it("keeps ClickDeck navigation working when the structured host protocol throws", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    window.__clickdeckSyncPresentationState = vi.fn(() => {
+      throw new Error("protocol failed");
+    });
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+    expect(mockLogger.warn).toHaveBeenCalledWith("Could not trigger ClickDeck presentation sync protocol", expect.any(Error));
+  });
+
+  it("dispatches clickdeck:presentationchange with the structured detail", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    const eventSpy = vi.fn();
+    document.addEventListener("clickdeck:presentationchange", eventSpy);
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+
+    const event = eventSpy.mock.calls.at(-1)?.[0] as CustomEvent;
+    expect(event.detail).toEqual(expect.objectContaining({
+      index: 1,
+      total: 2,
+      slide: slides[1],
+      direction: "next"
+    }));
+
+    document.removeEventListener("clickdeck:presentationchange", eventSpy);
+  });
+
+  it("syncs reveal.js through its public slide, sync, and layout APIs", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    window.Reveal = {
+      slide: vi.fn(),
+      sync: vi.fn(),
+      layout: vi.fn()
+    };
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+
+    expect(window.Reveal.slide).toHaveBeenLastCalledWith(1);
+    expect(window.Reveal.sync).toHaveBeenCalled();
+    expect(window.Reveal.layout).toHaveBeenCalled();
+  });
+
+  it("syncs impress.js by calling goto with the current slide id", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    const goto = vi.fn();
+    window.impress = vi.fn(() => ({ goto }));
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+
+    expect(goto).toHaveBeenLastCalledWith("s2");
+  });
+
+  it("ignores unknown framework-like globals instead of guessing APIs", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    (window as any).Reveal = { next: vi.fn(), prev: vi.fn() };
+    (window as any).impress = { goto: vi.fn() };
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    controller.goTo(1);
+
+    expect((window as any).Reveal.next).not.toHaveBeenCalled();
+    expect((window as any).Reveal.prev).not.toHaveBeenCalled();
+    expect((window as any).impress.goto).not.toHaveBeenCalled();
   });
 
   it("uses host nav dots as clickable presentation controls", async () => {

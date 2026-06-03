@@ -1,5 +1,5 @@
 import type { ClickDeckLogger } from "../diagnostics/logger";
-import { detectPresentationSlides } from "../content/presentation-mode";
+import { detectPresentationSlides, syncPresentationHostState } from "../content/presentation-mode";
 import { detectScrollTarget, throttledCaptureViewport, wait } from "./utils";
 import { downloadPdfBlob, imageElementToJpegDataUrl, SimpleImagePdf } from "./simple-image-pdf";
 
@@ -219,6 +219,13 @@ export async function exportImagePdfSlidesSnapshot(logger: ClickDeckLogger): Pro
         candidate.classList.toggle("clickdeck-presenting-slide", candidate === slide);
         candidate.classList.toggle("clickdeck-presentation-hidden-slide", candidate !== slide);
       }
+
+      syncPresentationHostState({
+        slides,
+        index: i,
+        direction: i === 0 ? "initial" : "next",
+        logger
+      });
 
       await wait(300);
 

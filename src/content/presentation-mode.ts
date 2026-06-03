@@ -31,6 +31,213 @@ export function detectPresentationSlides(root: ParentNode = document): HTMLEleme
   return [];
 }
 
+export type PresentationDirection = "next" | "previous" | "jump" | "initial";
+
+export type PresentationSyncDetail = {
+  index: number;
+  total: number;
+  slide: HTMLElement | null;
+  direction: PresentationDirection;
+};
+
+type RevealLike = {
+  slide?: (index: number) => unknown;
+  sync?: () => unknown;
+  layout?: () => unknown;
+};
+
+type ImpressLike = {
+  goto?: (target: string | HTMLElement) => unknown;
+};
+
+type PresentationHostWindow = Window & {
+  __playSlide?: (slideIndex: number) => unknown;
+  __clickdeckSyncPresentationState?: (detail: PresentationSyncDetail) => unknown;
+  Reveal?: RevealLike;
+  impress?: () => ImpressLike;
+};
+
+declare global {
+  interface Window {
+    __playSlide?: (slideIndex: number) => unknown;
+    __clickdeckSyncPresentationState?: (detail: PresentationSyncDetail) => unknown;
+    Reveal?: RevealLike;
+    impress?: () => ImpressLike;
+  }
+}
+
+export function syncPresentationHostState(options: {
+  slides: HTMLElement[];
+  index: number;
+  direction: PresentationDirection;
+  logger: ClickDeckLogger;
+}): PresentationSyncDetail {
+  const { slides, index, direction, logger } = options;
+  const slide = slides[index] ?? null;
+  const detail: PresentationSyncDetail = { index, total: slides.length, slide, direction };
+
+  syncCommonSlideState(slides, index);
+  syncHostNavState(slides, index);
+  syncCounters(slides, index);
+  syncHostThemeState(slides, index);
+  triggerLegacyHostSlideHook(index, logger);
+  syncKnownPresentationFrameworks(slide, index, logger);
+  triggerClickDeckHostProtocol(detail, logger);
+  dispatchPresentationChange(detail, logger);
+
+  return detail;
+}
+
+function getHostNavDots(): HTMLElement[] {
+  return Array.from(document.querySelectorAll<HTMLElement>("#nav .dot, .nav-dot, .nav-dots .nav-dot"));
+}
+
+function syncHostNavState(slides: HTMLElement[], index: number): void {
+  const dots = getHostNavDots();
+  if (dots.length !== slides.length) {
+    return;
+  }
+
+  dots.forEach((dot, dotIndex) => {
+    dot.classList.toggle("active", dotIndex === index);
+    if (dotIndex === index) {
+      dot.setAttribute("aria-current", "true");
+    } else {
+      dot.removeAttribute("aria-current");
+    }
+  });
+}
+
+function syncCommonSlideState(slides: HTMLElement[], index: number): void {
+  slides.forEach((slide, slideIndex) => {
+    if (slideIndex === index) {
+      slide.classList.add("active");
+      slide.classList.remove("prev");
+    } else if (slideIndex < index) {
+      slide.classList.remove("active");
+      slide.classList.add("prev");
+    } else {
+      slide.classList.remove("active");
+      slide.classList.remove("prev");
+    }
+  });
+}
+
+function syncCounters(slides: HTMLElement[], index: number): void {
+  const currentSlideEl = document.getElementById("currentSlide");
+  const totalSlidesEl = document.getElementById("totalSlides");
+
+  if (currentSlideEl) {
+    currentSlideEl.textContent = String(index + 1);
+  }
+  if (totalSlidesEl) {
+    totalSlidesEl.textContent = String(slides.length);
+  }
+}
+
+function syncHostThemeState(slides: HTMLElement[], index: number): void {
+  const slide = slides[index];
+  if (!slide) {
+    return;
+  }
+
+  const theme =
+    slide.dataset.theme ||
+    (slide.classList.contains("light") ? "light" : slide.classList.contains("dark") ? "dark" : "");
+
+  if (theme) {
+    document.body.classList.toggle("light-bg", theme === "light");
+  }
+}
+
+function triggerLegacyHostSlideHook(index: number, logger: ClickDeckLogger): void {
+  const hostWindow = window as PresentationHostWindow;
+  if (typeof hostWindow.__playSlide !== "function") {
+    return;
+  }
+
+  try {
+    hostWindow.__playSlide(index);
+  } catch (error) {
+    logger.warn("Could not trigger host slide hook", error);
+  }
+}
+
+function syncKnownPresentationFrameworks(slide: HTMLElement | null, index: number, logger: ClickDeckLogger): void {
+  const hostWindow = window as PresentationHostWindow;
+  const reveal = hostWindow.Reveal;
+  if (reveal && typeof reveal.slide === "function") {
+    try {
+      reveal.slide(index);
+      if (typeof reveal.sync === "function") {
+        reveal.sync();
+      }
+      if (typeof reveal.layout === "function") {
+        reveal.layout();
+      }
+    } catch (error) {
+      logger.warn("Could not sync reveal.js presentation state", error);
+    }
+  }
+
+  if (slide?.id && typeof hostWindow.impress === "function") {
+    try {
+      const impressApi = hostWindow.impress();
+      if (typeof impressApi?.goto === "function") {
+        impressApi.goto(slide.id);
+      }
+    } catch (error) {
+      logger.warn("Could not sync impress.js presentation state", error);
+    }
+  }
+}
+
+function triggerClickDeckHostProtocol(detail: PresentationSyncDetail, logger: ClickDeckLogger): void {
+  const hostWindow = window as PresentationHostWindow;
+  if (typeof hostWindow.__clickdeckSyncPresentationState !== "function") {
+    return;
+  }
+
+  try {
+    hostWindow.__clickdeckSyncPresentationState(detail);
+  } catch (error) {
+    logger.warn("Could not trigger ClickDeck presentation sync protocol", error);
+  }
+}
+
+function dispatchPresentationChange(detail: PresentationSyncDetail, logger: ClickDeckLogger): void {
+  try {
+    document.dispatchEvent(new CustomEvent("clickdeck:presentationchange", { detail }));
+  } catch (error) {
+    logger.warn("Could not dispatch presentation change event", error);
+  }
+}
+
+function getPresentationDirection(options: {
+  from: number;
+  to: number;
+  initial: boolean;
+  requested?: PresentationDirection;
+}): PresentationDirection {
+  const { from, to, initial, requested } = options;
+  if (requested) {
+    return requested;
+  }
+  if (initial) {
+    return "initial";
+  }
+  if (Math.abs(to - from) > 1) {
+    return "jump";
+  }
+  if (to > from) {
+    return "next";
+  }
+  if (to < from) {
+    return "previous";
+  }
+  return "jump";
+}
+
 export type PresentationController = {
   enter: () => Promise<void>;
   exit: () => void;
@@ -48,100 +255,13 @@ export function createPresentationController(options: {
   let currentIndex = 0;
   let isPresenting = false;
   let originalScrollY = 0;
+  let hasSyncedInitialState = false;
 
   let originalDimensions: { width: number; height: number }[] = [];
   let transformedAncestorStates: Array<{ element: HTMLElement; style: string | null }> = [];
 
-  function getHostNavDots(): HTMLElement[] {
-    return Array.from(document.querySelectorAll<HTMLElement>("#nav .dot, .nav-dot, .nav-dots .nav-dot"));
-  }
-
-  function syncHostNavState(index: number): void {
-    const dots = getHostNavDots();
-    if (dots.length !== slides.length) {
-      return;
-    }
-
-    dots.forEach((dot, dotIndex) => {
-      dot.classList.toggle("active", dotIndex === index);
-      if (dotIndex === index) {
-        dot.setAttribute("aria-current", "true");
-      } else {
-        dot.removeAttribute("aria-current");
-      }
-    });
-  }
-
-  function syncCommonSlideState(index: number): void {
-    slides.forEach((slide, slideIndex) => {
-      if (slideIndex === index) {
-        slide.classList.add("active");
-        slide.classList.remove("prev");
-      } else if (slideIndex < index) {
-        slide.classList.remove("active");
-        slide.classList.add("prev");
-      } else {
-        slide.classList.remove("active");
-        slide.classList.remove("prev");
-      }
-    });
-  }
-
-  function syncCounters(index: number): void {
-    const currentSlideEl = document.getElementById("currentSlide");
-    const totalSlidesEl = document.getElementById("totalSlides");
-    
-    if (currentSlideEl) {
-      currentSlideEl.textContent = String(index + 1);
-    }
-    if (totalSlidesEl) {
-      totalSlidesEl.textContent = String(slides.length);
-    }
-  }
-
-  function syncHostThemeState(index: number): void {
-    const slide = slides[index];
-    if (!slide) {
-      return;
-    }
-
-    const theme =
-      slide.dataset.theme ||
-      (slide.classList.contains("light") ? "light" : slide.classList.contains("dark") ? "dark" : "");
-
-    if (theme) {
-      document.body.classList.toggle("light-bg", theme === "light");
-    }
-  }
-
-  function triggerHostSlideHook(index: number): void {
-    const hostWindow = window as Window & {
-      __playSlide?: (slideIndex: number) => void;
-    };
-
-    if (typeof hostWindow.__playSlide !== "function") {
-      return;
-    }
-
-    try {
-      hostWindow.__playSlide(index);
-    } catch (error) {
-      logger.warn("Could not trigger host slide hook", error);
-    }
-  }
-
-  function notifyHostPresentationChange(index: number): void {
-    syncCommonSlideState(index);
-    syncHostNavState(index);
-    syncCounters(index);
-    syncHostThemeState(index);
-    triggerHostSlideHook(index);
-
-    document.dispatchEvent(
-      new CustomEvent("clickdeck:presentationchange", {
-        detail: { index, slide: slides[index] ?? null, total: slides.length }
-      })
-    );
+  function notifyHostPresentationChange(index: number, direction: PresentationDirection): void {
+    syncPresentationHostState({ slides, index, direction, logger });
   }
 
   function updateSlideVisibility() {
@@ -164,16 +284,25 @@ export function createPresentationController(options: {
     });
   }
 
-  function goTo(index: number) {
+  function goTo(index: number, requestedDirection?: PresentationDirection) {
     if (!isPresenting || slides.length === 0) return;
     if (index < 0) index = 0;
     if (index >= slides.length) index = slides.length - 1;
-    
+
+    const previousIndex = currentIndex;
     currentIndex = index;
+    const direction = getPresentationDirection({
+      from: previousIndex,
+      to: currentIndex,
+      initial: !hasSyncedInitialState,
+      requested: requestedDirection
+    });
+
     // We don't scroll anymore because position is fixed, but let's keep it in sync logically
     // if needed for exit
     updateSlideVisibility();
-    notifyHostPresentationChange(currentIndex);
+    notifyHostPresentationChange(currentIndex, direction);
+    hasSyncedInitialState = true;
   }
 
   function next() {
@@ -217,12 +346,12 @@ export function createPresentationController(options: {
       case "Home":
         e.preventDefault();
         e.stopPropagation();
-        goTo(0);
+        goTo(0, currentIndex === 0 ? "jump" : undefined);
         break;
       case "End":
         e.preventDefault();
         e.stopPropagation();
-        goTo(slides.length - 1);
+        goTo(slides.length - 1, slides.length > 2 ? "jump" : undefined);
         break;
       case "Escape":
         e.preventDefault();
@@ -255,7 +384,7 @@ export function createPresentationController(options: {
 
     e.preventDefault();
     e.stopPropagation();
-    goTo(nextIndex);
+    goTo(nextIndex, Math.abs(nextIndex - currentIndex) > 1 ? "jump" : undefined);
   }
 
   let wheelTimeout: number | null = null;
@@ -321,6 +450,7 @@ export function createPresentationController(options: {
     if (slides.length === 0) return;
 
     isPresenting = true;
+    hasSyncedInitialState = false;
     originalScrollY = window.scrollY;
 
     // Determine current slide based on scroll position
@@ -364,7 +494,7 @@ export function createPresentationController(options: {
       logger.warn("Could not request fullscreen", err);
     }
 
-    goTo(currentIndex);
+    goTo(currentIndex, "initial");
     logger.info("Entered presentation mode", { slideCount: slides.length });
   }
 
