@@ -55,4 +55,12 @@ docs/assets/logo*-original.png
 /.claude
 feedback
 docs
+!docs/
+docs/*
+!docs/assets/
+docs/assets/*
+!docs/assets/clickdeck-demo.gif
+!docs/assets/clickdeck-showcase.png
+!docs/assets/wechat.png
+!docs/assets/alipay.png
 fixtures
