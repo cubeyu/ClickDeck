@@ -52,6 +52,98 @@ export function createPresentationController(options: {
   let originalDimensions: { width: number; height: number }[] = [];
   let transformedAncestorStates: Array<{ element: HTMLElement; style: string | null }> = [];
 
+  function getHostNavDots(): HTMLElement[] {
+    return Array.from(document.querySelectorAll<HTMLElement>("#nav .dot, .nav-dot, .nav-dots .nav-dot"));
+  }
+
+  function syncHostNavState(index: number): void {
+    const dots = getHostNavDots();
+    if (dots.length !== slides.length) {
+      return;
+    }
+
+    dots.forEach((dot, dotIndex) => {
+      dot.classList.toggle("active", dotIndex === index);
+      if (dotIndex === index) {
+        dot.setAttribute("aria-current", "true");
+      } else {
+        dot.removeAttribute("aria-current");
+      }
+    });
+  }
+
+  function syncCommonSlideState(index: number): void {
+    slides.forEach((slide, slideIndex) => {
+      if (slideIndex === index) {
+        slide.classList.add("active");
+        slide.classList.remove("prev");
+      } else if (slideIndex < index) {
+        slide.classList.remove("active");
+        slide.classList.add("prev");
+      } else {
+        slide.classList.remove("active");
+        slide.classList.remove("prev");
+      }
+    });
+  }
+
+  function syncCounters(index: number): void {
+    const currentSlideEl = document.getElementById("currentSlide");
+    const totalSlidesEl = document.getElementById("totalSlides");
+    
+    if (currentSlideEl) {
+      currentSlideEl.textContent = String(index + 1);
+    }
+    if (totalSlidesEl) {
+      totalSlidesEl.textContent = String(slides.length);
+    }
+  }
+
+  function syncHostThemeState(index: number): void {
+    const slide = slides[index];
+    if (!slide) {
+      return;
+    }
+
+    const theme =
+      slide.dataset.theme ||
+      (slide.classList.contains("light") ? "light" : slide.classList.contains("dark") ? "dark" : "");
+
+    if (theme) {
+      document.body.classList.toggle("light-bg", theme === "light");
+    }
+  }
+
+  function triggerHostSlideHook(index: number): void {
+    const hostWindow = window as Window & {
+      __playSlide?: (slideIndex: number) => void;
+    };
+
+    if (typeof hostWindow.__playSlide !== "function") {
+      return;
+    }
+
+    try {
+      hostWindow.__playSlide(index);
+    } catch (error) {
+      logger.warn("Could not trigger host slide hook", error);
+    }
+  }
+
+  function notifyHostPresentationChange(index: number): void {
+    syncCommonSlideState(index);
+    syncHostNavState(index);
+    syncCounters(index);
+    syncHostThemeState(index);
+    triggerHostSlideHook(index);
+
+    document.dispatchEvent(
+      new CustomEvent("clickdeck:presentationchange", {
+        detail: { index, slide: slides[index] ?? null, total: slides.length }
+      })
+    );
+  }
+
   function updateSlideVisibility() {
     slides.forEach((slide, index) => {
       if (index === currentIndex) {
@@ -81,6 +173,7 @@ export function createPresentationController(options: {
     // We don't scroll anymore because position is fixed, but let's keep it in sync logically
     // if needed for exit
     updateSlideVisibility();
+    notifyHostPresentationChange(currentIndex);
   }
 
   function next() {
@@ -139,6 +232,82 @@ export function createPresentationController(options: {
     }
   }
 
+  function onDocumentClick(e: MouseEvent) {
+    if (!isPresenting) return;
+
+    const target = e.target as HTMLElement | null;
+    const dot = target?.closest<HTMLElement>("#nav .dot, .nav-dot");
+    if (!dot) {
+      return;
+    }
+
+    const dots = getHostNavDots();
+    if (dots.length !== slides.length) {
+      return;
+    }
+
+    const explicitIndexStr = dot.dataset.i || dot.dataset.index;
+    const explicitIndex = explicitIndexStr ? Number.parseInt(explicitIndexStr, 10) : Number.NaN;
+    const nextIndex = Number.isFinite(explicitIndex) ? explicitIndex : dots.indexOf(dot);
+    if (nextIndex < 0) {
+      return;
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    goTo(nextIndex);
+  }
+
+  let wheelTimeout: number | null = null;
+  function onWheel(e: WheelEvent) {
+    if (!isPresenting) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (wheelTimeout) return;
+    wheelTimeout = window.setTimeout(() => {
+      wheelTimeout = null;
+    }, 250);
+
+    if (e.deltaY + e.deltaX > 0) {
+      next();
+    } else if (e.deltaY + e.deltaX < 0) {
+      previous();
+    }
+  }
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+
+  function onTouchStart(e: TouchEvent) {
+    if (!isPresenting || e.touches.length === 0) return;
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }
+
+  function onTouchEnd(e: TouchEvent) {
+    if (!isPresenting || e.changedTouches.length === 0) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    
+    const deltaX = touchEndX - touchStartX;
+    const deltaY = touchEndY - touchStartY;
+    
+    if (Math.abs(deltaX) > 50 || Math.abs(deltaY) > 50) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX < 0) next();
+        else previous();
+      } else {
+        if (deltaY < 0) next();
+        else previous();
+      }
+    }
+  }
+
   // Also handle fullscreen change to exit presentation if user presses Esc to exit fullscreen
   function onFullscreenChange() {
     if (isPresenting && !document.fullscreenElement) {
@@ -181,6 +350,10 @@ export function createPresentationController(options: {
     neutralizeTransformedAncestors(transformedAncestorStates);
     
     document.addEventListener("keydown", onKeyDown, { capture: true });
+    document.addEventListener("click", onDocumentClick, { capture: true });
+    document.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    document.addEventListener("touchstart", onTouchStart, { capture: true, passive: false });
+    document.addEventListener("touchend", onTouchEnd, { capture: true, passive: false });
     document.addEventListener("fullscreenchange", onFullscreenChange);
 
     try {
@@ -209,6 +382,10 @@ export function createPresentationController(options: {
     });
     
     document.removeEventListener("keydown", onKeyDown, { capture: true });
+    document.removeEventListener("click", onDocumentClick, { capture: true });
+    document.removeEventListener("wheel", onWheel, { capture: true });
+    document.removeEventListener("touchstart", onTouchStart, { capture: true });
+    document.removeEventListener("touchend", onTouchEnd, { capture: true });
     document.removeEventListener("fullscreenchange", onFullscreenChange);
 
     if (document.fullscreenElement && document.exitFullscreen) {

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { detectPresentationSlides, createPresentationController } from "./presentation-mode";
 import type { ClickDeckLogger } from "../diagnostics/logger";
 
@@ -86,6 +86,7 @@ describe("detectPresentationSlides", () => {
 
 describe("createPresentationController", () => {
   let mockLogger: ClickDeckLogger;
+  let hostPlaySlideSpy: ReturnType<typeof vi.fn> | undefined;
 
   beforeEach(() => {
     mockLogger = {
@@ -101,6 +102,11 @@ describe("createPresentationController", () => {
     `;
     // Mock scrollIntoView
     Element.prototype.scrollIntoView = () => {};
+    hostPlaySlideSpy = undefined;
+  });
+
+  afterEach(() => {
+    delete (window as any).__playSlide;
   });
 
   it("adds staging classes and CSS variables on enter, updates on navigation, and cleans up on exit", async () => {
@@ -180,5 +186,182 @@ describe("createPresentationController", () => {
     controller.exit();
 
     expect(deck.getAttribute("style")).toContain("transform: translateX(-100vw)");
+  });
+
+  it("triggers host slide hooks and syncs host nav/theme state on navigation", async () => {
+    document.body.innerHTML = `
+      <div id="nav">
+        <button class="dot" data-i="0"></button>
+        <button class="dot" data-i="1"></button>
+      </div>
+      <div class="slide light" id="s1">1</div>
+      <div class="slide dark" id="s2">2</div>
+    `;
+
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide, index) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: index === 0 ? 0 : 1000 } as any);
+    });
+
+    hostPlaySlideSpy = vi.fn();
+    (window as any).__playSlide = hostPlaySlideSpy;
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    expect(hostPlaySlideSpy).toHaveBeenCalledWith(0);
+    expect(document.querySelectorAll("#nav .dot")[0].classList.contains("active")).toBe(true);
+    expect(document.body.classList.contains("light-bg")).toBe(true);
+
+    controller.goTo(1);
+
+    expect(hostPlaySlideSpy).toHaveBeenCalledWith(1);
+    expect(document.querySelectorAll("#nav .dot")[1].classList.contains("active")).toBe(true);
+    expect(document.body.classList.contains("light-bg")).toBe(false);
+  });
+
+  it("uses host nav dots as clickable presentation controls", async () => {
+    document.body.innerHTML = `
+      <div id="nav">
+        <button class="dot" data-i="0"></button>
+        <button class="dot" data-i="1"></button>
+      </div>
+      <div class="slide" id="s1">1</div>
+      <div class="slide" id="s2">2</div>
+    `;
+
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide, index) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: index === 0 ? 0 : 1000 } as any);
+    });
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    const secondDot = document.querySelectorAll<HTMLElement>("#nav .dot")[1];
+    secondDot.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+    expect(slides[0].classList.contains("clickdeck-presentation-hidden-slide")).toBe(true);
+    expect(secondDot.classList.contains("active")).toBe(true);
+  });
+
+  it("syncs .active and .prev classes on slides", async () => {
+    document.body.innerHTML = `
+      <div class="slide" id="s1">1</div>
+      <div class="slide" id="s2">2</div>
+      <div class="slide" id="s3">3</div>
+    `;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    expect(slides[0].classList.contains("active")).toBe(true);
+    expect(slides[1].classList.contains("active")).toBe(false);
+    expect(slides[1].classList.contains("prev")).toBe(false);
+
+    controller.goTo(1);
+    expect(slides[0].classList.contains("active")).toBe(false);
+    expect(slides[0].classList.contains("prev")).toBe(true);
+    expect(slides[1].classList.contains("active")).toBe(true);
+    expect(slides[1].classList.contains("prev")).toBe(false);
+    expect(slides[2].classList.contains("prev")).toBe(false);
+
+    controller.goTo(2);
+    expect(slides[0].classList.contains("prev")).toBe(true);
+    expect(slides[1].classList.contains("prev")).toBe(true);
+    expect(slides[2].classList.contains("active")).toBe(true);
+  });
+
+  it("syncs #currentSlide and #totalSlides counters", async () => {
+    document.body.innerHTML = `
+      <div id="currentSlide"></div>
+      <div id="totalSlides"></div>
+      <div class="slide">1</div>
+      <div class="slide">2</div>
+    `;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    expect(document.getElementById("currentSlide")?.textContent).toBe("1");
+    expect(document.getElementById("totalSlides")?.textContent).toBe("2");
+
+    controller.goTo(1);
+    expect(document.getElementById("currentSlide")?.textContent).toBe("2");
+  });
+
+  it("does not sync nav dots if dot count does not match slide count", async () => {
+    document.body.innerHTML = `
+      <div id="nav">
+        <button class="dot"></button>
+      </div>
+      <div class="slide">1</div>
+      <div class="slide">2</div>
+    `;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    const dot = document.querySelector(".dot")!;
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    expect(dot.classList.contains("active")).toBe(false);
+  });
+
+  it("intercepts wheel events to navigate", async () => {
+    document.body.innerHTML = `
+      <div class="slide">1</div>
+      <div class="slide">2</div>
+    `;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    const wheelEvent = new WheelEvent("wheel", { deltaY: 100, bubbles: true });
+    vi.spyOn(wheelEvent, 'preventDefault');
+    document.dispatchEvent(wheelEvent);
+
+    expect(wheelEvent.preventDefault).toHaveBeenCalled();
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+  });
+
+  it("intercepts touch events to navigate", async () => {
+    document.body.innerHTML = `
+      <div class="slide">1</div>
+      <div class="slide">2</div>
+    `;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+    slides.forEach((slide) => {
+      slide.getBoundingClientRect = () => ({ width: 800, height: 600, top: 0 } as any);
+    });
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+
+    // Mock touches for typescript
+    const touchStartEvent = new TouchEvent("touchstart", {
+      touches: [{ clientX: 100, clientY: 100 } as Touch],
+      bubbles: true
+    });
+    document.dispatchEvent(touchStartEvent);
+
+    const touchEndEvent = new TouchEvent("touchend", {
+      changedTouches: [{ clientX: 100, clientY: 20 } as Touch],
+      bubbles: true
+    });
+    vi.spyOn(touchEndEvent, 'preventDefault');
+    document.dispatchEvent(touchEndEvent);
+
+    expect(touchEndEvent.preventDefault).toHaveBeenCalled();
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
   });
 });
