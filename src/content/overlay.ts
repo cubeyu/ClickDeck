@@ -126,9 +126,9 @@ function injectBaseStyles(rootId: string): void {
     }
 
     .clickdeck-panel__floating-button img {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
       pointer-events: none;
     }
 
@@ -166,9 +166,9 @@ function injectBaseStyles(rootId: string): void {
     }
 
     .clickdeck-panel__logo {
-      width: 24px;
-      height: 24px;
-      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
       object-fit: cover;
       box-shadow: 0 2px 8px rgba(84, 58, 36, 0.16);
     }
@@ -193,6 +193,16 @@ function injectBaseStyles(rootId: string): void {
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid rgba(120, 84, 53, 0.14);
+    }
+
+    .clickdeck-panel__module-title {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(120, 84, 53, 0.18);
+      font-size: 12px;
+      font-weight: 700;
+      color: #4f3828;
+      letter-spacing: 0.03em;
     }
 
     .clickdeck-panel__section-title {
@@ -441,6 +451,26 @@ function injectBaseStyles(rootId: string): void {
     .clickdeck-notice__actions {
       display: flex;
       gap: 6px;
+    }
+
+    .clickdeck-panel__footer {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(120, 84, 53, 0.14);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      color: #8a6a4e;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .clickdeck-panel__footer a {
+      color: #6b4e35;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      pointer-events: auto;
     }
 
     @media print {

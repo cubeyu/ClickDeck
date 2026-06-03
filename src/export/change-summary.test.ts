@@ -72,7 +72,7 @@ describe("buildAiEditPrompt", () => {
     if (result.ok) {
       expect(result.prompt).toContain("Locator: #t");
       expect(result.prompt).toContain("Style: fontSize changed");
-      expect(result.prompt).toContain("Text changed");
+      expect(result.prompt).toContain("Text replaced");
     }
   });
 
@@ -206,8 +206,58 @@ describe("buildAiEditPrompt", () => {
     const result = buildAiEditPrompt([patch1, patch2], PAGE_EN);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.prompt).toContain('Text changed from "old" to "new"');
+      expect(result.prompt).toContain('Text replaced: "old" with "new"');
       expect(result.prompt).not.toContain("mid");
+    }
+  });
+
+  it("summarizes appended text so AI can reproduce title suffix edits", () => {
+    document.body.innerHTML = `<main><h1 id="t">如何优雅地与 AI 沟通设计？</h1></main>`;
+    const el = document.getElementById("t") as HTMLElement;
+    const baseLocator = { descriptor: "h1", tagName: "h1", cssPath: "#t", nthOfTypePath: "h1:nth-of-type(1)", siblingIndex: 0 };
+
+    const patch: ContentPatch = {
+      id: "1",
+      kind: "content",
+      targetElement: el,
+      targetDescriptor: "h1#t",
+      targetLocator: baseLocator,
+      before: "如何优雅地与 AI 沟通设计？",
+      after: "如何优雅地与 AI 沟通设计？（不说脏话版）",
+      createdAt: 1
+    };
+
+    const result = buildAiEditPrompt([patch], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain('Text appended: "（不说脏话版）"');
+      expect(result.prompt).toContain("Final text should be");
+    }
+  });
+
+  it("summarizes removed text fragments even when container text is long", () => {
+    document.body.innerHTML = `<main><article id="frame"><h1>如何优雅地与 AI 沟通设计？</h1><p>不说脏话</p></article></main>`;
+    const el = document.getElementById("frame") as HTMLElement;
+    const baseLocator = { descriptor: "article", tagName: "article", cssPath: "#frame", nthOfTypePath: "article:nth-of-type(1)", siblingIndex: 0 };
+    const before = "ClickDeck / Open Editorial Deck 01 / Cover Browser Extension · Chrome · Edge 如何优雅地与 AI 沟通设计？ 不说脏话 Design feedback should land on the page first.";
+    const after = "ClickDeck / Open Editorial Deck 01 / Cover Browser Extension · Chrome · Edge 如何优雅地与 AI 沟通设计？ Design feedback should land on the page first.";
+
+    const patch: ContentPatch = {
+      id: "1",
+      kind: "content",
+      targetElement: el,
+      targetDescriptor: "article#frame",
+      targetLocator: baseLocator,
+      before,
+      after,
+      createdAt: 1
+    };
+
+    const result = buildAiEditPrompt([patch], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain('Text removed: "不说脏话"');
+      expect(result.prompt).not.toContain('Text changed from');
     }
   });
 

@@ -94,13 +94,13 @@ describe("Intent Region Core Functions", () => {
     const userIntent = "I want to delete this specific box please.";
 
     const region = createIntentRegion({
-      action: "delete",
+      action: "intent",
       userIntent,
       viewportBox: box,
       root: document.body
     });
 
-    expect(region.action).toBe("delete");
+    expect(region.action).toBe("intent");
     expect(region.userIntent).toBe(userIntent); // Must preserve exactly what user said
     expect(region.pageMode).toBe("slide");
     expect(region.anchor.kind).toBe("slide");

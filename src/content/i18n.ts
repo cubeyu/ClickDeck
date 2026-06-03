@@ -2,6 +2,7 @@ export type PanelLabels = {
   active: string;
   close: string;
   selectHint: string;
+  selectedHintPrefix: string;
   typography: string;
   weight: string;
   lineHeight: string;
@@ -45,6 +46,7 @@ export type PanelLabels = {
   exportImagePdfA4: string;
   exportImagePdfSlides: string;
   imagePdfTooltip: string;
+  slidesPdfOnlyHint: string;
   pdfGroup: string;
   imageMax100: string;
   imageContain: string;
@@ -104,14 +106,14 @@ export type PanelLabels = {
   noSlides: string;
   exportLongImage: string;
   advanced: string;
+  visualEditing: string;
   
   // Intent draft UI
+  intentSection: string;
+  aiPromptSection: string;
   addIntent: string;
-  intentActionAdd: string;
-  intentActionDelete: string;
-  intentActionReplace: string;
-  intentActionRestyle: string;
   intentActionMove: string;
+  intentMoveTo: string;
   intentPlaceholder: string;
   save: string;
   cancel: string;
@@ -125,6 +127,7 @@ const englishLabels: PanelLabels = {
   active: "Active",
   close: "Close",
   selectHint: "Select an element on the page.",
+  selectedHintPrefix: "Selected:",
   typography: "Typography",
   weight: "Weight",
   lineHeight: "Line height",
@@ -168,6 +171,7 @@ const englishLabels: PanelLabels = {
   exportImagePdfA4: "Image PDF A4",
   exportImagePdfSlides: "Image PDF 16:9",
   imagePdfTooltip: "High fidelity layout preservation, but text is not selectable.",
+  slidesPdfOnlyHint: "This page looks like a slide deck. Please use Image PDF 16:9 for slide export.",
   pdfGroup: "PDF (Print)",
   imageMax100: "Max 100%",
   imageContain: "Contain",
@@ -197,7 +201,7 @@ const englishLabels: PanelLabels = {
   promptCopy: "Copy",
   promptCopied: "Copied!",
   promptClose: "Close",
-  finish: "Finish",
+  finish: "Output",
   savedEditsFound: "Saved edits found",
   restore: "Restore",
   dismiss: "Dismiss",
@@ -227,14 +231,14 @@ const englishLabels: PanelLabels = {
   noSlides: "No slides detected",
   exportLongImage: "Export long image",
   advanced: "Advanced",
+  visualEditing: "Visual editing",
   
   // Intent draft UI
-  addIntent: "Add intent",
-  intentActionAdd: "Add",
-  intentActionDelete: "Delete",
-  intentActionReplace: "Replace",
-  intentActionRestyle: "Restyle",
+  intentSection: "Edit suggestions",
+  aiPromptSection: "AI Prompt",
+  addIntent: "Add suggestion",
   intentActionMove: "Move",
+  intentMoveTo: "Move to...",
   intentPlaceholder: "Enter your instructions for AI...",
   save: "Save",
   cancel: "Cancel",
@@ -248,6 +252,7 @@ const chineseLabels: PanelLabels = {
   active: "已启用",
   close: "关闭",
   selectHint: "选择页面中的元素。",
+  selectedHintPrefix: "当前选中：",
   typography: "字号",
   weight: "字重",
   lineHeight: "行高",
@@ -291,6 +296,7 @@ const chineseLabels: PanelLabels = {
   exportImagePdfA4: "图片 PDF A4",
   exportImagePdfSlides: "图片 PDF 16:9",
   imagePdfTooltip: "布局高保真还原，但文字不可复制",
+  slidesPdfOnlyHint: "检测到这是幻灯片页面，请使用「图片 PDF 16:9」导出。",
   pdfGroup: "PDF 导出",
   imageMax100: "最大 100%",
   imageContain: "完整显示",
@@ -320,7 +326,7 @@ const chineseLabels: PanelLabels = {
   promptCopy: "复制",
   promptCopied: "已复制！",
   promptClose: "关闭",
-  finish: "完成",
+  finish: "输出",
   savedEditsFound: "发现已保存的修改",
   restore: "恢复",
   dismiss: "忽略",
@@ -350,14 +356,14 @@ const chineseLabels: PanelLabels = {
   noSlides: "未检测到可演示分页",
   exportLongImage: "导出长图",
   advanced: "高级选项",
+  visualEditing: "视觉编辑",
   
   // Intent draft UI
-  addIntent: "添加意图",
-  intentActionAdd: "添加",
-  intentActionDelete: "删除",
-  intentActionReplace: "替换",
-  intentActionRestyle: "调整样式",
+  intentSection: "修改意见",
+  aiPromptSection: "AI Prompt",
+  addIntent: "添加修改意见",
   intentActionMove: "移动",
+  intentMoveTo: "移动到...",
   intentPlaceholder: "输入你想让 AI 做的操作...",
   save: "保存",
   cancel: "取消",

@@ -192,6 +192,9 @@ export async function exportImagePdfA4Snapshot(logger: ClickDeckLogger): Promise
 export async function exportImagePdfSlidesSnapshot(logger: ClickDeckLogger): Promise<void> {
   const originalScrollX = window.scrollX;
   const originalScrollY = window.scrollY;
+  const originalScale = document.documentElement.style.getPropertyValue("--clickdeck-present-scale");
+  let slideStates: Array<{ slide: HTMLElement; className: string; style: string | null }> = [];
+  let transformedAncestorStates: Array<{ element: HTMLElement; style: string | null }> = [];
 
   try {
     const slides = detectPresentationSlides();
@@ -200,7 +203,23 @@ export async function exportImagePdfSlidesSnapshot(logger: ClickDeckLogger): Pro
       return;
     }
 
-    document.documentElement.classList.add("clickdeck-exporting");
+    slideStates = slides.map((slide) => ({
+      slide,
+      className: slide.className,
+      style: slide.getAttribute("style")
+    }));
+    const slideSizes = slides.map((slide) => {
+      const rect = slide.getBoundingClientRect();
+      return {
+        width: rect.width || window.innerWidth,
+        height: rect.height || window.innerHeight
+      };
+    });
+    transformedAncestorStates = collectTransformedAncestors(slides);
+
+    document.documentElement.classList.add("clickdeck-exporting", "clickdeck-presenting");
+    neutralizeTransformedAncestors(transformedAncestorStates);
+    window.scrollTo(0, 0);
     await wait(100);
 
     const dpr = window.devicePixelRatio || 1;
@@ -219,11 +238,19 @@ export async function exportImagePdfSlidesSnapshot(logger: ClickDeckLogger): Pro
 
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      slide.scrollIntoView({ block: "center" });
+      const slideSize = slideSizes[i];
+      const scale = Math.min(window.innerWidth / slideSize.width, window.innerHeight / slideSize.height, 1);
+      document.documentElement.style.setProperty("--clickdeck-present-scale", String(scale));
+
+      for (const candidate of slides) {
+        candidate.classList.toggle("clickdeck-presenting-slide", candidate === slide);
+        candidate.classList.toggle("clickdeck-presentation-hidden-slide", candidate !== slide);
+      }
+
       await wait(300);
 
       const img = await throttledCaptureViewport(logger);
-      
+
       const cropTarget = slide.querySelector<HTMLElement>("[data-slide-content], .sheet, .slide-content, .page, .card") || slide;
       const rect = cropTarget.getBoundingClientRect();
       const cropX = Math.max(0, rect.left);
@@ -266,9 +293,9 @@ export async function exportImagePdfSlidesSnapshot(logger: ClickDeckLogger): Pro
       }
       isFirstPage = false;
 
-      const scale = Math.min(pdfWidth / cropWidth, pdfHeight / cropHeight);
-      const drawWidth = cropWidth * scale;
-      const drawHeight = cropHeight * scale;
+      const drawScale = Math.min(pdfWidth / cropWidth, pdfHeight / cropHeight);
+      const drawWidth = cropWidth * drawScale;
+      const drawHeight = cropHeight * drawScale;
       const drawX = (pdfWidth - drawWidth) / 2;
       const drawY = (pdfHeight - drawHeight) / 2;
 
@@ -279,13 +306,78 @@ export async function exportImagePdfSlidesSnapshot(logger: ClickDeckLogger): Pro
       canvas.height = 0;
     }
 
+    if (isFirstPage) {
+      alert("No visible slide content was captured.");
+      logger.warn("Image PDF Slides export captured no visible slides.");
+      return;
+    }
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     pdf.save(`clickdeck-image-slides-${timestamp}.pdf`);
     logger.info("Image PDF Slides export successful");
   } catch (error) {
     logger.error("Image PDF Slides export failed", { error: error instanceof Error ? error.message : String(error) });
   } finally {
-    document.documentElement.classList.remove("clickdeck-exporting");
+    document.documentElement.classList.remove("clickdeck-exporting", "clickdeck-presenting");
+    if (originalScale) {
+      document.documentElement.style.setProperty("--clickdeck-present-scale", originalScale);
+    } else {
+      document.documentElement.style.removeProperty("--clickdeck-present-scale");
+    }
+    restoreSlideStates(slideStates);
+    restoreTransformedAncestors(transformedAncestorStates);
     window.scrollTo(originalScrollX, originalScrollY);
+  }
+}
+
+function collectTransformedAncestors(slides: HTMLElement[]): Array<{ element: HTMLElement; style: string | null }> {
+  const states = new Map<HTMLElement, string | null>();
+
+  for (const slide of slides) {
+    let current = slide.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+      const computed = window.getComputedStyle(current);
+      const createsFixedContainingBlock =
+        computed.transform !== "none" ||
+        computed.perspective !== "none" ||
+        computed.filter !== "none";
+
+      if (createsFixedContainingBlock && !states.has(current)) {
+        states.set(current, current.getAttribute("style"));
+      }
+
+      current = current.parentElement;
+    }
+  }
+
+  return Array.from(states.entries()).map(([element, style]) => ({ element, style }));
+}
+
+function neutralizeTransformedAncestors(states: Array<{ element: HTMLElement; style: string | null }>): void {
+  for (const { element } of states) {
+    element.style.transform = "none";
+    element.style.perspective = "none";
+    element.style.filter = "none";
+  }
+}
+
+function restoreTransformedAncestors(states: Array<{ element: HTMLElement; style: string | null }>): void {
+  for (const { element, style } of states) {
+    if (style === null) {
+      element.removeAttribute("style");
+    } else {
+      element.setAttribute("style", style);
+    }
+  }
+}
+
+function restoreSlideStates(states: Array<{ slide: HTMLElement; className: string; style: string | null }>): void {
+  for (const { slide, className, style } of states) {
+    slide.className = className;
+    if (style === null) {
+      slide.removeAttribute("style");
+    } else {
+      slide.setAttribute("style", style);
+    }
   }
 }

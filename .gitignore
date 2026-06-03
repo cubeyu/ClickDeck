@@ -32,6 +32,11 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+nul
+*.zip
+*.tar
+release/
+test-extension.cjs
 
 # Local/internal planning docs
 AGENTS.md
@@ -48,3 +53,6 @@ docs/assets/logo*-original.png
 /chrome-store-assets
 /chrome-store-screenshots
 /.claude
+feedback
+docs
+fixtures

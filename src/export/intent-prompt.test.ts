@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildIntentPrompt, IntentPromptInput } from "./intent-prompt";
 
 function mockRegionContext(
-  action: "add" | "delete" | "replace" | "restyle" | "move",
+  action: "intent" | "move",
   userIntent: string,
   empty: boolean,
   candidates: any[] = [],
@@ -44,8 +44,8 @@ describe("Intent Prompt Builder", () => {
     }
   });
 
-  it("builds add prompt for empty visual area with nearby references", () => {
-    const input = mockRegionContext("add", "Add a title here", true, [], [
+  it("builds natural-language intent prompt for empty visual area with nearby references", () => {
+    const input = mockRegionContext("intent", "Add a title here", true, [], [
       { direction: "above", summary: "[Image]" }
     ]);
 
@@ -54,14 +54,14 @@ describe("Intent Prompt Builder", () => {
     if (result.ok) {
       const prompt = result.prompt;
       // Global and Page sections
-      expect(prompt).toContain("ClickDeck edit instruction");
+      expect(prompt).toContain("ClickDeck AI edit prompt");
       expect(prompt).toContain("Global rules:");
       expect(prompt).toContain("URL: test.com");
       
       // Operation sections
-      expect(prompt).toContain("Operations:");
-      expect(prompt).toContain("1. Action: add");
-      expect(prompt).toContain('User intent: "Add a title here"');
+      expect(prompt).toContain("Intent notes:");
+      expect(prompt).toContain("1. User intent");
+      expect(prompt).toContain('User note: "Add a title here"');
       
       // Empty area wording
       expect(prompt).toContain("The selected region is an empty visual area. Treat it as the intended placement area, not as an existing element to edit.");
@@ -69,7 +69,8 @@ describe("Intent Prompt Builder", () => {
       
       // Standard ending
       expect(prompt).toContain("To do:");
-      expect(prompt).toContain("Add new content near or inside the target region.");
+      expect(prompt).toContain("Implement the user note inside the selected region.");
+      expect(prompt).toContain("Infer whether the note means add, delete, replace, restyle, or a small local layout adjustment");
       expect(prompt).toContain("Do not:");
       expect(prompt).toContain("Do not modify unrelated content");
       
@@ -79,8 +80,8 @@ describe("Intent Prompt Builder", () => {
     }
   });
 
-  it("builds delete prompt with specific red lines", () => {
-    const input = mockRegionContext("delete", "Remove this paragraph", false, [
+  it("keeps delete-like wording as user intent without requiring an action category", () => {
+    const input = mockRegionContext("intent", "Remove this paragraph", false, [
       { unit: { kind: "textLine" } }
     ]);
 
@@ -88,33 +89,35 @@ describe("Intent Prompt Builder", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const prompt = result.prompt;
-      expect(prompt).toContain('Action: delete');
+      expect(prompt).toContain('User note: "Remove this paragraph"');
       expect(prompt).toContain("Do not redesign the whole slide/page");
     }
   });
 
-  it("builds restyle prompt without omitting style reference", () => {
-    const input = mockRegionContext("restyle", "Make this red", false, [
+  it("builds restyle-like prompt without omitting style reference", () => {
+    const input = mockRegionContext("intent", "Make this red", false, [
       { unit: { kind: "textLine" } }
     ]);
 
     const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.prompt).toContain('Action: restyle');
+      expect(result.prompt).toContain('User note: "Make this red"');
       expect(result.prompt).toContain("Style reference:");
     }
   });
 
   it("handles multiple operations correctly", () => {
-    const op1 = mockRegionContext("delete", "Remove first", false);
-    const op2 = mockRegionContext("add", "Add second", true);
+    const op1 = mockRegionContext("intent", "Remove first", false);
+    const op2 = mockRegionContext("intent", "Add second", true);
 
     const result = buildIntentPrompt([op1, op2], { language: "en", page: { url: "", title: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.prompt).toContain("1. Action: delete");
-      expect(result.prompt).toContain("2. Action: add");
+      expect(result.prompt).toContain("1. User intent");
+      expect(result.prompt).toContain("2. User intent");
+      expect(result.prompt).toContain('User note: "Remove first"');
+      expect(result.prompt).toContain('User note: "Add second"');
     }
   });
 
@@ -142,13 +145,21 @@ describe("Intent Prompt Builder", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const prompt = result.prompt;
-      expect(prompt).toContain('Action: move');
-      expect(prompt).toContain('Target region A (Source):');
+      expect(prompt).toContain('Move instruction');
+      expect(prompt).toContain('Instruction: Move Source region A to Target region B.');
+      expect(prompt).not.toContain('User note: "Move this to there"');
+      expect(prompt).toContain('Source region A:');
       expect(prompt).toContain('Region contents A (Source):');
-      expect(prompt).toContain('Target region B (Destination):');
-      expect(prompt).toContain('Region contents B / Nearby references (Destination):');
+      expect(prompt).toContain('Target region B:');
+      expect(prompt).toContain('Target region B placement reference:');
+      expect(prompt).toContain('Use Target region B as the destination guide for placement and alignment.');
+      expect(prompt).toContain('treat that content as visual context only, not as content to edit');
       expect(prompt).toContain('- above: [Title]');
-      expect(prompt).toContain('Move the contents of Target region A to Target region B');
+      expect(prompt).toContain('Move the contents of Source region A into the placement indicated by Target region B');
+      expect(prompt).toContain("Preserve any obvious spatial relationship implied by the user's boxes");
+      expect(prompt).toContain('keep the move conservative and ask for clarification instead of guessing a strong alignment rule');
+      expect(prompt).toContain('Preserve the source content, approximate size, proportions, visual hierarchy, and existing style');
+      expect(prompt).toContain('Align with nearby elements when the alignment relationship is visually obvious');
       expect(prompt).toContain('Do not convert this into a full redesign');
     }
   });

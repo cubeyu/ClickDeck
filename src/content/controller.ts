@@ -30,13 +30,22 @@ import { exportImagePdfLongSnapshot, exportImagePdfA4Snapshot, exportImagePdfSli
 import { createIntentOverlay, type IntentOverlay } from "./intent-overlay";
 import { createIntentDraftPanel, type IntentDraftPanel } from "./intent-draft-panel";
 import { buildIntentPrompt, type IntentPromptInput } from "../export/intent-prompt";
-import { createIntentRegion, type IntentOperation } from "./intent-region";
+import { createIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
 import { collectVisualUnits } from "./visual-units";
 import { buildRegionContext, type RegionContext } from "./region-context";
 
 export type ClickDeckController = {
   toggle: () => void;
   isActive: () => boolean;
+};
+
+type IntentDraftState = {
+  operation: IntentOperation;
+  context: RegionContext;
+  targetContext?: RegionContext;
+  color: string;
+  sourceMarker: HTMLDivElement;
+  targetMarker?: HTMLDivElement;
 };
 
 export function createController(logger: ClickDeckLogger, rootId: string): ClickDeckController {
@@ -50,7 +59,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let panel: ClickDeckPanel | null = null;
   let intentOverlay: IntentOverlay | null = null;
   let intentDraftPanel: IntentDraftPanel | null = null;
-  let intentDrafts: { operation: IntentOperation; context: RegionContext; targetContext?: RegionContext }[] = [];
+  let intentDrafts: IntentDraftState[] = [];
   let presentationController: PresentationController | null = null;
   let editingElement: HTMLElement | null = null;
   let originalText: string = "";
@@ -58,6 +67,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   const storageKey = buildStorageKey(pageHref);
   const textTags = new Set(["h1", "h2", "h3", "h4", "h5", "h6", "p", "span", "a", "li", "strong", "em"]);
   const containerTags = new Set(["div", "section", "article", "main", "header", "footer", "nav", "aside"]);
+  const intentColors = ["#e85d75", "#16a085", "#d97706", "#2563eb", "#8b5cf6", "#0f766e"];
 
   function getSelectionContext(target: HTMLElement | null): SelectionContext {
     if (!target) {
@@ -74,6 +84,102 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return "container";
     }
     return "container";
+  }
+
+  function createIntentMarker(
+    region: IntentRegion,
+    color: string,
+    label: string
+  ): HTMLDivElement {
+    const marker = document.createElement("div");
+    marker.dataset.clickdeck = "true";
+    marker.dataset.intentColor = color;
+    marker.className = "clickdeck-intent-region-marker";
+
+    const anchorElement = findIntentAnchorElement(region);
+    const relativeBox = anchorElement ? region.relativeBox : undefined;
+    const box = relativeBox ?? region.documentBox;
+    const useRelativeBox = Boolean(anchorElement && relativeBox);
+
+    if (anchorElement && window.getComputedStyle(anchorElement).position === "static") {
+      anchorElement.style.position = "relative";
+    }
+
+    Object.assign(marker.style, {
+      position: "absolute",
+      left: useRelativeBox ? `${box.left}%` : `${box.left}px`,
+      top: useRelativeBox ? `${box.top}%` : `${box.top}px`,
+      width: useRelativeBox ? `${box.width}%` : `${box.width}px`,
+      height: useRelativeBox ? `${box.height}%` : `${box.height}px`,
+      border: `2px solid ${color}`,
+      backgroundColor: `${color}18`,
+      boxShadow: `0 0 0 3px ${color}24`,
+      borderRadius: "8px",
+      pointerEvents: "none",
+      zIndex: "2147483645",
+      transition: "box-shadow 0.2s ease, background-color 0.2s ease"
+    });
+
+    const badge = document.createElement("span");
+    badge.textContent = label;
+    Object.assign(badge.style, {
+      position: "absolute",
+      left: "-2px",
+      top: "-24px",
+      minWidth: "22px",
+      height: "20px",
+      padding: "0 7px",
+      borderRadius: "999px",
+      background: color,
+      color: "#fff",
+      fontSize: "12px",
+      fontWeight: "700",
+      lineHeight: "20px",
+      textAlign: "center",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.16)"
+    });
+    marker.appendChild(badge);
+    (anchorElement ?? document.body).appendChild(marker);
+    return marker;
+  }
+
+  function findIntentAnchorElement(region: IntentRegion): HTMLElement | null {
+    const locator = region.anchor.locator;
+    if (!locator || region.anchor.kind === "document") {
+      return null;
+    }
+
+    const selectors = [locator.cssPath, locator.nthOfTypePath].filter(Boolean);
+    for (const selector of selectors) {
+      try {
+        const element = document.querySelector<HTMLElement>(selector);
+        if (element) {
+          return element;
+        }
+      } catch {
+        // Ignore unstable selectors and fall back to the next candidate.
+      }
+    }
+
+    return null;
+  }
+
+  function pulseIntentMarker(marker?: HTMLDivElement): void {
+    if (!marker) return;
+    const color = marker.dataset.intentColor ?? "#3b82f6";
+    const originalShadow = marker.style.boxShadow;
+    const originalBackground = marker.style.backgroundColor;
+    marker.style.boxShadow = `0 0 0 6px rgba(255,255,255,0.85), 0 0 0 10px ${color}40`;
+    marker.style.backgroundColor = `${color}26`;
+    window.setTimeout(() => {
+      marker.style.boxShadow = originalShadow;
+      marker.style.backgroundColor = originalBackground;
+    }, 650);
+  }
+
+  function removeIntentDraftMarkers(draft: IntentDraftState): void {
+    draft.sourceMarker.remove();
+    draft.targetMarker?.remove();
   }
 
   function getEffectivePatches(): EditorPatch[] {
@@ -439,15 +545,18 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
       const intentInputs: IntentPromptInput[] = intentDrafts.map(d => ({
         operation: d.operation,
-        sourceContext: d.context
+        sourceContext: d.context,
+        targetContext: d.targetContext
       }));
 
       const patchResultEn = buildAiEditPrompt(effective, { language: "en", page });
       const intentResultEn = buildIntentPrompt(intentInputs, { language: "en", page });
 
       if (!patchResultEn.ok && !intentResultEn.ok) {
-        logger.info("No effective edits or intents to summarize for AI prompt");
-        alert(labels.noEdits);
+        logger.info("No effective edits or intents to summarize for AI prompt", {
+          intentMessage: intentResultEn.message
+        });
+        alert(intentDrafts.length > 0 ? intentResultEn.message : labels.noEdits);
         return;
       }
 
@@ -520,11 +629,19 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     }
 
     if (action === "export-image-pdf-long") {
+      if (detectPresentationSlides().length >= 2) {
+        alert(labels.slidesPdfOnlyHint);
+        return;
+      }
       exportImagePdfLongSnapshot(logger);
       return;
     }
 
     if (action === "export-image-pdf-a4") {
+      if (detectPresentationSlides().length >= 2) {
+        alert(labels.slidesPdfOnlyHint);
+        return;
+      }
       exportImagePdfA4Snapshot(logger);
       return;
     }
@@ -667,7 +784,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
           // Build Region Context
           const units = collectVisualUnits();
           const region = createIntentRegion({
-            action: "add",
+            action: "intent",
             userIntent: "",
             viewportBox: rect
           });
@@ -676,12 +793,14 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
           // Prepare drafting
           const operation: IntentOperation = {
             id: `op-${Date.now()}`,
-            action: "add",
+            action: "intent",
             source: region,
             createdAt: Date.now()
           };
+          const color = intentColors[intentDrafts.length % intentColors.length];
+          const sourceMarker = createIntentMarker(region, color, `${intentDrafts.length + 1}`);
           
-          intentDrafts.push({ operation, context });
+          intentDrafts.push({ operation, context, color, sourceMarker });
 
           if (!intentDraftPanel) {
             intentDraftPanel = createIntentDraftPanel(
@@ -689,11 +808,21 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 // saved
                 const idx = intentDrafts.findIndex(d => d.operation.id === op.id);
                 if (idx !== -1) {
+                  if (op.action === "move" && intentDrafts[idx].targetContext) {
+                    op.target = intentDrafts[idx].targetContext.region;
+                  }
                   intentDrafts[idx].operation = op;
+                  if (op.action !== "move" && intentDrafts[idx].targetMarker) {
+                    intentDrafts[idx].targetMarker?.remove();
+                    intentDrafts[idx].targetMarker = undefined;
+                    intentDrafts[idx].targetContext = undefined;
+                  }
                 }
               },
               (opId) => {
                 // canceled
+                const draft = intentDrafts.find(d => d.operation.id === opId);
+                if (draft) removeIntentDraftMarkers(draft);
                 intentDrafts = intentDrafts.filter(d => d.operation.id !== opId);
                 if (intentDrafts.length === 0) {
                   intentDraftPanel?.hide();
@@ -701,6 +830,8 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
               },
               (opId) => {
                 // deleted
+                const draft = intentDrafts.find(d => d.operation.id === opId);
+                if (draft) removeIntentDraftMarkers(draft);
                 intentDrafts = intentDrafts.filter(d => d.operation.id !== opId);
                 if (intentDrafts.length === 0) {
                   intentDraftPanel?.hide();
@@ -713,50 +844,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                   top: docBox.top - window.innerHeight / 2 + docBox.height / 2,
                   behavior: "smooth"
                 });
-                
-                const highlight = document.createElement("div");
-                highlight.style.position = "absolute";
-                highlight.style.left = `${docBox.left}px`;
-                highlight.style.top = `${docBox.top}px`;
-                highlight.style.width = `${docBox.width}px`;
-                highlight.style.height = `${docBox.height}px`;
-                highlight.style.backgroundColor = "rgba(59, 130, 246, 0.2)";
-                highlight.style.border = "2px solid #3b82f6";
-                highlight.style.zIndex = "2147483646";
-                highlight.style.pointerEvents = "none";
-                document.body.appendChild(highlight);
-                
-                // highlight target if exists
                 const draft = intentDrafts.find(d => d.operation.id === op.id);
-                let targetHighlight: HTMLDivElement | null = null;
-                
-                if (op.action === "move" && draft?.targetContext) {
-                  const targetBox = draft.targetContext.region.documentBox;
-                  targetHighlight = document.createElement("div");
-                  targetHighlight.style.position = "absolute";
-                  targetHighlight.style.left = `${targetBox.left}px`;
-                  targetHighlight.style.top = `${targetBox.top}px`;
-                  targetHighlight.style.width = `${targetBox.width}px`;
-                  targetHighlight.style.height = `${targetBox.height}px`;
-                  targetHighlight.style.backgroundColor = "rgba(16, 185, 129, 0.2)"; // green-500
-                  targetHighlight.style.border = "2px solid #10b981";
-                  targetHighlight.style.zIndex = "2147483646";
-                  targetHighlight.style.pointerEvents = "none";
-                  document.body.appendChild(targetHighlight);
-                }
-                
-                setTimeout(() => {
-                  highlight.style.transition = "opacity 0.5s";
-                  highlight.style.opacity = "0";
-                  if (targetHighlight) {
-                    targetHighlight.style.transition = "opacity 0.5s";
-                    targetHighlight.style.opacity = "0";
-                  }
-                  setTimeout(() => {
-                    highlight.remove();
-                    targetHighlight?.remove();
-                  }, 500);
-                }, 1000);
+                pulseIntentMarker(draft?.sourceMarker);
+                pulseIntentMarker(draft?.targetMarker);
               },
               (opId) => {
                 // onDrawTarget
@@ -782,24 +872,14 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     const idx = intentDrafts.findIndex(d => d.operation.id === opId);
                     if (idx !== -1) {
                       intentDrafts[idx].targetContext = targetContext;
-                      // briefly flash to show success
-                      const targetBox = targetContext.region.documentBox;
-                      const flash = document.createElement("div");
-                      flash.style.position = "absolute";
-                      flash.style.left = `${targetBox.left}px`;
-                      flash.style.top = `${targetBox.top}px`;
-                      flash.style.width = `${targetBox.width}px`;
-                      flash.style.height = `${targetBox.height}px`;
-                      flash.style.backgroundColor = "rgba(16, 185, 129, 0.4)";
-                      flash.style.border = "2px solid #10b981";
-                      flash.style.zIndex = "2147483647";
-                      flash.style.pointerEvents = "none";
-                      document.body.appendChild(flash);
-                      setTimeout(() => {
-                        flash.style.transition = "opacity 0.5s";
-                        flash.style.opacity = "0";
-                        setTimeout(() => flash.remove(), 500);
-                      }, 500);
+                      intentDrafts[idx].operation.target = targetContext.region;
+                      intentDrafts[idx].targetMarker?.remove();
+                      intentDrafts[idx].targetMarker = createIntentMarker(
+                        targetContext.region,
+                        intentDrafts[idx].color,
+                        `${idx + 1}B`
+                      );
+                      pulseIntentMarker(intentDrafts[idx].targetMarker);
                     }
                   },
                   () => {
@@ -810,11 +890,11 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 );
               }
             );
-            document.body.appendChild(intentDraftPanel.element);
+            document.documentElement.appendChild(intentDraftPanel.element);
           }
           
           intentDraftPanel.show();
-          intentDraftPanel.addDraft(operation);
+          intentDraftPanel.addDraft(operation, color);
         },
         () => {
           // Cancelled
@@ -914,6 +994,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     intentOverlay = null;
     intentDraftPanel?.destroy();
     intentDraftPanel = null;
+    intentDrafts.forEach(removeIntentDraftMarkers);
     intentDrafts = [];
 
     logger.info("ClickDeck deactivated");

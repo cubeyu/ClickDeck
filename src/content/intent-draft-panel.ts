@@ -6,7 +6,7 @@ const STYLE_ID = "clickdeck-intent-draft-style";
 export type IntentDraftPanel = {
   element: HTMLDivElement;
   destroy: () => void;
-  addDraft: (operation: IntentOperation) => void;
+  addDraft: (operation: IntentOperation, color?: string) => void;
   hide: () => void;
   show: () => void;
 };
@@ -31,23 +31,17 @@ export function createIntentDraftPanel(
 
   const cards = new Map<string, HTMLDivElement>();
 
-  function createCardDOM(operation: IntentOperation) {
+  function createCardDOM(operation: IntentOperation, color = "#3b82f6") {
     const card = document.createElement("div");
     card.className = "clickdeck-intent-draft__card";
+    card.style.setProperty("--clickdeck-intent-color", color);
     
     card.innerHTML = `
       <div class="clickdeck-intent-draft__editing" style="display: flex;">
-        <select class="clickdeck-intent-draft__action-select">
-          <option value="add">${labels.intentActionAdd}</option>
-          <option value="replace">${labels.intentActionReplace}</option>
-          <option value="restyle">${labels.intentActionRestyle}</option>
-          <option value="delete">${labels.intentActionDelete}</option>
-          <option value="move">${labels.intentActionMove}</option>
-        </select>
-        <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__target-btn" type="button" style="display: none; align-self: flex-start; font-size: 12px; padding: 4px 8px;">
-          ${labels.selectTargetRegion}
-        </button>
         <textarea class="clickdeck-intent-draft__textarea" placeholder="${labels.intentPlaceholder}"></textarea>
+        <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__target-btn" type="button">
+          ${labels.intentMoveTo}
+        </button>
         <div class="clickdeck-intent-draft__actions">
           <button class="clickdeck-button clickdeck-button--outline" data-action="cancel" type="button">${labels.cancel}</button>
           <button class="clickdeck-button clickdeck-button--primary" data-action="save" type="button">${labels.save}</button>
@@ -65,7 +59,6 @@ export function createIntentDraftPanel(
     const editingView = card.querySelector(".clickdeck-intent-draft__editing") as HTMLElement;
     const savedView = card.querySelector(".clickdeck-intent-draft__saved") as HTMLElement;
     
-    const actionSelect = card.querySelector(".clickdeck-intent-draft__action-select") as HTMLSelectElement;
     const textarea = card.querySelector(".clickdeck-intent-draft__textarea") as HTMLTextAreaElement;
     
     const savedActionSpan = card.querySelector(".clickdeck-intent-draft__saved-action") as HTMLElement;
@@ -76,38 +69,31 @@ export function createIntentDraftPanel(
     const btnDelete = card.querySelector('button[data-action="delete"]') as HTMLButtonElement;
     const btnTarget = card.querySelector('.clickdeck-intent-draft__target-btn') as HTMLButtonElement;
 
-    actionSelect.value = operation.action;
     textarea.value = operation.source.userIntent;
 
     let isSaved = false;
+    let draftAction = operation.action;
 
-    actionSelect.addEventListener("change", () => {
-      if (actionSelect.value === "move") {
-        btnTarget.style.display = "block";
-      } else {
-        btnTarget.style.display = "none";
-      }
-    });
-    
-    // Initial sync
-    if (operation.action === "move") {
-      btnTarget.style.display = "block";
+    const syncMoveButton = () => {
+      const isMove = draftAction === "move";
+      btnTarget.classList.toggle("clickdeck-intent-draft__target-btn--active", isMove);
+      btnTarget.textContent = isMove ? labels.selectTargetRegion : labels.intentMoveTo;
+      textarea.hidden = isMove;
     }
+    syncMoveButton();
 
     btnTarget.addEventListener("click", () => {
+      draftAction = "move";
+      textarea.value = "";
+      syncMoveButton();
       onDrawTarget?.(operation.id);
     });
 
     const updateSavedView = () => {
-      let actionLabel = "";
-      if (operation.action === "add") actionLabel = labels.intentActionAdd;
-      else if (operation.action === "delete") actionLabel = labels.intentActionDelete;
-      else if (operation.action === "replace") actionLabel = labels.intentActionReplace;
-      else if (operation.action === "restyle") actionLabel = labels.intentActionRestyle;
-      else if (operation.action === "move") actionLabel = labels.intentActionMove;
-
-      savedActionSpan.textContent = `[${actionLabel}]`;
-      savedTextSpan.textContent = operation.source.userIntent || actionLabel;
+      const isMove = operation.action === "move";
+      savedActionSpan.textContent = isMove ? `[${labels.intentActionMove}]` : "";
+      savedActionSpan.hidden = !isMove;
+      savedTextSpan.textContent = isMove ? labels.intentActionMove : (operation.source.userIntent || labels.addIntent);
       
       editingView.style.display = "none";
       savedView.style.display = "flex";
@@ -116,7 +102,8 @@ export function createIntentDraftPanel(
     btnCancel.addEventListener("click", () => {
       if (isSaved) {
         // Revert to saved view
-        actionSelect.value = operation.action;
+        draftAction = operation.action;
+        syncMoveButton();
         textarea.value = operation.source.userIntent;
         editingView.style.display = "none";
         savedView.style.display = "flex";
@@ -130,14 +117,13 @@ export function createIntentDraftPanel(
     });
 
     btnSave.addEventListener("click", () => {
-      const action = actionSelect.value as IntentOperation["action"];
-      const text = textarea.value.trim();
-      if (!text && action !== "delete") {
+      const text = draftAction === "move" ? "" : textarea.value.trim();
+      if (!text && draftAction !== "move") {
         textarea.focus();
         return;
       }
-      operation.action = action;
-      operation.source.action = action;
+      operation.action = draftAction;
+      operation.source.action = draftAction;
       operation.source.userIntent = text;
       isSaved = true;
       updateSavedView();
@@ -158,7 +144,11 @@ export function createIntentDraftPanel(
       // Actually clicking the saved view can just open it for editing, and we trigger highlight.
       editingView.style.display = "flex";
       savedView.style.display = "none";
-      textarea.focus();
+      if (operation.action === "move") {
+        btnTarget.focus();
+      } else {
+        textarea.focus();
+      }
       onHighlight(operation);
     });
 
@@ -181,8 +171,8 @@ export function createIntentDraftPanel(
     destroy: () => {
       element.remove();
     },
-    addDraft: (operation: IntentOperation) => {
-      createCardDOM(operation);
+    addDraft: (operation: IntentOperation, color?: string) => {
+      createCardDOM(operation, color);
     },
     hide: () => {
       element.classList.add("clickdeck-intent-draft--hidden");
@@ -212,7 +202,8 @@ function injectBaseStyles(): void {
       z-index: 2147483647;
       transition: opacity 0.2s;
       font-family: Inter, system-ui, sans-serif;
-      overflow: hidden;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
     }
     .clickdeck-intent-draft--hidden {
       opacity: 0;
@@ -223,17 +214,7 @@ function injectBaseStyles(): void {
       flex-direction: column;
       gap: 12px;
       padding: 16px;
-    }
-    .clickdeck-intent-draft__action-select {
-      width: 100%;
-      padding: 6px 8px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 14px;
-      outline: none;
-    }
-    .clickdeck-intent-draft__action-select:focus {
-      border-color: #3b82f6;
+      border-left: 4px solid var(--clickdeck-intent-color, #3b82f6);
     }
     .clickdeck-intent-draft__textarea {
       width: 100%;
@@ -248,6 +229,16 @@ function injectBaseStyles(): void {
     .clickdeck-intent-draft__textarea:focus {
       border-color: #3b82f6;
     }
+    .clickdeck-intent-draft__target-btn {
+      align-self: flex-start;
+      font-size: 12px;
+      padding: 4px 8px;
+    }
+    .clickdeck-intent-draft__target-btn--active {
+      border-color: var(--clickdeck-intent-color, #3b82f6);
+      color: var(--clickdeck-intent-color, #3b82f6);
+      background: color-mix(in srgb, var(--clickdeck-intent-color, #3b82f6) 10%, white);
+    }
     .clickdeck-intent-draft__actions {
       display: flex;
       justify-content: flex-end;
@@ -260,6 +251,7 @@ function injectBaseStyles(): void {
       padding: 12px 16px;
       cursor: pointer;
       background: #f8fafc;
+      border-left: 4px solid var(--clickdeck-intent-color, #3b82f6);
     }
     .clickdeck-intent-draft__saved:hover {
       background: #f1f5f9;
@@ -273,7 +265,7 @@ function injectBaseStyles(): void {
     .clickdeck-intent-draft__saved-action {
       font-size: 12px;
       font-weight: 600;
-      color: #3b82f6;
+      color: var(--clickdeck-intent-color, #3b82f6);
     }
     .clickdeck-intent-draft__saved-text {
       font-size: 13px;

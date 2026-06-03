@@ -50,6 +50,7 @@ export function createPresentationController(options: {
   let originalScrollY = 0;
 
   let originalDimensions: { width: number; height: number }[] = [];
+  let transformedAncestorStates: Array<{ element: HTMLElement; style: string | null }> = [];
 
   function updateSlideVisibility() {
     slides.forEach((slide, index) => {
@@ -158,7 +159,7 @@ export function createPresentationController(options: {
     let minDistance = Infinity;
     slides.forEach((slide, index) => {
       const rect = slide.getBoundingClientRect();
-      const distance = Math.abs(rect.top);
+      const distance = Math.abs(rect.top) + Math.abs(rect.left);
       if (distance < minDistance) {
         minDistance = distance;
         bestIndex = index;
@@ -174,8 +175,10 @@ export function createPresentationController(options: {
         height: rect.height || window.innerHeight
       };
     });
+    transformedAncestorStates = collectTransformedAncestors(slides);
 
     document.documentElement.classList.add("clickdeck-presenting");
+    neutralizeTransformedAncestors(transformedAncestorStates);
     
     document.addEventListener("keydown", onKeyDown, { capture: true });
     document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -197,6 +200,8 @@ export function createPresentationController(options: {
     isPresenting = false;
 
     document.documentElement.classList.remove("clickdeck-presenting");
+    restoreTransformedAncestors(transformedAncestorStates);
+    transformedAncestorStates = [];
     slides.forEach(slide => {
       slide.classList.remove("clickdeck-presenting-slide");
       slide.classList.remove("clickdeck-presentation-hidden-slide");
@@ -221,4 +226,45 @@ export function createPresentationController(options: {
   }
 
   return { enter, exit, next, previous, goTo, destroy };
+}
+
+function collectTransformedAncestors(slides: HTMLElement[]): Array<{ element: HTMLElement; style: string | null }> {
+  const states = new Map<HTMLElement, string | null>();
+
+  for (const slide of slides) {
+    let current = slide.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+      const computed = window.getComputedStyle(current);
+      const createsFixedContainingBlock =
+        computed.transform !== "none" ||
+        computed.perspective !== "none" ||
+        computed.filter !== "none";
+
+      if (createsFixedContainingBlock && !states.has(current)) {
+        states.set(current, current.getAttribute("style"));
+      }
+
+      current = current.parentElement;
+    }
+  }
+
+  return Array.from(states.entries()).map(([element, style]) => ({ element, style }));
+}
+
+function neutralizeTransformedAncestors(states: Array<{ element: HTMLElement; style: string | null }>): void {
+  for (const { element } of states) {
+    element.style.transform = "none";
+    element.style.perspective = "none";
+    element.style.filter = "none";
+  }
+}
+
+function restoreTransformedAncestors(states: Array<{ element: HTMLElement; style: string | null }>): void {
+  for (const { element, style } of states) {
+    if (style === null) {
+      element.removeAttribute("style");
+    } else {
+      element.setAttribute("style", style);
+    }
+  }
 }

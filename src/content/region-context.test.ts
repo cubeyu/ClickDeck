@@ -41,7 +41,7 @@ function mockRegion(viewportBox: Partial<IntentRegion["viewportBox"]>, anchorCon
   };
   return {
     id: "r1",
-    action: "add",
+    action: "intent",
     userIntent: "test",
     pageMode: "slide",
     viewportBox: r,

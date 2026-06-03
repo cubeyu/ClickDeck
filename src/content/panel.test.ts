@@ -49,6 +49,20 @@ describe("createPanel selection context", () => {
 
     panel.destroy();
   });
+
+  it("places intent before AI prompt and output sections", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    const sections = Array.from(panel.element.querySelectorAll<HTMLElement>("[data-section]")).map(
+      (section) => section.dataset.section
+    );
+
+    expect(sections.indexOf("intent")).toBeLessThan(sections.indexOf("ai-prompt"));
+    expect(sections.indexOf("ai-prompt")).toBeLessThan(sections.indexOf("finish"));
+
+    panel.destroy();
+  });
 });
 
 describe("createPanel saved edits notice", () => {
@@ -135,6 +149,7 @@ describe("createPanel export controls", () => {
     const exportPdfLong = panel.element.querySelector<HTMLButtonElement>("[data-action='export-image-pdf-long']");
     const exportPdfA4 = panel.element.querySelector<HTMLButtonElement>("[data-action='export-image-pdf-a4']");
     const exportPdfSlides = panel.element.querySelector<HTMLButtonElement>("[data-action='export-image-pdf-slides']");
+    const addIntent = panel.element.querySelector<HTMLButtonElement>("[data-action='add-intent']");
     const alignLeft = panel.element.querySelector<HTMLButtonElement>("[data-action='align-left']");
 
     expect(exportHtml?.disabled).toBe(false);
@@ -142,6 +157,7 @@ describe("createPanel export controls", () => {
     expect(exportPdfLong?.disabled).toBe(false);
     expect(exportPdfA4?.disabled).toBe(false);
     expect(exportPdfSlides?.disabled).toBe(false);
+    expect(addIntent?.disabled).toBe(false);
     expect(alignLeft?.disabled).toBe(true);
 
     panel.destroy();

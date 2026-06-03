@@ -53,7 +53,7 @@ export type ClickDeckPanel = {
 export function createPanel(onAction: (action: PanelAction) => void): ClickDeckPanel {
   const labels = getPanelLabels();
   const panelLogoUrl = typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("brand/logo2-panel.png") : "brand/logo2-panel.png";
-  const collapsedLogoUrl = typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("icons/icon48.png") : "icons/icon48.png";
+  const collapsedLogoUrl = typeof chrome !== "undefined" && chrome.runtime ? chrome.runtime.getURL("brand/logo-collapsed.png") : "brand/logo-collapsed.png";
   // Legacy browser-print PDF export is paused. Keep the code path for debugging/rollback,
   // but hide the end-user buttons by default. See roadmap task 44A.
   const SHOW_LEGACY_PDF_EXPORT = false;
@@ -78,11 +78,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         </span>
       </div>
     <div class="clickdeck-panel__hint">${labels.selectHint}</div>
-    <div class="clickdeck-panel__section" data-section="intent" data-context="none,text,container,image">
-      <div class="clickdeck-panel__group">
-        ${buttonMarkup("add-intent", labels.addIntent, true)}
-      </div>
-    </div>
+    <div class="clickdeck-panel__module-title">${labels.visualEditing}</div>
     <div class="clickdeck-panel__section" data-section="typography" data-context="text">
       <div class="clickdeck-panel__section-title">${labels.typography}</div>
       <div class="clickdeck-panel__group">
@@ -202,7 +198,26 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
           </div>
         </div>
       </div>
+      <div class="clickdeck-panel__section" data-section="diagnostics">
+        <div class="clickdeck-panel__section-title">${labels.diagnostics}</div>
+        <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
+          ${buttonMarkup("copy-diagnostics", labels.copyDiagnostics)}
+        </div>
+      </div>
     </details>
+
+    <div class="clickdeck-panel__section" data-section="intent">
+      <div class="clickdeck-panel__section-title">${labels.intentSection}</div>
+      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
+        ${buttonMarkup("add-intent", labels.addIntent)}
+      </div>
+    </div>
+    <div class="clickdeck-panel__section" data-section="ai-prompt">
+      <div class="clickdeck-panel__section-title">${labels.aiPromptSection}</div>
+      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
+        ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
+      </div>
+    </div>
 
     <div class="clickdeck-panel__section" data-section="finish">
       <div class="clickdeck-panel__section-title">${labels.finish}</div>
@@ -228,15 +243,11 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${buttonMarkup("export-image-pdf-a4", labels.exportImagePdfA4, false, labels.imagePdfTooltip)}
         ${buttonMarkup("export-image-pdf-slides", labels.exportImagePdfSlides, false, labels.imagePdfTooltip)}
       </div>
-      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
-        ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
-      </div>
     </div>
-    <div class="clickdeck-panel__section" data-section="diagnostics">
-      <div class="clickdeck-panel__section-title">${labels.diagnostics}</div>
-      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
-        ${buttonMarkup("copy-diagnostics", labels.copyDiagnostics)}
-      </div>
+    <div class="clickdeck-panel__footer">
+      <span>v1.2.0</span>
+      <a href="https://github.com/ningsiii/ClickDeck/issues" target="_blank" rel="noopener noreferrer">Feedback</a>
+      <a href="https://github.com/ningsiii/ClickDeck" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>
     </div>
     </div>
@@ -379,7 +390,8 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       "export-long-image",
       "export-image-pdf-long",
       "export-image-pdf-a4",
-      "export-image-pdf-slides"
+      "export-image-pdf-slides",
+      "add-intent"
     ]);
 
     element.querySelectorAll<HTMLButtonElement>("[data-action]").forEach((button) => {
@@ -418,7 +430,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
     setHint: (text) => {
       const hint = element.querySelector(".clickdeck-panel__hint");
       if (hint) {
-        hint.textContent = text;
+        hint.textContent = text === labels.selectHint ? text : `${labels.selectedHintPrefix} ${text}`;
       }
     },
     setHistoryAvailability: (canUndo, canRedo) => {

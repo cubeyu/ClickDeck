@@ -153,11 +153,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
     }
 
     if (group.textChange) {
-      if (isZh) {
-        lines.push(`   文本修改：从 ${quoteSnippet(group.textChange.before)} 改为 ${quoteSnippet(group.textChange.after)}。`);
-      } else {
-        lines.push(`   Text changed from ${quoteSnippet(group.textChange.before)} to ${quoteSnippet(group.textChange.after)}.`);
-      }
+      lines.push(...summarizeTextChange(group.textChange.before, group.textChange.after, isZh));
     }
 
     for (const [prop, change] of Array.from(group.styleChanges.entries())) {
@@ -207,6 +203,74 @@ function quoteSnippet(value: string): string {
   return JSON.stringify(clipped);
 }
 
+function summarizeTextChange(before: string, after: string, isZh: boolean): string[] {
+  const beforeText = normalizeText(before);
+  const afterText = normalizeText(after);
+
+  if (!beforeText && afterText) {
+    return [isZh ? `   文本新增：${quoteSnippet(afterText)}。` : `   Text added: ${quoteSnippet(afterText)}.`];
+  }
+
+  if (beforeText && !afterText) {
+    return [isZh ? `   文本删除：${quoteSnippet(beforeText)}。` : `   Text removed: ${quoteSnippet(beforeText)}.`];
+  }
+
+  const diff = findTextDiff(beforeText, afterText);
+  const lines: string[] = [];
+
+  if (diff.removed && !diff.added) {
+    lines.push(isZh ? `   文本删除：${quoteSnippet(diff.removed)}。` : `   Text removed: ${quoteSnippet(diff.removed)}.`);
+  } else if (!diff.removed && diff.added) {
+    const isAppend = diff.prefix.length >= beforeText.length - 1;
+    lines.push(
+      isZh
+        ? `   ${isAppend ? "文本追加" : "文本新增"}：${quoteSnippet(diff.added)}。`
+        : `   Text ${isAppend ? "appended" : "added"}: ${quoteSnippet(diff.added)}.`
+    );
+  } else if (diff.removed || diff.added) {
+    lines.push(
+      isZh
+        ? `   文本替换：将 ${quoteSnippet(diff.removed)} 替换为 ${quoteSnippet(diff.added)}。`
+        : `   Text replaced: ${quoteSnippet(diff.removed)} with ${quoteSnippet(diff.added)}.`
+    );
+  }
+
+  lines.push(
+    isZh
+      ? `   完整文本结果应为：${quoteSnippet(afterText)}。`
+      : `   Final text should be: ${quoteSnippet(afterText)}.`
+  );
+
+  return lines;
+}
+
+function normalizeText(value: string): string {
+  return (value ?? "").toString().replace(/\s+/g, " ").trim();
+}
+
+function findTextDiff(before: string, after: string): { prefix: string; removed: string; added: string } {
+  let prefixLength = 0;
+  const maxPrefix = Math.min(before.length, after.length);
+  while (prefixLength < maxPrefix && before[prefixLength] === after[prefixLength]) {
+    prefixLength += 1;
+  }
+
+  let suffixLength = 0;
+  const maxSuffix = Math.min(before.length - prefixLength, after.length - prefixLength);
+  while (
+    suffixLength < maxSuffix &&
+    before[before.length - 1 - suffixLength] === after[after.length - 1 - suffixLength]
+  ) {
+    suffixLength += 1;
+  }
+
+  return {
+    prefix: before.slice(0, prefixLength),
+    removed: before.slice(prefixLength, before.length - suffixLength).trim(),
+    added: after.slice(prefixLength, after.length - suffixLength).trim()
+  };
+}
+
 function normalizeAttributeValue(attribute: string, value: string): string {
   if (attribute !== "src") {
     return value;
@@ -217,4 +281,3 @@ function normalizeAttributeValue(attribute: string, value: string): string {
   }
   return raw;
 }
-

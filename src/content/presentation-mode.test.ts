@@ -156,4 +156,29 @@ describe("createPresentationController", () => {
     controller.next();
     expect(document.documentElement.classList.contains("clickdeck-presenting")).toBe(false);
   });
+
+  it("temporarily neutralizes transformed deck ancestors during presentation", async () => {
+    document.body.innerHTML = `
+      <div id="deck" style="transform: translateX(-100vw);">
+        <div class="slide" id="s1">1</div>
+        <div class="slide" id="s2">2</div>
+      </div>
+    `;
+    const deck = document.getElementById("deck") as HTMLElement;
+    const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
+
+    slides[0].getBoundingClientRect = () => ({ width: 800, height: 600, left: -1000, top: 0, right: -200, bottom: 600 } as any);
+    slides[1].getBoundingClientRect = () => ({ width: 800, height: 600, left: 0, top: 0, right: 800, bottom: 600 } as any);
+
+    const controller = createPresentationController({ slides, logger: mockLogger });
+
+    await controller.enter();
+
+    expect(deck.style.transform).toBe("none");
+    expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+
+    controller.exit();
+
+    expect(deck.getAttribute("style")).toContain("transform: translateX(-100vw)");
+  });
 });

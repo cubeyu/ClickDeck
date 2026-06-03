@@ -2,7 +2,7 @@ import { ElementLocator } from "../state/editor-state";
 import { createElementLocator } from "./dom-utils";
 import { RectLike, calculateOverlap } from "./visual-units";
 
-export type IntentAction = "add" | "delete" | "replace" | "restyle" | "move";
+export type IntentAction = "intent" | "move";
 export type PageMode = "slide" | "long" | "unknown";
 
 export type RegionAnchor = {

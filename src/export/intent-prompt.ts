@@ -64,7 +64,7 @@ export function buildIntentPrompt(
   const lines: string[] = [];
   let hasImageReplacement = false;
 
-  lines.push("ClickDeck edit instruction");
+  lines.push("ClickDeck AI edit prompt");
   lines.push("");
   lines.push("Page:");
   lines.push(`- URL: ${options.page.url || "unknown"}`);
@@ -74,13 +74,14 @@ export function buildIntentPrompt(
   
   lines.push("Global rules:");
   lines.push("1. Use the original HTML structure as the source of truth.");
-  lines.push("2. Preserve the user's wording and intent.");
-  lines.push("3. Keep changes limited to the selected region and directly related surrounding layout.");
-  lines.push("4. Match the existing visual style unless the user explicitly asks for another style.");
-  lines.push("5. If the intent or placement is ambiguous, ask the user a clarifying question before editing.");
+  lines.push("2. Treat each user note as natural-language editing intent. It may mean adding, deleting, replacing, restyling, or locally rearranging content.");
+  lines.push("3. Preserve the user's wording and intent. Do not treat the user note as literal page copy unless the user clearly asks to insert that exact text.");
+  lines.push("4. Keep changes limited to the selected region and directly related surrounding layout.");
+  lines.push("5. Match the existing visual style unless the user explicitly asks for another style.");
+  lines.push("6. If the intent, target, or placement is ambiguous, ask the user a clarifying question before editing.");
   lines.push("");
   
-  lines.push("Operations:");
+  lines.push("Intent notes:");
 
   for (let i = 0; i < inputs.length; i++) {
     const input = inputs[i];
@@ -91,11 +92,15 @@ export function buildIntentPrompt(
       return { ok: false, reason: "empty", message: options.language === "zh" ? "移动操作缺少目标区域。" : "Move operation is missing target region." };
     }
 
-    lines.push(`${i + 1}. Action: ${operation.action}`);
-    lines.push(`   User intent: "${region.userIntent}"`);
+    lines.push(`${i + 1}. ${operation.action === "move" ? "Move instruction" : "User intent"}`);
+    if (operation.action === "move") {
+      lines.push("   Instruction: Move Source region A to Target region B.");
+    } else {
+      lines.push(`   User note: "${region.userIntent}"`);
+    }
 
     if (operation.action === "move") {
-      lines.push("   Target region A (Source):");
+      lines.push("   Source region A:");
       lines.push(`   - Page mode: ${region.pageMode}`);
       lines.push(`   - Anchor: ${region.anchor.kind}${region.anchor.locator?.descriptor ? ` (${region.anchor.locator.descriptor})` : ""}`);
       if (region.relativeBox) {
@@ -117,7 +122,7 @@ export function buildIntentPrompt(
       lines.push("");
 
       const targetRegion = input.targetContext!.region;
-      lines.push("   Target region B (Destination):");
+      lines.push("   Target region B:");
       lines.push(`   - Page mode: ${targetRegion.pageMode}`);
       lines.push(`   - Anchor: ${targetRegion.anchor.kind}${targetRegion.anchor.locator?.descriptor ? ` (${targetRegion.anchor.locator.descriptor})` : ""}`);
       if (targetRegion.relativeBox) {
@@ -127,12 +132,14 @@ export function buildIntentPrompt(
       }
       lines.push("");
 
-      lines.push("   Region contents B / Nearby references (Destination):");
+      lines.push("   Target region B placement reference:");
+      lines.push("   - Use Target region B as the destination guide for placement and alignment.");
+      lines.push("   - If Target region B contains existing content, treat that content as visual context only, not as content to edit, unless it physically blocks the move.");
       if (input.targetContext!.empty) {
-        lines.push("   - The selected region is an empty visual area. Treat it as the intended placement area, not as an existing element to edit.");
+        lines.push("   - Target region B is an empty visual area. Treat it as the intended placement area.");
       } else {
         input.targetContext!.candidates.slice(0, 3).forEach(c => {
-          lines.push(`   - ${summarizeVisualUnit(c.unit)}`);
+          lines.push(`   - context: ${summarizeVisualUnit(c.unit)}`);
         });
       }
       input.targetContext!.nearby.slice(0, 4).forEach(n => {
@@ -185,28 +192,29 @@ export function buildIntentPrompt(
       lines.push("");
     }
 
-    // Action specific instructions
     lines.push("   To do:");
-    if (operation.action === "add") {
-      lines.push("   - Add new content near or inside the target region. Match the surrounding style.");
-    } else if (operation.action === "delete") {
-      lines.push("   - Delete only the contents inside the source region. You may close the gap layout if necessary.");
-    } else if (operation.action === "replace") {
-      lines.push("   - Replace the contents inside the source region exactly according to user intent.");
-    } else if (operation.action === "restyle") {
-      lines.push("   - Modify the CSS styles of the target region or its immediate contents.");
-    } else if (operation.action === "move") {
-      lines.push("   - Move the contents of Target region A to Target region B. You may adjust minor local spacing to fit the target area.");
+    if (operation.action === "move") {
+      lines.push("   - Move the contents of Source region A into the placement indicated by Target region B.");
+      lines.push("   - Preserve any obvious spatial relationship implied by the user's boxes, such as edge alignment, centering, relative offset, or approximate placement.");
+      lines.push("   - If the intended alignment is not visually clear from the boxes and nearby context, keep the move conservative and ask for clarification instead of guessing a strong alignment rule.");
+      lines.push("   - Preserve the source content, approximate size, proportions, visual hierarchy, and existing style.");
+      lines.push("   - Treat Target region B as the intended placement area, not as replacement content.");
+      lines.push("   - Align with nearby elements when the alignment relationship is visually obvious.");
+      lines.push("   - Only adjust local spacing if necessary to make the moved content fit.");
+    } else {
+      lines.push("   - Implement the user note inside the selected region.");
+      lines.push("   - Infer whether the note means add, delete, replace, restyle, or a small local layout adjustment from the user's wording.");
+      lines.push("   - If the selected region is empty, treat it as the intended placement area for new content.");
+      lines.push("   - If the selected region contains existing content, edit only the relevant content needed to satisfy the user note.");
     }
     lines.push("");
 
     lines.push("   Do not:");
-    if (operation.action === "delete") {
-      lines.push("   - Do not redesign the whole slide/page or modify unrelated content.");
-    } else if (operation.action === "move") {
+    if (operation.action === "move") {
       lines.push("   - Do not convert this into a full redesign. Do not move unrelated content unless it's strictly necessary to make room. Do not modify other slides/pages.");
     } else {
-      lines.push("   - Do not modify unrelated content or layout outside the target region.");
+      lines.push("   - Do not redesign the whole slide/page.");
+      lines.push("   - Do not modify unrelated content or layout outside the selected region.");
     }
     lines.push("");
   }
