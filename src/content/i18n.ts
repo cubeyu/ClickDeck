@@ -55,6 +55,7 @@ export type PanelLabels = {
   larger: string;
   round: string;
   replaceImage: string;
+  replaceVideo: string;
   ai: string;
   copyAiPrompt: string;
   noEdits: string;
@@ -84,8 +85,8 @@ export type PanelLabels = {
   collapse: string;
   restorePanel: string;
   transparency: string;
-  promptImageAIHint: string;
-  promptImageUIReminder: string;
+  promptMediaAIHint: string;
+  promptMediaUIReminder: string;
   promptSwitchLangConfirm: string;
   increaseWeight: string;
   decreaseWeight: string;
@@ -181,6 +182,7 @@ const englishLabels: PanelLabels = {
   larger: "Larger",
   round: "Round",
   replaceImage: "Replace image",
+  replaceVideo: "Replace video",
   ai: "AI",
   copyAiPrompt: "Copy AI edit prompt",
   noEdits: "No edits to summarize yet.",
@@ -210,8 +212,8 @@ const englishLabels: PanelLabels = {
   collapse: "Collapse",
   restorePanel: "Restore panel",
   transparency: "Transparency",
-  promptImageAIHint: "If this prompt does not include an image file or asset path, please ask the user for the replacement image before changing this src.",
-  promptImageUIReminder: "Image reminder: This prompt references a replaced image. When sending it to AI, attach the image file or provide the asset path.",
+  promptMediaAIHint: "If this prompt does not include an image/video file or asset path, please ask the user for the replacement media before changing this src.",
+  promptMediaUIReminder: "Media reminder: This prompt references a replaced image or video. When sending it to AI, attach the media file or provide the asset path.",
   promptSwitchLangConfirm: "You have manually edited the prompt. Switching language will discard your changes. Continue?",
   increaseWeight: "Increase weight",
   decreaseWeight: "Decrease weight",
@@ -307,6 +309,7 @@ const chineseLabels: PanelLabels = {
   larger: "变大",
   round: "圆形",
   replaceImage: "替换图片",
+  replaceVideo: "替换视频",
   ai: "AI",
   copyAiPrompt: "复制 AI edit prompt",
   noEdits: "当前没有可总结的修改。",
@@ -336,8 +339,8 @@ const chineseLabels: PanelLabels = {
   collapse: "折叠",
   restorePanel: "展开",
   transparency: "透明度",
-  promptImageAIHint: "如果这份 prompt 没有同时提供图片文件或资源路径，请先向用户索要替换图片，再修改这个 src。",
-  promptImageUIReminder: "图片提醒：这份 prompt 提到了替换图片。发送给 AI 时，请额外附上图片文件，或提供项目中的图片路径。",
+  promptMediaAIHint: "如果这份 prompt 没有同时提供媒体文件或资源路径，请先向用户索要替换文件，再修改这个 src。",
+  promptMediaUIReminder: "媒体提醒：这份 prompt 提到了替换媒体文件。发送给 AI 时，请额外附上媒体文件，或提供项目中的资源路径。",
   promptSwitchLangConfirm: "你已手动编辑了 prompt，切换语言将丢失这些编辑，确定继续吗？",
   increaseWeight: "增大字重",
   decreaseWeight: "减小字重",

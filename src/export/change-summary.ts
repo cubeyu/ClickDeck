@@ -2,7 +2,7 @@ import type { EditorPatch } from "../state/editor-state";
 import { getSlideContext } from "../content/dom-utils";
 
 export type PromptBuildResult =
-  | { ok: true; prompt: string; hasImageReplacement: boolean }
+  | { ok: true; prompt: string; hasMediaReplacement: boolean }
   | { ok: false; reason: "empty"; message: string };
 
 export type PromptLanguage = "en" | "zh";
@@ -137,7 +137,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
   }
 
   let index = 0;
-  let hasImageReplacement = false;
+  let hasMediaReplacement = false;
   
   for (const group of groups) {
     index += 1;
@@ -174,11 +174,11 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
       }
       
       if (attr === "src") {
-        hasImageReplacement = true;
+        hasMediaReplacement = true;
         if (isZh) {
-          lines.push(`   如果这份 prompt 没有同时提供图片文件或资源路径，请先向用户索要替换图片，再修改这个 src。`);
+          lines.push(`   如果这份 prompt 没有同时提供媒体文件或资源路径，请先向用户索要替换文件，再修改这个 src。`);
         } else {
-          lines.push(`   If this prompt does not include an image file or asset path, please ask the user for the replacement image before changing this src.`);
+          lines.push(`   If this prompt does not include an image/video file or asset path, please ask the user for the replacement media before changing this src.`);
         }
       }
     }
@@ -190,7 +190,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
     "If multiple elements match the description, use the CSS path or surrounding parent context to identify the target."
   );
 
-  return { ok: true, prompt: lines.join("\n"), hasImageReplacement };
+  return { ok: true, prompt: lines.join("\n"), hasMediaReplacement };
 }
 
 function quoteSnippet(value: string): string {
@@ -277,6 +277,9 @@ function normalizeAttributeValue(attribute: string, value: string): string {
   }
   const raw = (value ?? "").toString();
   if (raw.startsWith("data:")) {
+    if (raw.startsWith("data:video/")) {
+      return "[data URL video]";
+    }
     return "[data URL image]";
   }
   return raw;

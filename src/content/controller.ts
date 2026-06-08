@@ -77,6 +77,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     if (tag === "img") {
       return "image";
     }
+    if (tag === "video") {
+      return "video";
+    }
     if (textTags.has(tag) || canAutoStartTextEditing(target)) {
       return "text";
     }
@@ -332,6 +335,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         patch.targetElement.src = value;
       } else {
         patch.targetElement.setAttribute(patch.attribute, value);
+        if (patch.targetElement instanceof HTMLVideoElement || patch.targetElement instanceof HTMLSourceElement) {
+          const videoEl = patch.targetElement instanceof HTMLVideoElement ? patch.targetElement : patch.targetElement.closest("video");
+          if (videoEl) videoEl.load();
+        }
       }
     } else {
       patch.targetElement.textContent = value;
@@ -408,7 +415,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const descriptor = describeElement(target);
     setSelectedElement(state, { element: target, descriptor });
     panel?.setHint(descriptor);
-    panel?.setReplaceImageAvailability(target.tagName.toLowerCase() === "img");
+    const tag = target.tagName.toLowerCase();
+    const mediaType = tag === "img" ? "image" : tag === "video" ? "video" : "none";
+    panel?.setReplaceMediaAvailability(mediaType !== "none", mediaType);
     panel?.setSelectionContext(getSelectionContext(target));
 
     // Only auto-start in-place text editing for text-like elements.
@@ -432,7 +441,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     selectedElement = null;
     setSelectedElement(state, null);
     panel?.setHint(labels.selectHint);
-    panel?.setReplaceImageAvailability(false);
+    panel?.setReplaceMediaAvailability(false, "none");
     panel?.setSelectionContext("none");
     updateOutline();
     logger.info("Selection cleared", { reason });
@@ -444,7 +453,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const descriptor = describeElement(target);
     setSelectedElement(state, { element: target, descriptor });
     panel?.setHint(descriptor);
-    panel?.setReplaceImageAvailability(target.tagName.toLowerCase() === "img");
+    const tag = target.tagName.toLowerCase();
+    const mediaType = tag === "img" ? "image" : tag === "video" ? "video" : "none";
+    panel?.setReplaceMediaAvailability(mediaType !== "none", mediaType);
     panel?.setSelectionContext(getSelectionContext(target));
     updateOutline();
     logger.info("Element selected", { descriptor, reason });
@@ -562,16 +573,16 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
       let finalEn = "";
       let finalZh = "";
-      let hasImageReplacement = false;
+      let hasMediaReplacement = false;
 
       if (intentResultEn.ok) {
         finalEn += intentResultEn.prompt;
-        hasImageReplacement = hasImageReplacement || intentResultEn.hasImageReplacement;
+        hasMediaReplacement = hasMediaReplacement || intentResultEn.hasMediaReplacement;
       }
       if (patchResultEn.ok) {
         if (finalEn) finalEn += "\n\n---\n\n";
         finalEn += patchResultEn.prompt;
-        hasImageReplacement = hasImageReplacement || patchResultEn.hasImageReplacement;
+        hasMediaReplacement = hasMediaReplacement || patchResultEn.hasMediaReplacement;
       }
 
       const patchResultZh = buildAiEditPrompt(effective, { language: "zh", page });
@@ -588,7 +599,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       panel?.showPromptPreview({
         promptEn: finalEn,
         promptZh: finalZh || finalEn,
-        hasImageReplacement,
+        hasMediaReplacement,
         onCopy: (value, lang) => {
           if (!value.trim()) {
             logger.info("Copy cancelled: empty prompt");
@@ -712,6 +723,88 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             persistPatches();
 
             logger.info("Image replaced", { target: patch.targetDescriptor, fileName: file.name });
+            input.remove();
+          };
+
+          reader.readAsDataURL(file);
+        },
+        { once: true }
+      );
+
+      input.click();
+      return;
+    }
+
+    if (action === "replace-video") {
+      if (!(selectedElement instanceof HTMLVideoElement)) {
+        logger.warn("Replace video is only available for video elements");
+        return;
+      }
+
+      const video = selectedElement;
+      let targetForPatch: HTMLElement = video;
+      let targetAttr: "src" = "src";
+      
+      if (!video.hasAttribute("src")) {
+        const source = video.querySelector("source");
+        if (source) {
+          targetForPatch = source;
+        }
+      }
+
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "video/*";
+      input.style.display = "none";
+      input.dataset.clickdeck = "true";
+      document.body.appendChild(input);
+
+      input.addEventListener(
+        "change",
+        () => {
+          const file = input.files?.[0];
+          if (!file) {
+            input.remove();
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onerror = () => {
+            logger.error("Failed to read video file", { fileName: file.name });
+            input.remove();
+          };
+          reader.onload = () => {
+            const result = reader.result;
+            if (typeof result !== "string") {
+              logger.error("Unexpected FileReader result when replacing video");
+              input.remove();
+              return;
+            }
+
+            const before = targetForPatch.getAttribute(targetAttr) || "";
+            targetForPatch.setAttribute(targetAttr, result);
+            video.load();
+
+            const patch: AttributePatch = {
+              id: `${Date.now()}-${state.patches.length + 1}`,
+              kind: "attribute",
+              targetElement: targetForPatch,
+              targetDescriptor: describeElement(targetForPatch),
+              targetLocator: createElementLocator(targetForPatch),
+              attribute: targetAttr,
+              before,
+              after: result,
+              createdAt: Date.now()
+            };
+
+            state.patches.push(patch);
+            history.undoStack.push(patch);
+            history.redoStack.length = 0;
+            refreshHistoryButtons();
+            updateOutline();
+            persistPatches();
+
+            logger.info("Video replaced", { target: patch.targetDescriptor, fileName: file.name });
             input.remove();
           };
 
@@ -925,7 +1018,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     panel = createPanel(handlePanelAction);
     overlay.root.append(panel.element);
     refreshHistoryButtons();
-    panel.setReplaceImageAvailability(false);
+    panel.setReplaceMediaAvailability(false, "none");
     panel.setSelectionContext("none");
 
     const slides = detectPresentationSlides();
@@ -960,7 +1053,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     hoveredElement = null;
     selectedElement = null;
     setSelectedElement(state, null);
-    panel?.setReplaceImageAvailability(false);
+    panel?.setReplaceMediaAvailability(false, "none");
     panel?.setSelectionContext("none");
 
     presentationController?.destroy();

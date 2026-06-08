@@ -215,7 +215,7 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Visual boxes are placement hints, not absolute CSS instructions");
       expect(prompt).toContain("Do not hard-code viewport coordinates as CSS top/left");
       expect(prompt).toContain("above: [Title] (distance: 24px)");
-      expect(result.hasImageReplacement).toBe(true);
+      expect(result.hasMediaReplacement).toBe(true);
     }
   });
 

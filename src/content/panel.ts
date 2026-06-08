@@ -15,17 +15,18 @@ export type PanelAction =
   | "present"
   | "export-long-image"
   | "replace-image"
+  | "replace-video"
   | "add-intent"
   | `color:${string}`;
 
 export type PromptPreviewOptions = {
   promptEn: string;
   promptZh: string;
-  hasImageReplacement: boolean;
+  hasMediaReplacement: boolean;
   onCopy: (value: string, lang: "en" | "zh") => void;
 };
 
-export type SelectionContext = "none" | "text" | "image" | "container";
+export type SelectionContext = "none" | "text" | "image" | "video" | "container";
 
 export type SavedEditsNoticeOptions = {
   count: number;
@@ -39,7 +40,7 @@ export type ClickDeckPanel = {
   destroy: () => void;
   setHint: (text: string) => void;
   setHistoryAvailability: (canUndo: boolean, canRedo: boolean) => void;
-  setReplaceImageAvailability: (enabled: boolean) => void;
+  setReplaceMediaAvailability: (enabled: boolean, mediaType: "image" | "video" | "none") => void;
   setSelectionContext: (context: SelectionContext) => void;
   setPresentationAvailability: (hasSlides: boolean) => void;
   showPromptPreview: (options: PromptPreviewOptions) => void;
@@ -113,12 +114,13 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         ${iconButtonMarkup("align-right", `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`, labels.alignRight)}
       </div>
     </div>
-    <div class="clickdeck-panel__section" data-section="image-basic" data-context="image">
+    <div class="clickdeck-panel__section" data-section="image-basic" data-context="image,video">
       <div class="clickdeck-panel__section-title">${labels.image}</div>
       <div class="clickdeck-panel__sub-section">
         <div class="clickdeck-panel__sub-title">${labels.imageSource}</div>
         <div class="clickdeck-panel__group">
           ${buttonMarkup("replace-image", labels.replaceImage, true)}
+          ${buttonMarkup("replace-video", labels.replaceVideo, true)}
         </div>
       </div>
       <div class="clickdeck-panel__sub-section">
@@ -130,7 +132,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         </div>
       </div>
     </div>
-    <div class="clickdeck-panel__section" data-section="history" data-context="text,container,image">
+    <div class="clickdeck-panel__section" data-section="history" data-context="text,container,image,video">
       <div class="clickdeck-panel__section-title">${labels.history}</div>
       <div class="clickdeck-panel__group">
         ${buttonMarkup("undo", labels.undo, true)}
@@ -154,7 +156,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
           ${iconButtonMarkup("letterspacing-increase", `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M7 9l-3 3l3 3M17 9l3 3l-3 3M8 4v16M16 4v16"/></svg>`, labels.increaseLetterSpacing)}
         </div>
       </div>
-      <div class="clickdeck-panel__section" data-section="spacing" data-context="text,container,image">
+      <div class="clickdeck-panel__section" data-section="spacing" data-context="text,container,image,video">
         <div class="clickdeck-panel__section-title">${labels.spacing}</div>
         <div class="clickdeck-panel__group clickdeck-panel__group--spacing" data-spacing-group="margin">
           <span class="clickdeck-panel__spacing-label">${labels.margin}</span>
@@ -336,7 +338,8 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
 
   let undoAvailable = false;
   let redoAvailable = false;
-  let canReplaceImage = false;
+  let canReplaceMedia = false;
+  let replaceMediaType: "image" | "video" | "none" = "none";
   let canPresent = false;
   let currentContext: SelectionContext = "none";
 
@@ -346,9 +349,9 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       section.hidden = !allowedContexts.includes(currentContext);
     });
 
-    const paddingGroup = element.querySelector<HTMLElement>("[data-spacing-group='padding']");
+    const paddingGroup = element.querySelector<HTMLElement>('.clickdeck-panel__group--spacing[data-spacing-group="padding"]');
     if (paddingGroup) {
-      paddingGroup.hidden = currentContext === "image";
+      paddingGroup.hidden = currentContext === "image" || currentContext === "video";
     }
 
     const colorPickerEl = element.querySelector<HTMLInputElement>(".clickdeck-color-picker");
@@ -398,7 +401,15 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
         return;
       }
       if (action === "replace-image") {
-        button.disabled = currentContext !== "image" || !canReplaceImage;
+        const isImage = currentContext === "image";
+        button.disabled = !isImage || !canReplaceMedia || replaceMediaType !== "image";
+        button.style.display = isImage ? "" : "none";
+        return;
+      }
+      if (action === "replace-video") {
+        const isVideo = currentContext === "video";
+        button.disabled = !isVideo || !canReplaceMedia || replaceMediaType !== "video";
+        button.style.display = isVideo ? "" : "none";
         return;
       }
       button.disabled = currentContext === "none";
@@ -423,8 +434,9 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       redoAvailable = canRedo;
       updateContextUI();
     },
-    setReplaceImageAvailability: (enabled) => {
-      canReplaceImage = enabled;
+    setReplaceMediaAvailability: (enabled, mediaType) => {
+      canReplaceMedia = enabled;
+      replaceMediaType = mediaType;
       updateContextUI();
     },
     setSelectionContext: (context) => {
@@ -448,6 +460,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
 
       const render = (): void => {
         const promptText = currentLang === "zh" ? options.promptZh : options.promptEn;
+        
         overlay.innerHTML = `
           <div class="clickdeck-prompt-modal">
             <div class="clickdeck-prompt-modal__header">
@@ -457,8 +470,8 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
                 <button class="clickdeck-button${currentLang === "zh" ? " clickdeck-button--active" : ""}" data-lang="zh" type="button">${labels.promptLangZh}</button>
               </div>
             </div>
-            ${options.hasImageReplacement ? `<div class="clickdeck-prompt-modal__warning">${labels.promptImageUIReminder}</div>` : ""}
-            <textarea class="clickdeck-prompt-modal__textarea">${escapeHtml(promptText)}</textarea>
+            ${options.hasMediaReplacement ? `<div class="clickdeck-prompt-modal__warning">${labels.promptMediaUIReminder}</div>` : ""}
+            <textarea class="clickdeck-prompt-modal__textarea" spellcheck="false">${promptText}</textarea>
             <div class="clickdeck-prompt-modal__footer">
               <button class="clickdeck-button clickdeck-button--primary" data-prompt-action="copy" type="button">${labels.promptCopy}</button>
               <button class="clickdeck-button" data-prompt-action="close" type="button">${labels.promptClose}</button>

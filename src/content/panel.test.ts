@@ -8,7 +8,7 @@ describe("createPanel selection context", () => {
     document.body.appendChild(panel.element);
 
     panel.setSelectionContext("image");
-    panel.setReplaceImageAvailability(true);
+    panel.setReplaceMediaAvailability(true, "image");
 
     const imageSection = panel.element.querySelector<HTMLElement>("[data-section='image-basic']");
     const replaceButton = panel.element.querySelector<HTMLButtonElement>("[data-action='replace-image']");
@@ -23,7 +23,7 @@ describe("createPanel selection context", () => {
     document.body.appendChild(panel.element);
 
     panel.setSelectionContext("text");
-    panel.setReplaceImageAvailability(true);
+    panel.setReplaceMediaAvailability(true, "image");
 
     const imageSection = panel.element.querySelector<HTMLElement>("[data-section='image-basic']");
     const replaceButton = panel.element.querySelector<HTMLButtonElement>("[data-action='replace-image']");

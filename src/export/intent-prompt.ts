@@ -17,7 +17,7 @@ export type IntentPromptInput = {
 };
 
 export type PromptBuildResult =
-  | { ok: true; prompt: string; hasImageReplacement: boolean }
+  | { ok: true; prompt: string; hasMediaReplacement: boolean }
   | { ok: false; reason: "empty"; message: string };
 
 function formatRect(rect: { left: number; top: number; width: number; height: number; right: number; bottom: number }): string {
@@ -193,7 +193,7 @@ export function buildIntentPrompt(
   }
 
   const lines: string[] = [];
-  let hasImageReplacement = false;
+  let hasMediaReplacement = false;
   const hasMove = inputs.some((input) => input.operation.action === "move");
   const opIds = inputs.map((_, index) => `OP-${index + 1}`);
 
@@ -237,9 +237,9 @@ export function buildIntentPrompt(
   inputs.forEach((input, index) => {
     const opId = opIds[index];
     if (input.operation.action === "move") {
-      hasImageReplacement = appendMoveOperation(lines, input, opId) || hasImageReplacement;
+      hasMediaReplacement = appendMoveOperation(lines, input, opId) || hasMediaReplacement;
     } else {
-      hasImageReplacement = appendIntentOperation(lines, input, opId) || hasImageReplacement;
+      hasMediaReplacement = appendIntentOperation(lines, input, opId) || hasMediaReplacement;
     }
   });
 
@@ -252,6 +252,6 @@ export function buildIntentPrompt(
   return {
     ok: true,
     prompt: lines.join("\n").trim(),
-    hasImageReplacement
+    hasMediaReplacement
   };
 }
