@@ -112,6 +112,12 @@ export type PanelLabels = {
   // Intent draft UI
   intentSection: string;
   aiPromptSection: string;
+  askGeminiSection: string;
+  askGeminiHint: string;
+  askGeminiFlow: string;
+  askGeminiFocus: string;
+  askGeminiInteraction: string;
+  copyFailed: string;
   addIntent: string;
   intentActionMove: string;
   intentMoveTo: string;
@@ -239,6 +245,12 @@ const englishLabels: PanelLabels = {
   // Intent draft UI
   intentSection: "Edit suggestions",
   aiPromptSection: "AI Prompt",
+  askGeminiSection: "Ask Gemini",
+  askGeminiHint: "Paste into Chrome Ask Gemini, or Gemini/Claude website (though web versions may not see the current page natively).",
+  askGeminiFlow: "Check Flow",
+  askGeminiFocus: "Check Focus",
+  askGeminiInteraction: "Check Interaction",
+  copyFailed: "Copy failed",
   addIntent: "Add suggestion",
   intentActionMove: "Move",
   intentMoveTo: "Move to...",
@@ -366,6 +378,12 @@ const chineseLabels: PanelLabels = {
   // Intent draft UI
   intentSection: "修改意见",
   aiPromptSection: "AI Prompt",
+  askGeminiSection: "Ask Gemini",
+  askGeminiHint: "优先粘贴到 Chrome Ask Gemini；也可粘贴到网页版 Gemini/Claude，但其可能无法直接看当前页面。",
+  askGeminiFlow: "看逻辑",
+  askGeminiFocus: "看重点",
+  askGeminiInteraction: "看交互",
+  copyFailed: "复制失败",
   addIntent: "添加修改意见",
   intentActionMove: "移动",
   intentMoveTo: "移动到...",

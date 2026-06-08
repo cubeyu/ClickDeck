@@ -16,6 +16,7 @@ import {
 } from "../state/editor-state";
 import { createEditHistory } from "../state/history";
 import { canAutoStartTextEditing, createElementLocator, describeElement } from "./dom-utils";
+import { askGeminiPrompts } from "../export/ask-gemini";
 import { getPanelLabels } from "./i18n";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel, type PanelAction, type SelectionContext } from "./panel";
@@ -611,6 +612,27 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             .catch((error) => logger.error("Failed to copy AI edit prompt", { error }));
         }
       });
+      return;
+    }
+
+    if (action === "ask-gemini-flow" || action === "ask-gemini-focus" || action === "ask-gemini-interaction") {
+      let promptText = "";
+      if (action === "ask-gemini-flow") promptText = askGeminiPrompts.flow;
+      else if (action === "ask-gemini-focus") promptText = askGeminiPrompts.focus;
+      else if (action === "ask-gemini-interaction") promptText = askGeminiPrompts.interaction;
+
+      navigator.clipboard
+        .writeText(promptText)
+        .then(() => {
+          logger.info("Ask Gemini prompt copied to clipboard", { action });
+          panel?.setHint(labels.promptCopied);
+          setTimeout(() => panel?.setHint(labels.selectHint), 2000);
+        })
+        .catch((error) => {
+          logger.error("Failed to copy Ask Gemini prompt", { action, error });
+          panel?.setHint(labels.copyFailed);
+          setTimeout(() => panel?.setHint(labels.selectHint), 3000);
+        });
       return;
     }
 

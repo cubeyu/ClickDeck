@@ -17,6 +17,9 @@ export type PanelAction =
   | "replace-image"
   | "replace-video"
   | "add-intent"
+  | "ask-gemini-flow"
+  | "ask-gemini-focus"
+  | "ask-gemini-interaction"
   | `color:${string}`;
 
 export type PromptPreviewOptions = {
@@ -215,6 +218,16 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       </div>
     </div>
 
+    <div class="clickdeck-panel__section" data-section="ask-gemini">
+      <div class="clickdeck-panel__section-title">${labels.askGeminiSection}</div>
+      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr 1fr 1fr;">
+        ${buttonMarkup("ask-gemini-flow", labels.askGeminiFlow)}
+        ${buttonMarkup("ask-gemini-focus", labels.askGeminiFocus)}
+        ${buttonMarkup("ask-gemini-interaction", labels.askGeminiInteraction)}
+      </div>
+      <div class="clickdeck-panel__sub-hint" style="margin-top: 8px; font-size: 11px; opacity: 0.6; line-height: 1.4;">${labels.askGeminiHint}</div>
+    </div>
+
     <div class="clickdeck-panel__section" data-section="finish">
       <div class="clickdeck-panel__section-title">${labels.finish}</div>
       <div class="clickdeck-panel__group">
@@ -374,6 +387,9 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
       "close",
       "copy-diagnostics",
       "copy-ai-prompt",
+      "ask-gemini-flow",
+      "ask-gemini-focus",
+      "ask-gemini-interaction",
       "export-html",
       "export-long-image",
       "export-image-pdf-long",
