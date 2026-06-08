@@ -16,7 +16,8 @@ export function createIntentDraftPanel(
   onCancel: (operationId: string) => void,
   onDelete: (operationId: string) => void,
   onHighlight: (operation: IntentOperation) => void,
-  onDrawTarget?: (operationId: string) => void
+  onDrawTarget?: (operationId: string) => void,
+  onDragTarget?: (operationId: string) => void
 ): IntentDraftPanel {
   injectBaseStyles();
   const labels = getPanelLabels();
@@ -39,9 +40,14 @@ export function createIntentDraftPanel(
     card.innerHTML = `
       <div class="clickdeck-intent-draft__editing" style="display: flex;">
         <textarea class="clickdeck-intent-draft__textarea" placeholder="${labels.intentPlaceholder}"></textarea>
-        <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__target-btn" type="button">
-          ${labels.intentMoveTo}
-        </button>
+        <div class="clickdeck-intent-draft__target-actions" style="display: flex; gap: 8px;">
+          <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__target-btn" type="button">
+            ${labels.intentMoveTo}
+          </button>
+          <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__ghost-btn" type="button" style="display: none;">
+            ${labels.intentDragGhost}
+          </button>
+        </div>
         <div class="clickdeck-intent-draft__actions">
           <button class="clickdeck-button clickdeck-button--outline" data-action="cancel" type="button">${labels.cancel}</button>
           <button class="clickdeck-button clickdeck-button--primary" data-action="save" type="button">${labels.save}</button>
@@ -68,6 +74,7 @@ export function createIntentDraftPanel(
     const btnSave = card.querySelector('button[data-action="save"]') as HTMLButtonElement;
     const btnDelete = card.querySelector('button[data-action="delete"]') as HTMLButtonElement;
     const btnTarget = card.querySelector('.clickdeck-intent-draft__target-btn') as HTMLButtonElement;
+    const btnGhost = card.querySelector('.clickdeck-intent-draft__ghost-btn') as HTMLButtonElement;
 
     textarea.value = operation.source.userIntent;
 
@@ -78,6 +85,7 @@ export function createIntentDraftPanel(
       const isMove = draftAction === "move";
       btnTarget.classList.toggle("clickdeck-intent-draft__target-btn--active", isMove);
       btnTarget.textContent = isMove ? labels.selectTargetRegion : labels.intentMoveTo;
+      btnGhost.style.display = isMove ? "inline-flex" : "none";
       textarea.hidden = false;
       textarea.placeholder = isMove ? labels.intentMovePlaceholder : labels.intentPlaceholder;
     }
@@ -87,6 +95,12 @@ export function createIntentDraftPanel(
       draftAction = "move";
       syncMoveButton();
       onDrawTarget?.(operation.id);
+    });
+
+    btnGhost.addEventListener("click", () => {
+      draftAction = "move";
+      syncMoveButton();
+      onDragTarget?.(operation.id);
     });
 
     const updateSavedView = () => {

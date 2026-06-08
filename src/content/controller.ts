@@ -34,6 +34,7 @@ import { buildIntentPrompt, type IntentPromptInput } from "../export/intent-prom
 import { createIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
 import { collectVisualUnits } from "./visual-units";
 import { buildRegionContext, type RegionContext } from "./region-context";
+import { createGhostPreview, type GhostPreview } from "./intent-ghost";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -61,6 +62,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let intentOverlay: IntentOverlay | null = null;
   let intentDraftPanel: IntentDraftPanel | null = null;
   let intentDrafts: IntentDraftState[] = [];
+  let ghostPreview: GhostPreview | null = null;
   let presentationController: PresentationController | null = null;
   let editingElement: HTMLElement | null = null;
   let originalText: string = "";
@@ -996,6 +998,57 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     intentOverlay = null;
                   },
                   labels.drawTargetRegionHint
+                );
+              },
+              (opId) => {
+                // onDragTarget
+                if (ghostPreview || intentOverlay) return;
+                const draft = intentDrafts.find(d => d.operation.id === opId);
+                if (!draft) return;
+
+                const sourceViewportBox = draft.context.region.viewportBox;
+
+                ghostPreview = createGhostPreview(
+                  sourceViewportBox,
+                  (finalRect) => {
+                    ghostPreview?.destroy();
+                    ghostPreview = null;
+
+                    const units = collectVisualUnits();
+                    const region = createIntentRegion({
+                      action: "move",
+                      userIntent: "",
+                      viewportBox: finalRect,
+                      isGhostPreview: true
+                    });
+                    
+                    const idx = intentDrafts.findIndex(d => d.operation.id === opId);
+                    const excludeTexts = idx !== -1 
+                      ? intentDrafts[idx].context.candidates
+                          .map(c => c.unit.textSnippet?.trim())
+                          .filter(Boolean) as string[]
+                      : undefined;
+
+                    const targetContext = buildRegionContext(region, units, {
+                      excludeTextSnippets: excludeTexts
+                    });
+                    
+                    if (idx !== -1) {
+                      intentDrafts[idx].targetContext = targetContext;
+                      intentDrafts[idx].operation.target = targetContext.region;
+                      intentDrafts[idx].targetMarker?.remove();
+                      intentDrafts[idx].targetMarker = createIntentMarker(
+                        targetContext.region,
+                        intentDrafts[idx].color,
+                        `${idx + 1}B`
+                      );
+                      pulseIntentMarker(intentDrafts[idx].targetMarker);
+                    }
+                  },
+                  () => {
+                    ghostPreview?.destroy();
+                    ghostPreview = null;
+                  }
                 );
               }
             );

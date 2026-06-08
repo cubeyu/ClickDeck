@@ -23,6 +23,7 @@ export type IntentRegion = {
   relativeBox?: RectLike;
   anchor: RegionAnchor;
   createdAt: number;
+  isGhostPreview?: boolean;
 };
 
 export type IntentOperation = {
@@ -165,32 +166,34 @@ export function findRegionAnchor(box: RectLike, root: ParentNode = document.body
   };
 }
 
-export function createIntentRegion(input: {
+export function createIntentRegion(options: {
   action: IntentAction;
   userIntent: string;
   viewportBox: RectLike;
   root?: ParentNode;
+  isGhostPreview?: boolean;
 }): IntentRegion {
-  const root = input.root ?? document.body;
+  const root = options.root ?? document.body;
   const pageMode = detectPageMode(root);
-  const documentBox = toDocumentRect(input.viewportBox);
-  const anchor = findRegionAnchor(input.viewportBox, root);
+  const documentBox = toDocumentRect(options.viewportBox);
+  const anchor = findRegionAnchor(options.viewportBox, root);
   
   let relativeBox: RectLike | undefined;
   if (anchor.rect) {
-    relativeBox = toRelativeRect(input.viewportBox, anchor.rect);
+    relativeBox = toRelativeRect(options.viewportBox, anchor.rect);
   }
 
   return {
     id: `ir-${nextRegionId++}`,
-    action: input.action,
-    userIntent: input.userIntent,
+    action: options.action,
+    userIntent: options.userIntent,
     pageMode,
-    viewportBox: input.viewportBox,
+    viewportBox: options.viewportBox,
     documentBox,
     relativeBox,
     anchor,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    isGhostPreview: options.isGhostPreview
   };
 }
 
