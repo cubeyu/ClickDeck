@@ -230,6 +230,15 @@ function injectBaseStyles(rootId: string): void {
       margin-bottom: 0;
     }
 
+    .clickdeck-panel__group--ask-gemini {
+      grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+    }
+
+    .clickdeck-panel__group--ask-gemini .clickdeck-button {
+      min-height: 34px;
+      white-space: nowrap;
+    }
+
     .clickdeck-panel__spacing-label {
       font-size: 11px;
       color: #8a6a4e;

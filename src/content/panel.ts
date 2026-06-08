@@ -220,7 +220,7 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
 
     <div class="clickdeck-panel__section" data-section="ask-gemini">
       <div class="clickdeck-panel__section-title">${labels.askGeminiSection}</div>
-      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div class="clickdeck-panel__group clickdeck-panel__group--ask-gemini">
         ${buttonMarkup("ask-gemini-flow", labels.askGeminiFlow)}
         ${buttonMarkup("ask-gemini-focus", labels.askGeminiFocus)}
         ${buttonMarkup("ask-gemini-interaction", labels.askGeminiInteraction)}

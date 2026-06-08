@@ -397,8 +397,12 @@ const chineseLabels: PanelLabels = {
   selectTargetRegion: "选择目标区域"
 };
 
-export function getPanelLabels(): PanelLabels {
+export function getPanelLanguage(): "en" | "zh" {
   const extensionLanguage = typeof chrome !== "undefined" ? chrome.i18n?.getUILanguage?.() : undefined;
   const language = extensionLanguage ?? navigator.language ?? "";
-  return language.toLowerCase().startsWith("zh") ? chineseLabels : englishLabels;
+  return language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+export function getPanelLabels(): PanelLabels {
+  return getPanelLanguage() === "zh" ? chineseLabels : englishLabels;
 }

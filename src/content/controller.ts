@@ -16,8 +16,8 @@ import {
 } from "../state/editor-state";
 import { createEditHistory } from "../state/history";
 import { canAutoStartTextEditing, createElementLocator, describeElement } from "./dom-utils";
-import { askGeminiPrompts } from "../export/ask-gemini";
-import { getPanelLabels } from "./i18n";
+import { getAskGeminiPrompt, type AskGeminiPromptKey } from "../export/ask-gemini";
+import { getPanelLabels, getPanelLanguage } from "./i18n";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel, type PanelAction, type SelectionContext } from "./panel";
 import { getEditableTarget, getTabSwitchTarget } from "./selection";
@@ -616,10 +616,12 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     }
 
     if (action === "ask-gemini-flow" || action === "ask-gemini-focus" || action === "ask-gemini-interaction") {
-      let promptText = "";
-      if (action === "ask-gemini-flow") promptText = askGeminiPrompts.flow;
-      else if (action === "ask-gemini-focus") promptText = askGeminiPrompts.focus;
-      else if (action === "ask-gemini-interaction") promptText = askGeminiPrompts.interaction;
+      const promptKeyByAction: Record<typeof action, AskGeminiPromptKey> = {
+        "ask-gemini-flow": "flow",
+        "ask-gemini-focus": "focus",
+        "ask-gemini-interaction": "interaction"
+      };
+      const promptText = getAskGeminiPrompt(promptKeyByAction[action], getPanelLanguage());
 
       navigator.clipboard
         .writeText(promptText)
