@@ -262,4 +262,54 @@ describe("Intent Prompt Builder", () => {
       expect(result.prompt).toContain("- None detected; use Target B visual box and nearby references conservatively.");
     }
   });
+
+  it("replaces low-overlap block contents with fallback in Target B", () => {
+    const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
+    addTargetContext(input, "", false);
+    
+    // Set Target B candidates to only low overlap blocks
+    input.targetContext!.candidates = [
+      { unit: mockVisualUnit("block"), rank: 1, reason: "bg", overlapRatio: 0.05, centerInBox: false },
+      { unit: mockVisualUnit("block"), rank: 2, reason: "bg", overlapRatio: 0.08, centerInBox: false }
+    ];
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Target B placement reference:");
+      expect(result.prompt).toContain("- Mostly empty/structural area; use nearby references and alignment hints as placement context.");
+      // Ensure it doesn't output the typical formatCandidate details
+      expect(result.prompt).not.toContain("overlap 5%");
+    }
+  });
+
+  it("sorts high confidence hints before low confidence and prefixes low confidence when no high exist", () => {
+    const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
+    addTargetContext(input, "", false);
+    
+    input.targetContext!.alignmentHints = [
+      { summary: "Low edge aligns", deltaPx: 12, confidence: "low" },
+      { summary: "High edge aligns", deltaPx: 2, confidence: "high" }
+    ];
+
+    const result1 = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result1.ok).toBe(true);
+    if (result1.ok) {
+      const prompt = result1.prompt;
+      const highIdx = prompt.indexOf("- High edge aligns (delta: 2px, confidence: high).");
+      const lowIdx = prompt.indexOf("- Low edge aligns (delta: 12px, confidence: low).");
+      expect(highIdx).toBeLessThan(lowIdx);
+    }
+
+    input.targetContext!.alignmentHints = [
+      { summary: "Low edge aligns", deltaPx: 12, confidence: "low" }
+    ];
+    
+    const result2 = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result2.ok).toBe(true);
+    if (result2.ok) {
+      expect(result2.prompt).toContain("- Low-confidence: Low edge aligns");
+      expect(result2.prompt).toContain("- Only low-confidence references found");
+    }
+  });
 });

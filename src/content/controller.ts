@@ -969,9 +969,16 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                       userIntent: "",
                       viewportBox: rect
                     });
-                    const targetContext = buildRegionContext(region, units);
-                    
                     const idx = intentDrafts.findIndex(d => d.operation.id === opId);
+                    const excludeTexts = idx !== -1 
+                      ? intentDrafts[idx].context.candidates
+                          .map(c => c.unit.textSnippet?.trim())
+                          .filter(Boolean) as string[]
+                      : undefined;
+
+                    const targetContext = buildRegionContext(region, units, {
+                      excludeTextSnippets: excludeTexts
+                    });
                     if (idx !== -1) {
                       intentDrafts[idx].targetContext = targetContext;
                       intentDrafts[idx].operation.target = targetContext.region;

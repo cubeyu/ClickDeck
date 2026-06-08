@@ -177,4 +177,44 @@ describe("Region Context", () => {
       expect(spacingIndex).toBeLessThan(farCenterIndex);
     }
   });
+
+  it("calculateAlignmentHints prioritizes high confidence edge over low confidence edge", () => {
+    const box = { left: 100, top: 100, width: 200, height: 100, right: 300, bottom: 200 };
+    
+    // Low confidence edge: delta is 15px (which is low confidence, getConfidence(15) === "low")
+    const unitLow = mockUnit("textLine", { left: 85, top: 0, width: 20, height: 20 }, { textSnippet: "Low" });
+    
+    // High confidence edge: delta is 2px (which is high confidence, getConfidence(2) === "high")
+    // Let's make it a far away unit so its reference priority is lower
+    const unitHigh = mockUnit("image", { left: 102, top: 800, width: 50, height: 50 }); // Left is 102, box left is 100
+    
+    const hints = calculateAlignmentHints(box, undefined, [unitLow, unitHigh]);
+    
+    const lowHint = hints.find(h => h.summary.includes("Left edge aligns with Low"));
+    const highHint = hints.find(h => h.summary.includes("Left edge aligns with [Image]"));
+    
+    expect(lowHint).toBeDefined();
+    expect(highHint).toBeDefined();
+    
+    const lowIndex = hints.indexOf(lowHint!);
+    const highIndex = hints.indexOf(highHint!);
+    
+    // Both are nearby edges. High confidence has delta 2, Low has delta 15.
+    // High confidence should beat low confidence.
+    expect(highIndex).toBeLessThan(lowIndex);
+  });
+
+  it("calculateAlignmentHints excludes snippets if options.excludeTextSnippets is provided", () => {
+    const box = { left: 100, top: 100, width: 200, height: 100, right: 300, bottom: 200 };
+    const unitSource = mockUnit("textLine", { left: 100, top: 100, width: 200, height: 100 }, { textSnippet: "Source A Content" });
+    const unitOther = mockUnit("textLine", { left: 100, top: 200, width: 200, height: 100 }, { textSnippet: "Other Content" });
+    
+    const hints = calculateAlignmentHints(box, undefined, [unitSource, unitOther], { excludeTextSnippets: ["Source A Content"] });
+    
+    const sourceHint = hints.find(h => h.summary.includes("Source A Content"));
+    expect(sourceHint).toBeUndefined();
+    
+    const otherHint = hints.find(h => h.summary.includes("Other Content"));
+    expect(otherHint).toBeDefined();
+  });
 });

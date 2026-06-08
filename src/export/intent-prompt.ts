@@ -57,11 +57,19 @@ function appendContextBlock(lines: string[], label: string, context: RegionConte
   lines.push(`${indent}- Region confidence: ${context.confidence}`);
 }
 
-function appendRegionContents(lines: string[], context: RegionContext, indent = ""): void {
+function appendRegionContents(lines: string[], context: RegionContext, indent = "", isTargetB = false): void {
   lines.push(`${indent}Region contents:`);
   if (context.empty) {
     lines.push(`${indent}- Empty visual area; use it as intended placement area, not as an existing element.`);
     return;
+  }
+
+  if (isTargetB && context.candidates.length > 0) {
+    const allLowOverlapBlocks = context.candidates.every(c => c.unit.kind === "block" && c.overlapRatio < 0.1);
+    if (allLowOverlapBlocks) {
+      lines.push(`${indent}- Mostly empty/structural area; use nearby references and alignment hints as placement context.`);
+      return;
+    }
   }
 
   context.candidates.slice(0, 3).forEach((candidate) => {
@@ -164,13 +172,29 @@ function appendMoveOperation(lines: string[], input: IntentPromptInput, opId: st
   lines.push("Target B placement reference:");
   lines.push("- Target B is the destination guide for placement and alignment, not replacement content.");
   lines.push("- Existing content inside Target B is visual context unless it physically blocks the move.");
-  appendRegionContents(lines, targetContext);
+  appendRegionContents(lines, targetContext, "", true);
   
   lines.push("Target B alignment hints:");
   if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
-    targetContext.alignmentHints.forEach((hint) => {
+    // Partition high and non-high confidence hints
+    const highHints = targetContext.alignmentHints.filter(h => h.confidence === "high");
+    const otherHints = targetContext.alignmentHints.filter(h => h.confidence !== "high");
+    
+    highHints.forEach((hint) => {
       lines.push(`- ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
     });
+    
+    if (highHints.length === 0) {
+      // If only low/medium confidence hints, max 2, prefix with Low-confidence
+      otherHints.slice(0, 2).forEach((hint) => {
+        lines.push(`- Low-confidence: ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
+      });
+      lines.push("- Only low-confidence references found; use Target B visual box conservatively.");
+    } else {
+      otherHints.forEach((hint) => {
+        lines.push(`- ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
+      });
+    }
   } else {
     lines.push("- None detected; use Target B visual box and nearby references conservatively.");
   }

@@ -158,10 +158,15 @@ type InternalAlignmentHint = AlignmentHint & {
   referencePriority: number;
 };
 
+export type AlignmentHintOptions = {
+  excludeTextSnippets?: string[];
+};
+
 export function calculateAlignmentHints(
   box: RectLike,
   anchorRect: RectLike | undefined,
-  units: VisualUnit[]
+  units: VisualUnit[],
+  options?: AlignmentHintOptions
 ): AlignmentHint[] {
   const hints: InternalAlignmentHint[] = [];
   const boxCenterX = box.left + box.width / 2;
@@ -197,6 +202,11 @@ export function calculateAlignmentHints(
   for (const unit of units) {
     if (unit.element.closest('[data-clickdeck="true"]')) continue;
     if (unit.kind === "background" || unit.kind === "block") continue;
+
+    const textSnippet = unit.textSnippet?.trim();
+    if (options?.excludeTextSnippets && textSnippet && options.excludeTextSnippets.includes(textSnippet)) {
+      continue;
+    }
 
     const u = unit.rect;
     if (u.width === 0 || u.height === 0) continue;
@@ -243,10 +253,10 @@ export function calculateAlignmentHints(
   }
 
   const score = (h: InternalAlignmentHint) => {
-    const typeScore = h.relationKind === "edge" ? 0 : h.relationKind === "spacing" ? 10 : 20;
-    const refScore = h.referencePriority * 100;
-    const confScore = h.confidence === "high" ? 0 : h.confidence === "medium" ? 2 : 4;
-    return refScore + typeScore + confScore + (h.deltaPx * 0.1);
+    const typeScore = h.relationKind === "edge" ? 0 : h.relationKind === "spacing" ? 100 : 200;
+    const refScore = h.referencePriority === 0 ? 0 : h.referencePriority === 1 ? 100 : 400;
+    const confScore = h.confidence === "high" ? 0 : h.confidence === "medium" ? 150 : 1000;
+    return confScore + refScore + typeScore + (h.deltaPx * 0.1);
   };
 
   hints.sort((a, b) => score(a) - score(b));
@@ -276,9 +286,14 @@ export function calculateAlignmentHints(
   return topHints;
 }
 
+export type RegionContextOptions = {
+  excludeTextSnippets?: string[];
+};
+
 export function buildRegionContext(
   region: IntentRegion,
-  units: VisualUnit[]
+  units: VisualUnit[],
+  options?: RegionContextOptions
 ): RegionContext {
   const candidates = rankRegionCandidates(region, units);
   const empty = candidates.length === 0;
@@ -295,7 +310,7 @@ export function buildRegionContext(
     confidence = "medium";
   }
 
-  const alignmentHints = region.action === "move" ? calculateAlignmentHints(region.viewportBox, region.anchor.rect, units) : undefined;
+  const alignmentHints = region.action === "move" ? calculateAlignmentHints(region.viewportBox, region.anchor.rect, units, options) : undefined;
 
   return {
     region,
