@@ -17,7 +17,8 @@ export function createIntentDraftPanel(
   onDelete: (operationId: string) => void,
   onHighlight: (operation: IntentOperation) => void,
   onDrawTarget?: (operationId: string) => void,
-  onDragTarget?: (operationId: string) => void
+  onDragTarget?: (operationId: string) => void,
+  onActionChange?: (operationId: string, action: IntentAction) => void
 ): IntentDraftPanel {
   injectBaseStyles();
   const labels = getPanelLabels();
@@ -92,14 +93,18 @@ export function createIntentDraftPanel(
     syncMoveButton();
 
     btnTarget.addEventListener("click", () => {
+      const changed = draftAction !== "move";
       draftAction = "move";
       syncMoveButton();
+      if (changed) onActionChange?.(operation.id, "move");
       onDrawTarget?.(operation.id);
     });
 
     btnGhost.addEventListener("click", () => {
+      const changed = draftAction !== "move";
       draftAction = "move";
       syncMoveButton();
+      if (changed) onActionChange?.(operation.id, "move");
       onDragTarget?.(operation.id);
     });
 

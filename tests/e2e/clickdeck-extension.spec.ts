@@ -393,4 +393,50 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(page.locator("#clickdeck-root")).toBeVisible();
   });
 
+  test("10. Move intent target box label and dashed styles", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    const heading = page.getByRole("heading", { name: "Quarterly Product Review" });
+    await heading.click();
+
+    // 1. Initially it should create a marker with label "1"
+    await page.locator("[data-action='add-intent']").click();
+    
+    // Draw an intent region
+    const mouse = page.mouse;
+    await mouse.move(50, 50);
+    await mouse.down();
+    await mouse.move(150, 150);
+    await mouse.up();
+
+    // Check initial marker text
+    const marker = page.locator(".clickdeck-intent-region-marker").first();
+    await expect(marker).toBeVisible();
+    await expect(marker.locator(".clickdeck-intent-region-badge")).toHaveText("1");
+    // Ensure border style is solid initially
+    await expect(marker).toHaveCSS("border-style", "solid");
+
+    // 2. Click Move to... to switch to move
+    const intentDraft = page.locator(".clickdeck-intent-draft");
+    const btnTarget = intentDraft.locator(".clickdeck-intent-draft__target-btn");
+    await btnTarget.click();
+
+    // The marker should update its label to "1A"
+    await expect(marker.locator(".clickdeck-intent-region-badge")).toHaveText("1A");
+
+    // 3. Draw Target B
+    // We are in draw mode, click and drag
+    await mouse.move(10, 10);
+    await mouse.down();
+    await mouse.move(100, 100);
+    await mouse.up();
+
+    // A new target marker should appear, should have label "1B" and dashed border
+    const targetMarker = page.locator(".clickdeck-intent-region-marker").nth(1);
+    await expect(targetMarker).toBeVisible();
+    await expect(targetMarker.locator(".clickdeck-intent-region-badge")).toHaveText("1B");
+    await expect(targetMarker).toHaveCSS("border-style", "dashed");
+  });
+
 });

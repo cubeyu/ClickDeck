@@ -92,10 +92,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     return "container";
   }
 
+  type IntentMarkerVariant = "source" | "target" | "remove";
+
   function createIntentMarker(
     region: IntentRegion,
     color: string,
-    label: string
+    label: string,
+    variant: IntentMarkerVariant = "source"
   ): HTMLDivElement {
     const marker = document.createElement("div");
     marker.dataset.clickdeck = "true";
@@ -117,7 +120,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       top: useRelativeBox ? `${box.top}%` : `${box.top}px`,
       width: useRelativeBox ? `${box.width}%` : `${box.width}px`,
       height: useRelativeBox ? `${box.height}%` : `${box.height}px`,
-      border: `2px solid ${color}`,
+      border: `2px ${variant === "target" ? "dashed" : "solid"} ${color}`,
       backgroundColor: `${color}18`,
       boxShadow: `0 0 0 3px ${color}24`,
       borderRadius: "8px",
@@ -126,25 +129,28 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       transition: "box-shadow 0.2s ease, background-color 0.2s ease"
     });
 
-    const badge = document.createElement("span");
-    badge.textContent = label;
-    Object.assign(badge.style, {
-      position: "absolute",
-      left: "-2px",
-      top: "-24px",
-      minWidth: "22px",
-      height: "20px",
-      padding: "0 7px",
-      borderRadius: "999px",
-      background: color,
-      color: "#fff",
-      fontSize: "12px",
-      fontWeight: "700",
-      lineHeight: "20px",
-      textAlign: "center",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.16)"
-    });
-    marker.appendChild(badge);
+    if (label) {
+      const badge = document.createElement("span");
+      badge.textContent = label;
+      badge.className = "clickdeck-intent-region-badge";
+      Object.assign(badge.style, {
+        position: "absolute",
+        left: "-2px",
+        top: "-24px",
+        minWidth: "22px",
+        height: "20px",
+        padding: "0 7px",
+        borderRadius: "999px",
+        background: color,
+        color: "#fff",
+        fontSize: "12px",
+        fontWeight: "700",
+        lineHeight: "20px",
+        textAlign: "center",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.16)"
+      });
+      marker.appendChild(badge);
+    }
     (anchorElement ?? document.body).appendChild(marker);
     return marker;
   }
@@ -902,7 +908,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             createdAt: Date.now()
           };
           const color = intentColors[intentDrafts.length % intentColors.length];
-          const sourceMarker = createIntentMarker(region, color, `${intentDrafts.length + 1}A`);
+          const sourceMarker = createIntentMarker(region, color, `${intentDrafts.length + 1}`);
           
           intentDrafts.push({ operation, context, color, sourceMarker });
 
@@ -988,7 +994,8 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                       intentDrafts[idx].targetMarker = createIntentMarker(
                         targetContext.region,
                         intentDrafts[idx].color,
-                        `${idx + 1}B`
+                        `${idx + 1}B`,
+                        "target"
                       );
                       pulseIntentMarker(intentDrafts[idx].targetMarker);
                     }
@@ -1042,7 +1049,8 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                       intentDrafts[idx].targetMarker = createIntentMarker(
                         targetContext.region,
                         intentDrafts[idx].color,
-                        `${idx + 1}B`
+                        `${idx + 1}B`,
+                        "target"
                       );
                       pulseIntentMarker(intentDrafts[idx].targetMarker);
                     }
@@ -1052,6 +1060,23 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     ghostPreview = null;
                   }
                 );
+              },
+              (opId, action) => {
+                // onActionChange
+                const idx = intentDrafts.findIndex(d => d.operation.id === opId);
+                if (idx === -1) return;
+                const draft = intentDrafts[idx];
+                draft.operation.action = action;
+                draft.context.region.action = action;
+                
+                if (action === "move" && draft.sourceMarker) {
+                  draft.sourceMarker.remove();
+                  draft.sourceMarker = createIntentMarker(
+                    draft.context.region,
+                    draft.color,
+                    `${idx + 1}A`
+                  );
+                }
               }
             );
             document.documentElement.appendChild(intentDraftPanel.element);
