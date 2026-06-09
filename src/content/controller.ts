@@ -32,9 +32,9 @@ import { createIntentOverlay, type IntentOverlay } from "./intent-overlay";
 import { createIntentDraftPanel, type IntentDraftPanel } from "./intent-draft-panel";
 import { buildIntentPrompt, type IntentPromptInput } from "../export/intent-prompt";
 import { createIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
-import { collectVisualUnits } from "./visual-units";
+import { collectVisualUnits, type RectLike } from "./visual-units";
 import { buildRegionContext, type RegionContext } from "./region-context";
-import { createGhostPreview, type GhostPreview } from "./intent-ghost";
+import { createMoveTargetBox, type MoveTargetBox } from "./intent-ghost";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -62,7 +62,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let intentOverlay: IntentOverlay | null = null;
   let intentDraftPanel: IntentDraftPanel | null = null;
   let intentDrafts: IntentDraftState[] = [];
-  let ghostPreview: GhostPreview | null = null;
+  let moveTargetBox: MoveTargetBox | null = null;
   let presentationController: PresentationController | null = null;
   let editingElement: HTMLElement | null = null;
   let originalText: string = "";
@@ -922,6 +922,20 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     op.target = intentDrafts[idx].targetContext.region;
                   }
                   intentDrafts[idx].operation = op;
+                  
+                  if (moveTargetBox && op.action === "move") {
+                    moveTargetBox.destroy();
+                    moveTargetBox = null;
+                    if (intentDrafts[idx].targetContext) {
+                      intentDrafts[idx].targetMarker = createIntentMarker(
+                        intentDrafts[idx].targetContext!.region, 
+                        intentDrafts[idx].color, 
+                        `${idx + 1}B`, 
+                        "target"
+                      );
+                    }
+                  }
+
                   if (op.action !== "move" && intentDrafts[idx].targetMarker) {
                     intentDrafts[idx].targetMarker?.remove();
                     intentDrafts[idx].targetMarker = undefined;
@@ -937,6 +951,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 if (intentDrafts.length === 0) {
                   intentDraftPanel?.hide();
                 }
+                if (moveTargetBox) {
+                  moveTargetBox.destroy();
+                  moveTargetBox = null;
+                }
               },
               (opId) => {
                 // deleted
@@ -945,6 +963,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 intentDrafts = intentDrafts.filter(d => d.operation.id !== opId);
                 if (intentDrafts.length === 0) {
                   intentDraftPanel?.hide();
+                }
+                if (moveTargetBox) {
+                  moveTargetBox.destroy();
+                  moveTargetBox = null;
                 }
               },
               (op) => {
@@ -1009,60 +1031,67 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
               },
               (opId) => {
                 // onDragTarget
-                if (ghostPreview || intentOverlay) return;
+                if (moveTargetBox || intentOverlay) return;
                 const draft = intentDrafts.find(d => d.operation.id === opId);
                 if (!draft) return;
 
                 const sourceViewportBox = draft.context.region.viewportBox;
                 const anchorElement = findIntentAnchorElement(draft.context.region);
-                const anchorRect = anchorElement ? anchorElement.getBoundingClientRect() : sourceViewportBox;
+                const relativeBox = anchorElement ? draft.context.region.relativeBox : undefined;
+                const useRelativeBox = Boolean(anchorElement && relativeBox);
+                const box = relativeBox ?? draft.context.region.documentBox;
 
-                ghostPreview = createGhostPreview(
-                  sourceViewportBox,
-                  draft.color || "#3b82f6",
-                  `${intentDrafts.findIndex(d => d.operation.id === opId) + 1}B`,
-                  anchorRect,
-                  (finalRect) => {
-                    ghostPreview?.destroy();
-                    ghostPreview = null;
+                const units = collectVisualUnits();
+                const guideCandidatesX = Array.from(new Set(units.flatMap(u => [u.rect.left, u.rect.right, u.rect.left + u.rect.width / 2])));
+                const guideCandidatesY = Array.from(new Set(units.flatMap(u => [u.rect.top, u.rect.bottom, u.rect.top + u.rect.height / 2])));
 
-                    const units = collectVisualUnits();
-                    const region = createIntentRegion({
-                      action: "move",
-                      userIntent: "",
-                      viewportBox: finalRect,
-                      isGhostPreview: true
-                    });
-                    
-                    const idx = intentDrafts.findIndex(d => d.operation.id === opId);
-                    const excludeTexts = idx !== -1 
-                      ? intentDrafts[idx].context.candidates
-                          .map(c => c.unit.textSnippet?.trim())
-                          .filter(Boolean) as string[]
-                      : undefined;
-
-                    const targetContext = buildRegionContext(region, units, {
-                      excludeTextSnippets: excludeTexts
-                    });
-                    
-                    if (idx !== -1) {
-                      intentDrafts[idx].targetContext = targetContext;
-                      intentDrafts[idx].operation.target = targetContext.region;
-                      intentDrafts[idx].targetMarker?.remove();
-                      intentDrafts[idx].targetMarker = createIntentMarker(
-                        targetContext.region,
-                        intentDrafts[idx].color,
-                        `${idx + 1}B`,
-                        "target"
-                      );
-                      pulseIntentMarker(intentDrafts[idx].targetMarker);
-                    }
-                  },
-                  () => {
-                    ghostPreview?.destroy();
-                    ghostPreview = null;
+                const updateTargetContext = (finalRect: RectLike) => {
+                  const region = createIntentRegion({
+                    action: "move",
+                    userIntent: "",
+                    viewportBox: finalRect,
+                    isGhostPreview: true
+                  });
+                  const idx = intentDrafts.findIndex(d => d.operation.id === opId);
+                  const excludeTexts = idx !== -1 
+                    ? intentDrafts[idx].context.candidates
+                        .map(c => c.unit.textSnippet?.trim())
+                        .filter(Boolean) as string[]
+                    : undefined;
+                  const targetContext = buildRegionContext(region, units, { excludeTextSnippets: excludeTexts });
+                  if (idx !== -1) {
+                    intentDrafts[idx].targetContext = targetContext;
+                    intentDrafts[idx].operation.target = targetContext.region;
                   }
-                );
+                };
+
+                updateTargetContext(sourceViewportBox);
+
+                draft.targetMarker?.remove();
+                draft.targetMarker = undefined;
+
+                const idx = intentDrafts.findIndex(d => d.operation.id === opId);
+                moveTargetBox = createMoveTargetBox({
+                  color: draft.color || "#3b82f6",
+                  label: `${idx + 1}B`,
+                  anchorElement,
+                  useRelativeBox,
+                  box,
+                  guideCandidatesX,
+                  guideCandidatesY,
+                  onChange: (finalRect) => {
+                    updateTargetContext(finalRect);
+                  },
+                  onCancel: () => {
+                    moveTargetBox?.destroy();
+                    moveTargetBox = null;
+                    const d = intentDrafts.find(d => d.operation.id === opId);
+                    if (d) {
+                      d.targetContext = undefined;
+                      d.operation.target = undefined;
+                    }
+                  }
+                });
               },
               (opId, action) => {
                 // onActionChange
@@ -1084,10 +1113,17 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                   }
                 }
                 
-                if (action !== "move" && draft.targetMarker) {
-                  draft.targetMarker.remove();
-                  draft.targetMarker = undefined;
+                if (action !== "move") {
+                  if (moveTargetBox) {
+                    moveTargetBox.destroy();
+                    moveTargetBox = null;
+                  }
+                  if (draft.targetMarker) {
+                    draft.targetMarker.remove();
+                    draft.targetMarker = undefined;
+                  }
                   draft.targetContext = undefined;
+                  draft.operation.target = undefined;
                 }
               }
             );

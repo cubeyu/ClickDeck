@@ -125,6 +125,7 @@ export type PanelLabels = {
   intentMovePlaceholder: string;
   intentDragGhost: string;
   intentDragGhostHint: string;
+  intentDragToPlace: string;
   intentUsePosition: string;
   intentCancelPreview: string;
   intentMarkRemoval: string;
@@ -265,6 +266,7 @@ const englishLabels: PanelLabels = {
   intentMovePlaceholder: "Optional: align left edge / cover this text / avoid the title / keep size",
   intentDragGhost: "Move target box",
   intentDragGhostHint: "Drag the target box to describe where AI should move this region.\nThis does not change the page yet.",
+  intentDragToPlace: "Drag to place",
   intentUsePosition: "Use this position",
   intentCancelPreview: "Cancel preview",
   intentMarkRemoval: "Mark removal",
@@ -404,7 +406,8 @@ const chineseLabels: PanelLabels = {
   intentPlaceholder: "输入你想让 AI 做的操作...",
   intentMovePlaceholder: "可选：对齐左边缘 / 盖住这里 / 避开标题 / 保持大小",
   intentDragGhost: "拖动目标框",
-  intentDragGhostHint: "拖动目标框，告诉 AI 想把这块移动到哪里。\n这不会立即改变页面。",
+  intentDragGhostHint: "拖动目标框来告诉 AI 移动到哪里。\n这不会修改当前页面的 DOM。",
+  intentDragToPlace: "拖动到目标位置",
   intentUsePosition: "使用这个位置",
   intentCancelPreview: "取消预览",
   intentMarkRemoval: "标记删除",

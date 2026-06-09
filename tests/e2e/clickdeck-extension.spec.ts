@@ -430,7 +430,7 @@ test.describe("ClickDeck core editing workflows", () => {
     
     // We want to test the fallback draw path, so cancel ghost preview
     const ghostPreview = page.locator(".clickdeck-ghost-preview");
-    await ghostPreview.locator("button[data-action='cancel']").click();
+    await ghostPreview.locator(".clickdeck-ghost-preview__close").click();
 
     // 3. Draw Target B
     const btnGhost = intentDraft.locator(".clickdeck-intent-draft__ghost-btn");
@@ -475,9 +475,6 @@ test.describe("ClickDeck core editing workflows", () => {
 
     const ghostPreview = page.locator(".clickdeck-ghost-preview");
     await expect(ghostPreview).toBeVisible();
-    
-    // Assert scroll lock is active
-    await expect(page.locator("html")).toHaveClass(/clickdeck-target-box-active/);
 
     const initialBox = await ghostPreview.boundingBox();
     expect(initialBox).toBeTruthy();
@@ -502,19 +499,12 @@ test.describe("ClickDeck core editing workflows", () => {
     expect(newBox!.x).toBeGreaterThan(initialBox!.x + 50);
     expect(newBox!.y).toBeGreaterThan(initialBox!.y + 50);
 
-    // Click Use this position
-    const btnUsePosition = ghostPreview.locator("button[data-action='confirm']");
-    await btnUsePosition.click();
+    // Verify 1B marker is the ghost preview itself and has the correct badge
+    await expect(ghostPreview).toBeVisible();
+    await expect(ghostPreview.locator(".clickdeck-ghost-preview__label")).toHaveText("1B");
+    await expect(page.locator(".clickdeck-intent-region-marker", { hasText: "1B" })).toHaveCount(0); // Ensure no duplicate 1B marker
 
-    // Assert scroll lock is removed
-    await expect(page.locator("html")).not.toHaveClass(/clickdeck-target-box-active/);
     await expect(page.locator(".clickdeck-ghost-guide-line")).toHaveCount(0);
-
-    // Verify 1B marker is created and is dashed
-    const targetMarker = page.locator(".clickdeck-intent-region-marker", { hasText: "1B" });
-    await expect(targetMarker).toBeVisible();
-    await expect(targetMarker.locator(".clickdeck-intent-region-badge")).toHaveText("1B");
-    await expect(targetMarker).toHaveCSS("border-style", "dashed");
 
     // Copy AI prompt
     await page.locator("[data-action='copy-ai-prompt']").click();
