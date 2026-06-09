@@ -480,7 +480,7 @@ test.describe("ClickDeck core editing workflows", () => {
     const promptText = await modal.locator("textarea").inputValue();
     
     expect(promptText).toContain("type: remove");
-    expect(promptText).toContain("Remove the specified target region from the DOM");
+    expect(promptText).toContain("Remove the selected region from the source HTML/CSS");
   });
 
 });

@@ -43,7 +43,7 @@ function mockCandidate(kind: VisualUnitKind, options: { text?: string; element?:
 }
 
 function mockRegionContext(
-  action: "intent" | "move",
+  action: "intent" | "move" | "remove",
   userIntent: string,
   empty: boolean,
   candidates: RegionCandidate[] = [],
@@ -310,6 +310,29 @@ describe("Intent Prompt Builder", () => {
     if (result2.ok) {
       expect(result2.prompt).toContain("- Low-confidence: Low edge aligns");
       expect(result2.prompt).toContain("- Only low-confidence references found");
+    }
+  });
+
+  it("handles remove operation with note", () => {
+    const input = mockRegionContext("remove", "just delete this", false, [mockCandidate("block")]);
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("OP-1 | type: remove");
+      expect(result.prompt).toContain('Remove note: "just delete this"');
+      expect(result.prompt).toContain("Remove the selected region from the source HTML/CSS");
+      expect(result.prompt).toContain("Preserve surrounding layout where possible");
+      expect(result.prompt).toContain("Do not redesign unrelated sections");
+    }
+  });
+
+  it("handles remove operation without note", () => {
+    const input = mockRegionContext("remove", "", false, [mockCandidate("block")]);
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("OP-1 | type: remove");
+      expect(result.prompt).toContain("Remove note: [not provided]");
     }
   });
 });

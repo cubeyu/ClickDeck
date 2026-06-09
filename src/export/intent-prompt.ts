@@ -220,17 +220,17 @@ function appendRemoveOperation(lines: string[], input: IntentPromptInput, opId: 
   const userNote = sourceContext.region.userIntent.trim();
 
   lines.push(`${opId} | type: remove`);
-  if (userNote) {
-    lines.push(`User note: "${userNote}"`);
-  }
+  lines.push(`Remove note: ${userNote ? `"${userNote}"` : "[not provided]"}`);
   appendContextBlock(lines, "Target", sourceContext);
   appendRegionContents(lines, sourceContext);
   appendNearbyReferences(lines, sourceContext);
   appendCssFacts(lines, sourceContext);
   lines.push("Expected result:");
-  lines.push("- Remove the specified target region from the DOM.");
-  lines.push("- Preserve surrounding layout when removing.");
-  lines.push("- Ensure no layout collapse or unintended shifts happen after removal.");
+  lines.push("- Remove the selected region from the source HTML/CSS, or hide it only if that matches the existing implementation style.");
+  lines.push("- Preserve surrounding layout where possible.");
+  lines.push("- If removal leaves an obvious gap, adjust only local spacing/layout.");
+  lines.push("- Avoid unintended layout shifts outside the selected region and directly related surrounding layout.");
+  lines.push("- Do not redesign unrelated sections, slides, scripts, or behavior.");
   lines.push("");
 
   return false;
