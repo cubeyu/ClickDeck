@@ -1,5 +1,5 @@
 import { getPanelLabels } from "./i18n";
-import type { IntentOperation } from "./intent-region";
+import type { IntentOperation, IntentAction } from "./intent-region";
 
 const STYLE_ID = "clickdeck-intent-draft-style";
 
@@ -48,6 +48,9 @@ export function createIntentDraftPanel(
           <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__ghost-btn" type="button" style="display: none;">
             ${labels.intentDragGhost}
           </button>
+          <button class="clickdeck-button clickdeck-button--outline clickdeck-intent-draft__remove-btn" type="button">
+            ${labels.intentMarkRemoval}
+          </button>
         </div>
         <div class="clickdeck-intent-draft__actions">
           <button class="clickdeck-button clickdeck-button--outline" data-action="cancel" type="button">${labels.cancel}</button>
@@ -76,6 +79,7 @@ export function createIntentDraftPanel(
     const btnDelete = card.querySelector('button[data-action="delete"]') as HTMLButtonElement;
     const btnTarget = card.querySelector('.clickdeck-intent-draft__target-btn') as HTMLButtonElement;
     const btnGhost = card.querySelector('.clickdeck-intent-draft__ghost-btn') as HTMLButtonElement;
+    const btnRemove = card.querySelector('.clickdeck-intent-draft__remove-btn') as HTMLButtonElement;
 
     textarea.value = operation.source.userIntent;
 
@@ -87,6 +91,10 @@ export function createIntentDraftPanel(
       btnTarget.classList.toggle("clickdeck-intent-draft__target-btn--active", isMove);
       btnTarget.textContent = isMove ? labels.selectTargetRegion : labels.intentMoveTo;
       btnGhost.style.display = isMove ? "inline-flex" : "none";
+      
+      const isRemove = draftAction === "remove";
+      btnRemove.classList.toggle("clickdeck-intent-draft__remove-btn--active", isRemove);
+      
       textarea.hidden = false;
       textarea.placeholder = isMove ? labels.intentMovePlaceholder : labels.intentPlaceholder;
     }
@@ -108,13 +116,28 @@ export function createIntentDraftPanel(
       onDragTarget?.(operation.id);
     });
 
+    btnRemove.addEventListener("click", () => {
+      const changed = draftAction !== "remove";
+      draftAction = "remove";
+      syncMoveButton();
+      if (changed) onActionChange?.(operation.id, "remove");
+    });
+
     const updateSavedView = () => {
       const isMove = operation.action === "move";
-      savedActionSpan.textContent = isMove ? `[${labels.intentActionMove}]` : "";
-      savedActionSpan.hidden = !isMove;
+      const isRemove = operation.action === "remove";
+      
       if (isMove) {
+        savedActionSpan.textContent = `[${labels.intentActionMove}]`;
+        savedActionSpan.hidden = false;
         savedTextSpan.textContent = operation.source.userIntent || labels.intentActionMove;
+      } else if (isRemove) {
+        savedActionSpan.textContent = `[${labels.intentMarkRemoval}]`;
+        savedActionSpan.hidden = false;
+        savedTextSpan.textContent = operation.source.userIntent || labels.intentMarkRemoval;
       } else {
+        savedActionSpan.textContent = "";
+        savedActionSpan.hidden = true;
         savedTextSpan.textContent = operation.source.userIntent || labels.addIntent;
       }
       
@@ -141,7 +164,7 @@ export function createIntentDraftPanel(
 
     btnSave.addEventListener("click", () => {
       const text = textarea.value.trim();
-      if (!text && draftAction !== "move") {
+      if (!text && draftAction !== "move" && draftAction !== "remove") {
         textarea.focus();
         return;
       }

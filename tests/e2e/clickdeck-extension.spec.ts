@@ -439,4 +439,48 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(targetMarker).toHaveCSS("border-style", "dashed");
   });
 
+  test("11. Remove intent marker", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    const heading = page.getByRole("heading", { name: "Quarterly Product Review" });
+    await heading.click();
+    await page.locator("[data-action='add-intent']").click();
+    
+    // Draw an intent region
+    const mouse = page.mouse;
+    await mouse.move(50, 50);
+    await mouse.down();
+    await mouse.move(150, 150);
+    await mouse.up();
+
+    // Switch to Remove
+    const intentDraft = page.locator(".clickdeck-intent-draft");
+    const btnRemove = intentDraft.locator(".clickdeck-intent-draft__remove-btn");
+    await btnRemove.click();
+
+    // Check marker is dashed and has "1 Del" or "Del"
+    const marker = page.locator(".clickdeck-intent-region-marker").first();
+    await expect(marker).toHaveCSS("border-style", "dashed");
+    await expect(marker.locator(".clickdeck-intent-region-badge")).toContainText("Del");
+
+    // Save with empty note
+    await intentDraft.locator("[data-action='save']").click();
+    
+    // Panel should show [Mark removal] or similar saved state
+    await expect(intentDraft.locator(".clickdeck-intent-draft__saved-action")).toBeVisible();
+    
+    // DOM element should still be visible
+    await expect(heading).toBeVisible();
+
+    // Check Prompt
+    await page.locator("[data-action='copy-ai-prompt']").click();
+    const modal = page.locator(".clickdeck-prompt-modal");
+    await expect(modal).toBeVisible();
+    const promptText = await modal.locator("textarea").inputValue();
+    
+    expect(promptText).toContain("type: remove");
+    expect(promptText).toContain("Remove the specified target region from the DOM");
+  });
+
 });

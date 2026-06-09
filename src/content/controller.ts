@@ -97,7 +97,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   function createIntentMarker(
     region: IntentRegion,
     color: string,
-    label: string,
+    label?: string,
     variant: IntentMarkerVariant = "source"
   ): HTMLDivElement {
     const marker = document.createElement("div");
@@ -120,7 +120,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       top: useRelativeBox ? `${box.top}%` : `${box.top}px`,
       width: useRelativeBox ? `${box.width}%` : `${box.width}px`,
       height: useRelativeBox ? `${box.height}%` : `${box.height}px`,
-      border: `2px ${variant === "target" ? "dashed" : "solid"} ${color}`,
+      border: `2px ${variant === "source" ? "solid" : "dashed"} ${color}`,
       backgroundColor: `${color}18`,
       boxShadow: `0 0 0 3px ${color}24`,
       borderRadius: "8px",
@@ -1069,13 +1069,22 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 draft.operation.action = action;
                 draft.context.region.action = action;
                 
-                if (action === "move" && draft.sourceMarker) {
+                if (draft.sourceMarker) {
                   draft.sourceMarker.remove();
-                  draft.sourceMarker = createIntentMarker(
-                    draft.context.region,
-                    draft.color,
-                    `${idx + 1}A`
-                  );
+                  if (action === "move") {
+                    draft.sourceMarker = createIntentMarker(draft.context.region, draft.color, `${idx + 1}A`);
+                  } else if (action === "remove") {
+                    const panelLabels = getPanelLabels();
+                    draft.sourceMarker = createIntentMarker(draft.context.region, draft.color, `${idx + 1} ${panelLabels.intentDelBadge}`, "remove");
+                  } else {
+                    draft.sourceMarker = createIntentMarker(draft.context.region, draft.color, `${idx + 1}`);
+                  }
+                }
+                
+                if (action !== "move" && draft.targetMarker) {
+                  draft.targetMarker.remove();
+                  draft.targetMarker = undefined;
+                  draft.targetContext = undefined;
                 }
               }
             );

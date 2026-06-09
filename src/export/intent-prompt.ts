@@ -215,6 +215,27 @@ function appendMoveOperation(lines: string[], input: IntentPromptInput, opId: st
   return contextHasImage(sourceContext) || contextHasImage(targetContext);
 }
 
+function appendRemoveOperation(lines: string[], input: IntentPromptInput, opId: string): boolean {
+  const { sourceContext } = input;
+  const userNote = sourceContext.region.userIntent.trim();
+
+  lines.push(`${opId} | type: remove`);
+  if (userNote) {
+    lines.push(`User note: "${userNote}"`);
+  }
+  appendContextBlock(lines, "Target", sourceContext);
+  appendRegionContents(lines, sourceContext);
+  appendNearbyReferences(lines, sourceContext);
+  appendCssFacts(lines, sourceContext);
+  lines.push("Expected result:");
+  lines.push("- Remove the specified target region from the DOM.");
+  lines.push("- Preserve surrounding layout when removing.");
+  lines.push("- Ensure no layout collapse or unintended shifts happen after removal.");
+  lines.push("");
+
+  return false;
+}
+
 export function buildIntentPrompt(
   inputs: IntentPromptInput[],
   options: IntentPromptOptions
@@ -275,6 +296,8 @@ export function buildIntentPrompt(
     const opId = opIds[index];
     if (input.operation.action === "move") {
       hasMediaReplacement = appendMoveOperation(lines, input, opId) || hasMediaReplacement;
+    } else if (input.operation.action === "remove") {
+      hasMediaReplacement = appendRemoveOperation(lines, input, opId) || hasMediaReplacement;
     } else {
       hasMediaReplacement = appendIntentOperation(lines, input, opId) || hasMediaReplacement;
     }

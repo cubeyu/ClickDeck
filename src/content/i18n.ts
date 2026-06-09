@@ -127,6 +127,9 @@ export type PanelLabels = {
   intentDragGhostHint: string;
   intentUsePosition: string;
   intentCancelPreview: string;
+  intentMarkRemoval: string;
+  intentDelBadge: string;
+  removeActionConstraint: string;
   save: string;
   cancel: string;
   delete: string;
@@ -264,6 +267,9 @@ const englishLabels: PanelLabels = {
   intentDragGhostHint: "Drag the target box to describe where AI should move this region.\nThis does not change the page yet.",
   intentUsePosition: "Use this position",
   intentCancelPreview: "Cancel preview",
+  intentMarkRemoval: "Mark removal",
+  intentDelBadge: "Del",
+  removeActionConstraint: "Preserve surrounding layout when removing.",
   save: "Save",
   cancel: "Cancel",
   delete: "Delete",
@@ -401,6 +407,9 @@ const chineseLabels: PanelLabels = {
   intentDragGhostHint: "拖动目标框，告诉 AI 想把这块移动到哪里。\n这不会立即改变页面。",
   intentUsePosition: "使用这个位置",
   intentCancelPreview: "取消预览",
+  intentMarkRemoval: "标记删除",
+  intentDelBadge: "删除",
+  removeActionConstraint: "局部删除并保持周围布局稳定，不要引起页面排版崩塌。",
   save: "保存",
   cancel: "取消",
   delete: "删除",
