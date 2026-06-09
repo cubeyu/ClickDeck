@@ -12,6 +12,7 @@ export function createGhostPreview(
   initialRect: RectLike,
   color: string,
   label: string,
+  anchorRect: RectLike | undefined,
   onConfirm: (finalRect: RectLike) => void,
   onCancel: () => void
 ): GhostPreview {
@@ -29,6 +30,34 @@ export function createGhostPreview(
   let currentTop = initialRect.top;
   const width = initialRect.width;
   const height = initialRect.height;
+
+  // Scroll lock
+  document.documentElement.classList.add("clickdeck-target-box-active");
+
+  // Guide lines
+  const guideLines: HTMLDivElement[] = [];
+  function clearGuideLines() {
+    guideLines.forEach(l => l.remove());
+    guideLines.length = 0;
+  }
+  function drawGuideLine(isVertical: boolean, position: number) {
+    const line = document.createElement("div");
+    line.className = "clickdeck-ghost-guide-line";
+    line.dataset.clickdeck = "true";
+    if (isVertical) {
+      line.style.left = `${position}px`;
+      line.style.top = "0";
+      line.style.width = "1px";
+      line.style.height = "100vh";
+    } else {
+      line.style.left = "0";
+      line.style.top = `${position}px`;
+      line.style.width = "100vw";
+      line.style.height = "1px";
+    }
+    document.body.appendChild(line);
+    guideLines.push(line);
+  }
 
   function updatePosition() {
     element.style.left = `${currentLeft}px`;
@@ -105,12 +134,58 @@ export function createGhostPreview(
     currentLeft = initialLeft + dx;
     currentTop = initialTop + dy;
     updatePosition();
+    
+    // Update guide lines
+    clearGuideLines();
+    if (anchorRect) {
+      const threshold = 8;
+      const boxCenterX = currentLeft + width / 2;
+      const boxCenterY = currentTop + height / 2;
+      const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+      const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+      
+      const candidatesX = [
+        { anchorPos: anchorRect.left, boxPos: currentLeft },
+        { anchorPos: anchorRect.right, boxPos: currentLeft + width },
+        { anchorPos: anchorCenterX, boxPos: boxCenterX }
+      ];
+      
+      const candidatesY = [
+        { anchorPos: anchorRect.top, boxPos: currentTop },
+        { anchorPos: anchorRect.bottom, boxPos: currentTop + height },
+        { anchorPos: anchorCenterY, boxPos: boxCenterY }
+      ];
+      
+      let closestX = null;
+      let minDx = Infinity;
+      for (const cx of candidatesX) {
+        const dist = Math.abs(cx.boxPos - cx.anchorPos);
+        if (dist <= threshold && dist < minDx) {
+          minDx = dist;
+          closestX = cx.anchorPos;
+        }
+      }
+      
+      let closestY = null;
+      let minDy = Infinity;
+      for (const cy of candidatesY) {
+        const dist = Math.abs(cy.boxPos - cy.anchorPos);
+        if (dist <= threshold && dist < minDy) {
+          minDy = dist;
+          closestY = cy.anchorPos;
+        }
+      }
+      
+      if (closestX !== null) drawGuideLine(true, closestX);
+      if (closestY !== null) drawGuideLine(false, closestY);
+    }
   }
 
   function onMouseUp() {
     if (!isDragging) return;
     isDragging = false;
     element.classList.remove("clickdeck-ghost-preview--dragging");
+    clearGuideLines();
   }
 
   element.addEventListener("mousedown", onMouseDown);
@@ -125,6 +200,8 @@ export function createGhostPreview(
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       element.remove();
+      clearGuideLines();
+      document.documentElement.classList.remove("clickdeck-target-box-active");
     }
   };
 }
@@ -191,6 +268,17 @@ function injectBaseStyles(): void {
       display: flex;
       justify-content: flex-end;
       gap: 8px;
+    }
+    html.clickdeck-target-box-active,
+    html.clickdeck-target-box-active body {
+      overflow: hidden !important;
+    }
+    .clickdeck-ghost-guide-line {
+      position: fixed;
+      background-color: #3b82f688;
+      pointer-events: none;
+      z-index: 2147483646;
+      box-shadow: 0 0 2px rgba(59, 130, 246, 0.5);
     }
   `;
   document.documentElement.appendChild(style);

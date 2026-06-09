@@ -425,12 +425,16 @@ test.describe("ClickDeck core editing workflows", () => {
     // The marker should update its label to "1A"
     await expect(marker.locator(".clickdeck-intent-region-badge")).toHaveText("1A");
 
-    // We should not be in draw mode yet. We need to click "Select target region"
-    await expect(page.locator(".clickdeck-intent-overlay")).not.toBeVisible();
-    await expect(intentDraft.locator(".clickdeck-intent-draft__ghost-btn")).toBeVisible();
+    // We should be in ghost preview mode now
+    await expect(page.locator(".clickdeck-ghost-preview")).toBeVisible();
     
+    // We want to test the fallback draw path, so cancel ghost preview
+    const ghostPreview = page.locator(".clickdeck-ghost-preview");
+    await ghostPreview.locator("button[data-action='cancel']").click();
+
     // 3. Draw Target B
-    await btnTarget.click();
+    const btnGhost = intentDraft.locator(".clickdeck-intent-draft__ghost-btn");
+    await btnGhost.click();
     
     // We are in draw mode, click and drag
     await mouse.move(10, 10);
@@ -447,6 +451,10 @@ test.describe("ClickDeck core editing workflows", () => {
 
   test("11. Move intent target box dragging", async ({ page, demoPageUrl }) => {
     await page.goto(demoPageUrl);
+    
+    page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
+    page.on('pageerror', err => console.log('BROWSER ERROR:', err.message));
+
     await activateExtension(page);
 
     const heading = page.getByRole("heading", { name: "Quarterly Product Review" });
@@ -460,17 +468,16 @@ test.describe("ClickDeck core editing workflows", () => {
     await mouse.move(150, 150);
     await mouse.up();
 
-    // Click Move to...
+    // Click Move to... triggers ghost preview immediately
     const intentDraft = page.locator(".clickdeck-intent-draft");
     const btnTarget = intentDraft.locator(".clickdeck-intent-draft__target-btn");
     await btnTarget.click();
 
-    // Click Move target box
-    const btnGhost = intentDraft.locator(".clickdeck-intent-draft__ghost-btn");
-    await btnGhost.click();
-
     const ghostPreview = page.locator(".clickdeck-ghost-preview");
     await expect(ghostPreview).toBeVisible();
+    
+    // Assert scroll lock is active
+    await expect(page.locator("html")).toHaveClass(/clickdeck-target-box-active/);
 
     const initialBox = await ghostPreview.boundingBox();
     expect(initialBox).toBeTruthy();
@@ -478,7 +485,16 @@ test.describe("ClickDeck core editing workflows", () => {
     // Drag the ghost preview
     await mouse.move(initialBox!.x + 10, initialBox!.y + 10);
     await mouse.down();
+    // Move vertically downwards, keeping X same as startX, so dx=0, currentLeft=initialLeft.
+    await mouse.move(initialBox!.x + 10, initialBox!.y + 100);
+    
+    // The anchor rect's left is initialBox.x. Dragging such that dx=0 should align left exactly and show a guide line.
+    const guideLine = page.locator(".clickdeck-ghost-guide-line").first();
+    await expect(guideLine).toBeVisible();
+
+    // Now move it further right to satisfy the > 50px assertion
     await mouse.move(initialBox!.x + 100, initialBox!.y + 100);
+
     await mouse.up();
 
     const newBox = await ghostPreview.boundingBox();
@@ -489,6 +505,10 @@ test.describe("ClickDeck core editing workflows", () => {
     // Click Use this position
     const btnUsePosition = ghostPreview.locator("button[data-action='confirm']");
     await btnUsePosition.click();
+
+    // Assert scroll lock is removed
+    await expect(page.locator("html")).not.toHaveClass(/clickdeck-target-box-active/);
+    await expect(page.locator(".clickdeck-ghost-guide-line")).toHaveCount(0);
 
     // Verify 1B marker is created and is dashed
     const targetMarker = page.locator(".clickdeck-intent-region-marker", { hasText: "1B" });

@@ -95,10 +95,10 @@ describe("intent-draft-panel", () => {
     expect(savedOp.source.userIntent).toBe("align left edge");
   });
 
-  it("should not call onDrawTarget on first Move to click, but only on subsequent clicks", () => {
-    const onDrawTarget = vi.fn();
+  it("should trigger onDragTarget on Move to click immediately", () => {
+    const onDragTarget = vi.fn();
     const onActionChange = vi.fn();
-    const panel = createIntentDraftPanel(vi.fn(), vi.fn(), vi.fn(), vi.fn(), onDrawTarget, vi.fn(), onActionChange);
+    const panel = createIntentDraftPanel(vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), onDragTarget, onActionChange);
     
     const operation = createMockOperation();
     operation.action = "intent";
@@ -107,19 +107,15 @@ describe("intent-draft-panel", () => {
     const card = panel.element.querySelector(".clickdeck-intent-draft__card") as HTMLElement;
     const btnTarget = card.querySelector(".clickdeck-intent-draft__target-btn") as HTMLButtonElement;
     
-    // First click: should just switch to move
+    // Click Move to... should trigger both action change and drag target immediately
     btnTarget.click();
     expect(onActionChange).toHaveBeenCalledWith(operation.id, "move");
-    expect(onDrawTarget).not.toHaveBeenCalled();
-    
-    // Second click: should actually call onDrawTarget
-    btnTarget.click();
-    expect(onDrawTarget).toHaveBeenCalledWith(operation.id);
+    expect(onDragTarget).toHaveBeenCalledWith(operation.id);
   });
 
-  it("should call onDragTarget when btnGhost is clicked", () => {
-    const onDragTarget = vi.fn();
-    const panel = createIntentDraftPanel(vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), onDragTarget, vi.fn());
+  it("should call onDrawTarget when btnGhost is clicked", () => {
+    const onDrawTarget = vi.fn();
+    const panel = createIntentDraftPanel(vi.fn(), vi.fn(), vi.fn(), vi.fn(), onDrawTarget, vi.fn(), vi.fn());
     
     const operation = createMockOperation();
     operation.action = "move";
@@ -129,6 +125,6 @@ describe("intent-draft-panel", () => {
     const btnGhost = card.querySelector(".clickdeck-intent-draft__ghost-btn") as HTMLButtonElement;
     
     btnGhost.click();
-    expect(onDragTarget).toHaveBeenCalledWith(operation.id);
+    expect(onDrawTarget).toHaveBeenCalledWith(operation.id);
   });
 });

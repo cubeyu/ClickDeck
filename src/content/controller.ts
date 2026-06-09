@@ -1014,11 +1014,14 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 if (!draft) return;
 
                 const sourceViewportBox = draft.context.region.viewportBox;
+                const anchorElement = findIntentAnchorElement(draft.context.region);
+                const anchorRect = anchorElement ? anchorElement.getBoundingClientRect() : sourceViewportBox;
 
                 ghostPreview = createGhostPreview(
                   sourceViewportBox,
                   draft.color || "#3b82f6",
                   `${intentDrafts.findIndex(d => d.operation.id === opId) + 1}B`,
+                  anchorRect,
                   (finalRect) => {
                     ghostPreview?.destroy();
                     ghostPreview = null;

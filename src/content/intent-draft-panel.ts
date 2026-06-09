@@ -89,8 +89,9 @@ export function createIntentDraftPanel(
     const syncMoveButton = () => {
       const isMove = draftAction === "move";
       btnTarget.classList.toggle("clickdeck-intent-draft__target-btn--active", isMove);
-      btnTarget.textContent = isMove ? labels.selectTargetRegion : labels.intentMoveTo;
+      btnTarget.textContent = isMove ? labels.intentDragGhost : labels.intentMoveTo;
       btnGhost.style.display = isMove ? "inline-flex" : "none";
+      btnGhost.textContent = labels.selectTargetRegion;
       
       const isRemove = draftAction === "remove";
       btnRemove.classList.toggle("clickdeck-intent-draft__remove-btn--active", isRemove);
@@ -106,17 +107,18 @@ export function createIntentDraftPanel(
       syncMoveButton();
       if (changed) {
         onActionChange?.(operation.id, "move");
-      } else {
-        onDrawTarget?.(operation.id);
       }
+      onDragTarget?.(operation.id);
     });
 
     btnGhost.addEventListener("click", () => {
       const changed = draftAction !== "move";
       draftAction = "move";
       syncMoveButton();
-      if (changed) onActionChange?.(operation.id, "move");
-      onDragTarget?.(operation.id);
+      if (changed) {
+        onActionChange?.(operation.id, "move");
+      }
+      onDrawTarget?.(operation.id);
     });
 
     btnRemove.addEventListener("click", () => {
