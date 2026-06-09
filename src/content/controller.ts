@@ -635,13 +635,21 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         .writeText(promptText)
         .then(() => {
           logger.info("Ask Gemini prompt copied to clipboard", { action });
-          panel?.setHint(labels.promptCopied);
-          setTimeout(() => panel?.setHint(labels.selectHint), 2000);
+          const btn = panel?.element.querySelector(`[data-action="${action}"]`);
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = labels.askGeminiCopied;
+            setTimeout(() => { btn.textContent = originalText; }, 2000);
+          }
         })
         .catch((error) => {
           logger.error("Failed to copy Ask Gemini prompt", { action, error });
-          panel?.setHint(labels.copyFailed);
-          setTimeout(() => panel?.setHint(labels.selectHint), 3000);
+          const btn = panel?.element.querySelector(`[data-action="${action}"]`);
+          if (btn) {
+            const originalText = btn.textContent;
+            btn.textContent = labels.copyFailed;
+            setTimeout(() => { btn.textContent = originalText; }, 2000);
+          }
         });
       return;
     }

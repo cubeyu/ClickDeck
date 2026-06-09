@@ -220,12 +220,15 @@ export function createPanel(onAction: (action: PanelAction) => void): ClickDeckP
 
     <div class="clickdeck-panel__section" data-section="ask-gemini">
       <div class="clickdeck-panel__section-title">${labels.askGeminiSection}</div>
-      <div class="clickdeck-panel__group clickdeck-panel__group--ask-gemini">
-        ${buttonMarkup("ask-gemini-flow", labels.askGeminiFlow)}
-        ${buttonMarkup("ask-gemini-focus", labels.askGeminiFocus)}
-        ${buttonMarkup("ask-gemini-interaction", labels.askGeminiInteraction)}
-      </div>
-      <div class="clickdeck-panel__sub-hint" style="margin-top: 8px; font-size: 11px; opacity: 0.6; line-height: 1.4;">${labels.askGeminiHint}</div>
+      <div class="clickdeck-panel__sub-hint" style="margin-bottom: 8px; font-size: 11px; opacity: 0.6; line-height: 1.4;">${labels.askGeminiHint}</div>
+      <details class="clickdeck-panel__ask-gemini-details">
+        <summary class="clickdeck-panel__advanced-summary" style="margin-bottom: 8px; text-transform: none; letter-spacing: normal;">${labels.askGeminiToggle}</summary>
+        <div class="clickdeck-panel__group clickdeck-panel__group--ask-gemini">
+          ${buttonMarkup("ask-gemini-flow", labels.askGeminiFlow, false, labels.askGeminiFlowTooltip)}
+          ${buttonMarkup("ask-gemini-focus", labels.askGeminiFocus, false, labels.askGeminiFocusTooltip)}
+          ${buttonMarkup("ask-gemini-interaction", labels.askGeminiInteraction, false, labels.askGeminiInteractionTooltip)}
+        </div>
+      </details>
     </div>
 
     <div class="clickdeck-panel__section" data-section="finish">

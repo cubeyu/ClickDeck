@@ -163,3 +163,32 @@ describe("createPanel export controls", () => {
     panel.destroy();
   });
 });
+
+describe("createPanel Ask Gemini section", () => {
+  it("renders collapsed Ask Gemini section with three buttons", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    const details = panel.element.querySelector<HTMLDetailsElement>(".clickdeck-panel__ask-gemini-details");
+    expect(details).not.toBeNull();
+    expect(details?.open).toBe(false);
+
+    const btnFlow = details?.querySelector("[data-action='ask-gemini-flow']");
+    const btnFocus = details?.querySelector("[data-action='ask-gemini-focus']");
+    const btnInteraction = details?.querySelector("[data-action='ask-gemini-interaction']");
+
+    expect(btnFlow).not.toBeNull();
+    expect(btnFocus).not.toBeNull();
+    expect(btnInteraction).not.toBeNull();
+
+    expect(btnFlow?.getAttribute("title")).toBeTruthy();
+    expect(btnFlow?.getAttribute("aria-label")).toBeTruthy();
+
+    const panelHtml = panel.element.innerHTML;
+    expect(panelHtml).not.toContain("Paste into Chrome Ask Gemini");
+    expect(panelHtml).not.toContain("优先粘贴到");
+    expect(panelHtml).toContain("Use with an AI that can see this page"); // English hint by default in tests (navigator language fallback)
+
+    panel.destroy();
+  });
+});

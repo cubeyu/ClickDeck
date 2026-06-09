@@ -114,9 +114,14 @@ export type PanelLabels = {
   aiPromptSection: string;
   askGeminiSection: string;
   askGeminiHint: string;
+  askGeminiToggle: string;
   askGeminiFlow: string;
+  askGeminiFlowTooltip: string;
   askGeminiFocus: string;
+  askGeminiFocusTooltip: string;
   askGeminiInteraction: string;
+  askGeminiInteractionTooltip: string;
+  askGeminiCopied: string;
   copyFailed: string;
   addIntent: string;
   intentActionMove: string;
@@ -254,10 +259,15 @@ const englishLabels: PanelLabels = {
   intentSection: "Edit suggestions",
   aiPromptSection: "AI Prompt",
   askGeminiSection: "Ask Gemini",
-  askGeminiHint: "Paste into Chrome Ask Gemini, or Gemini/Claude website (though web versions may not see the current page natively).",
-  askGeminiFlow: "Check Flow",
-  askGeminiFocus: "Check Focus",
-  askGeminiInteraction: "Check Interaction",
+  askGeminiHint: "Use with an AI that can see this page, so it can review what coding AI may miss.",
+  askGeminiToggle: "Choose review type",
+  askGeminiFlow: "Flow",
+  askGeminiFlowTooltip: "Ask AI to review page order, cause-and-effect, and narrative flow.",
+  askGeminiFocus: "Focus",
+  askGeminiFocusTooltip: "Ask AI to spot weak visual hierarchy and buried key messages.",
+  askGeminiInteraction: "Interaction",
+  askGeminiInteractionTooltip: "Ask AI to review buttons, tabs, scrolling, and reveal patterns.",
+  askGeminiCopied: "Copied. Paste it into Ask Gemini.",
   copyFailed: "Copy failed",
   addIntent: "Add suggestion",
   intentActionMove: "Move",
@@ -395,10 +405,15 @@ const chineseLabels: PanelLabels = {
   intentSection: "修改意见",
   aiPromptSection: "AI Prompt",
   askGeminiSection: "Ask Gemini",
-  askGeminiHint: "优先粘贴到 Chrome Ask Gemini；也可粘贴到网页版 Gemini/Claude，但其可能无法直接看当前页面。",
+  askGeminiHint: "给能看见页面的 AI 用，从旁观者视角发现代码 AI 不容易看见的问题。",
+  askGeminiToggle: "选择评审方向",
   askGeminiFlow: "看逻辑",
+  askGeminiFlowTooltip: "让 AI 给页面顺序、因果关系和叙事节奏提建议。",
   askGeminiFocus: "看重点",
+  askGeminiFocusTooltip: "让 AI 找出视觉主次问题，提醒哪些重点被埋没。",
   askGeminiInteraction: "看交互",
+  askGeminiInteractionTooltip: "让 AI 检查按钮、切换和滚动路径是否顺手。",
+  askGeminiCopied: "已复制，可粘贴到 Ask Gemini",
   copyFailed: "复制失败",
   addIntent: "添加修改意见",
   intentActionMove: "移动",
