@@ -10,6 +10,8 @@ const STYLE_ID = "clickdeck-ghost-preview-style";
 
 export function createGhostPreview(
   initialRect: RectLike,
+  color: string,
+  label: string,
   onConfirm: (finalRect: RectLike) => void,
   onCancel: () => void
 ): GhostPreview {
@@ -19,6 +21,8 @@ export function createGhostPreview(
   const element = document.createElement("div");
   element.className = "clickdeck-ghost-preview";
   element.dataset.clickdeck = "true";
+  element.style.setProperty("--ghost-color", color);
+  element.style.setProperty("--ghost-bg", `color-mix(in srgb, ${color} 15%, transparent)`);
   
   // Set initial position
   let currentLeft = initialRect.left;
@@ -38,10 +42,11 @@ export function createGhostPreview(
   const uiContainer = document.createElement("div");
   uiContainer.className = "clickdeck-ghost-preview__ui";
   uiContainer.innerHTML = `
+    <div class="clickdeck-ghost-preview__label" style="background: ${color};">${label}</div>
     <div class="clickdeck-ghost-preview__hint">${labels.intentDragGhostHint}</div>
     <div class="clickdeck-ghost-preview__actions">
       <button class="clickdeck-button clickdeck-button--outline" data-action="cancel" type="button">${labels.intentCancelPreview}</button>
-      <button class="clickdeck-button clickdeck-button--primary" data-action="confirm" type="button">${labels.intentUsePosition}</button>
+      <button class="clickdeck-button clickdeck-button--primary" data-action="confirm" type="button" style="background: ${color}; border-color: ${color};">${labels.intentUsePosition}</button>
     </div>
   `;
 
@@ -131,8 +136,8 @@ function injectBaseStyles(): void {
   style.textContent = `
     .clickdeck-ghost-preview {
       position: fixed; /* We use fixed to represent viewportBox */
-      background: rgba(59, 130, 246, 0.15);
-      border: 2px dashed #3b82f6;
+      background: var(--ghost-bg);
+      border: 2px dashed var(--ghost-color);
       border-radius: 8px;
       cursor: grab;
       z-index: 2147483647; /* high z-index */
@@ -143,8 +148,19 @@ function injectBaseStyles(): void {
     .clickdeck-ghost-preview--dragging {
       cursor: grabbing;
       opacity: 0.8;
-      border: 2px solid #3b82f6;
-      background: rgba(59, 130, 246, 0.25);
+      border: 2px solid var(--ghost-color);
+    }
+    .clickdeck-ghost-preview__label {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: translateY(-100%);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 4px 4px 0 0;
+      pointer-events: none;
     }
     .clickdeck-ghost-preview__ui {
       position: absolute;

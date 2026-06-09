@@ -902,7 +902,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             createdAt: Date.now()
           };
           const color = intentColors[intentDrafts.length % intentColors.length];
-          const sourceMarker = createIntentMarker(region, color, `${intentDrafts.length + 1}`);
+          const sourceMarker = createIntentMarker(region, color, `${intentDrafts.length + 1}A`);
           
           intentDrafts.push({ operation, context, color, sourceMarker });
 
@@ -1010,6 +1010,8 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
                 ghostPreview = createGhostPreview(
                   sourceViewportBox,
+                  draft.color || "#3b82f6",
+                  `${intentDrafts.findIndex(d => d.operation.id === opId) + 1}B`,
                   (finalRect) => {
                     ghostPreview?.destroy();
                     ghostPreview = null;

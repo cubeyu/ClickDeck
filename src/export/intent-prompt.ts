@@ -171,7 +171,7 @@ function appendMoveOperation(lines: string[], input: IntentPromptInput, opId: st
   appendContextBlock(lines, "Target B", targetContext);
   lines.push("Target B placement reference:");
   if (targetContext.region.isGhostPreview) {
-    lines.push("- Target B source: dragged ghost preview.");
+    lines.push("- Target B source: dragged target box.");
   }
   lines.push("- Target B is the destination guide for placement and alignment, not replacement content.");
   lines.push("- Existing content inside Target B is visual context unless it physically blocks the move.");
