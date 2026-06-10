@@ -57,6 +57,33 @@ describe("Intent Region Core Functions", () => {
     expect(detectPageMode(document.body)).toBe("slide");
   });
 
+  it("detectPageMode should not trigger slide mode for a single generic section", () => {
+    document.body.innerHTML = `
+      <section style="width: 1000px; height: 1000px;"></section>
+    `;
+    // Mock dimensions
+    const section = document.querySelector("section") as HTMLElement;
+    (section as any).getBoundingClientRect = () => ({ width: 1000, height: 1000 });
+    Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 1000, configurable: true });
+
+    expect(detectPageMode(document.body)).toBe("unknown");
+  });
+
+  it("detectPageMode should trigger slide mode for multiple large generic sections", () => {
+    document.body.innerHTML = `
+      <section style="width: 1000px; height: 1000px;"></section>
+      <section style="width: 1000px; height: 1000px;"></section>
+    `;
+    const sections = document.querySelectorAll("section");
+    (sections[0] as any).getBoundingClientRect = () => ({ width: 1000, height: 1000 });
+    (sections[1] as any).getBoundingClientRect = () => ({ width: 1000, height: 1000 });
+    Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 1000, configurable: true });
+
+    expect(detectPageMode(document.body)).toBe("slide");
+  });
+
   it("detectPageMode should identify long mode based on scrollHeight", () => {
     // Override properties just for this test
     Object.defineProperty(document.body, 'scrollHeight', { value: 3000, configurable: true });
@@ -79,6 +106,57 @@ describe("Intent Region Core Functions", () => {
     const box = normalizeRect({ left: 100, top: 700, width: 100, height: 100 });
     
     const anchor = findRegionAnchor(box, document.body);
+    expect(anchor.kind).toBe("slide");
+    expect(anchor.locator?.descriptor).toContain("#slide2");
+  });
+
+  it("findRegionAnchor should ignore hidden slides even with exact overlap", () => {
+    document.body.innerHTML = `
+      <section class="slide" id="slide1" style="width: 800px; height: 600px; opacity: 0;"></section>
+      <section class="slide active" id="slide2" style="width: 800px; height: 600px; opacity: 1;"></section>
+    `;
+
+    const slides = document.querySelectorAll(".slide");
+    // Both cover the same viewport area
+    (slides[0] as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+    (slides[1] as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+    
+    // Mock getComputedStyle for visibility checks
+    window.getComputedStyle = (el) => ({
+      display: "block",
+      visibility: "visible",
+      opacity: (el as HTMLElement).style.opacity || "1"
+    }) as any;
+
+    const box = normalizeRect({ left: 100, top: 100, width: 100, height: 100 });
+    const anchor = findRegionAnchor(box, document.body);
+    
+    expect(anchor.kind).toBe("slide");
+    expect(anchor.locator?.descriptor).toContain("#slide2");
+  });
+
+  it("findRegionAnchor should prioritize active slide over identical overlap", () => {
+    document.body.innerHTML = `
+      <section class="slide" id="slide1" style="width: 800px; height: 600px;"></section>
+      <section class="slide active" id="slide2" style="width: 800px; height: 600px;"></section>
+      <section class="slide" id="slide3" style="width: 800px; height: 600px;"></section>
+    `;
+
+    const slides = document.querySelectorAll(".slide");
+    // All cover the exact same area
+    (slides[0] as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+    (slides[1] as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+    (slides[2] as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+
+    window.getComputedStyle = () => ({
+      display: "block",
+      visibility: "visible",
+      opacity: "1"
+    }) as any;
+
+    const box = normalizeRect({ left: 100, top: 100, width: 100, height: 100 });
+    const anchor = findRegionAnchor(box, document.body);
+    
     expect(anchor.kind).toBe("slide");
     expect(anchor.locator?.descriptor).toContain("#slide2");
   });

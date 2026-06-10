@@ -5,6 +5,8 @@ import { RectLike, calculateOverlap } from "./visual-units";
 export type IntentAction = "intent" | "move" | "remove";
 export type PageMode = "slide" | "long" | "unknown";
 
+export const ANCHOR_OVERLAP_EPSILON = 10;
+
 export type RegionAnchor = {
   kind: "slide" | "section" | "container" | "document";
   label?: string;
@@ -84,12 +86,47 @@ export function toRelativeRect(box: RectLike, anchorRect: RectLike): RectLike {
   };
 }
 
+export function isVisibleAnchorCandidate(element: HTMLElement): boolean {
+  if (element.hasAttribute("hidden")) return false;
+  if (element.getAttribute("aria-hidden") === "true") return false;
+  
+  const style = window.getComputedStyle(element);
+  if (style.display === "none") return false;
+  if (style.visibility === "hidden") return false;
+  if (parseFloat(style.opacity) < 0.01) return false;
+  
+  return true;
+}
+
+export function getAnchorPriority(element: HTMLElement): number {
+  if (element.classList.contains("active")) return 10;
+  if (element.getAttribute("aria-current") === "true") return 10;
+  if (element.getAttribute("data-active") === "true") return 10;
+  return 0;
+}
+
 export function detectPageMode(root: ParentNode = document.body): PageMode {
   if (typeof document === "undefined") return "unknown";
   
-  const slideElements = root.querySelectorAll('[aria-roledescription="slide"], .slide, [data-slide], section');
-  if (slideElements.length > 0) {
+  const strongSlideElements = root.querySelectorAll('[aria-roledescription="slide"], .slide, [data-slide]');
+  if (strongSlideElements.length > 0) {
     return "slide";
+  }
+
+  const sections = root.querySelectorAll('section');
+  if (sections.length > 1) {
+    let slideLikeSections = 0;
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    for (let i = 0; i < sections.length; i++) {
+      const rect = sections[i].getBoundingClientRect();
+      if (rect.height >= viewportHeight * 0.8 && rect.width >= viewportWidth * 0.8) {
+        slideLikeSections++;
+      }
+    }
+    if (slideLikeSections > 1) {
+      return "slide";
+    }
   }
 
   const height = document.body.scrollHeight;
@@ -108,13 +145,26 @@ export function findRegionAnchor(box: RectLike, root: ParentNode = document.body
     const slides = Array.from(root.querySelectorAll('[aria-roledescription="slide"], .slide, [data-slide], section')) as HTMLElement[];
     let bestSlide: HTMLElement | null = null;
     let maxOverlap = 0;
+    let bestPriority = -1;
     
     for (const slide of slides) {
+      if (!isVisibleAnchorCandidate(slide)) continue;
+
       const rect = slide.getBoundingClientRect();
       const { overlapArea } = calculateOverlap(rect, box);
-      if (overlapArea > maxOverlap) {
-        maxOverlap = overlapArea;
-        bestSlide = slide;
+      const priority = getAnchorPriority(slide);
+
+      if (overlapArea > 0) {
+        const areaDiff = overlapArea - maxOverlap;
+        if (areaDiff > ANCHOR_OVERLAP_EPSILON) {
+          maxOverlap = overlapArea;
+          bestPriority = priority;
+          bestSlide = slide;
+        } else if (Math.abs(areaDiff) <= ANCHOR_OVERLAP_EPSILON && priority > bestPriority) {
+          maxOverlap = Math.max(maxOverlap, overlapArea);
+          bestPriority = priority;
+          bestSlide = slide;
+        }
       }
     }
 
