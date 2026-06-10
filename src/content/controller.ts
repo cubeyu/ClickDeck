@@ -268,6 +268,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
           const hydrated = hydratePersistedPatches(payload.patches, logger);
           if (hydrated.length === 0) {
             logger.warn("No persisted patches could be restored");
+            clearPersistedPatches();
           } else {
             for (const patch of hydrated) {
               applyPatchValue(patch, patch.after);
@@ -641,6 +642,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             btn.textContent = labels.askGeminiCopied;
             setTimeout(() => { btn.textContent = originalText; }, 2000);
           }
+          panel?.element.classList.add("clickdeck-panel--collapsed");
         })
         .catch((error) => {
           logger.error("Failed to copy Ask Gemini prompt", { action, error });
