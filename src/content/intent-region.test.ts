@@ -161,6 +161,35 @@ describe("Intent Region Core Functions", () => {
     expect(anchor.locator?.descriptor).toContain("#slide2");
   });
 
+  it("findRegionAnchor should ignore nested generic sections inside an active slide", () => {
+    document.body.innerHTML = `
+      <div class="slide active" id="slide1" style="width: 800px; height: 600px;">
+        <section id="inner-section" style="width: 400px; height: 300px;"></section>
+      </div>
+    `;
+
+    const slide = document.querySelector("#slide1") as HTMLElement;
+    const section = document.querySelector("#inner-section") as HTMLElement;
+    
+    // Both are visible
+    window.getComputedStyle = () => ({
+      display: "block",
+      visibility: "visible",
+      opacity: "1"
+    }) as any;
+
+    (slide as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+    (section as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 300, right: 400, bottom: 300 });
+
+    // The box exactly matches the inner section, so overlap is identical for the inner section
+    const box = normalizeRect({ left: 0, top: 0, width: 400, height: 300 });
+    const anchor = findRegionAnchor(box, document.body);
+    
+    // Should still anchor to the slide, not the generic section
+    expect(anchor.kind).toBe("slide");
+    expect(anchor.locator?.descriptor).toContain("#slide1");
+  });
+
   it("createIntentRegion should preserve userIntent and compute correct properties", () => {
     document.body.innerHTML = `
       <section class="slide" id="slide1" style="width: 800px; height: 600px;"></section>

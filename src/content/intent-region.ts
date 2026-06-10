@@ -142,7 +142,7 @@ export function findRegionAnchor(box: RectLike, root: ParentNode = document.body
   const mode = detectPageMode(root);
   
   if (mode === "slide") {
-    const slides = Array.from(root.querySelectorAll('[aria-roledescription="slide"], .slide, [data-slide], section')) as HTMLElement[];
+    const slides = Array.from(root.querySelectorAll('[aria-roledescription="slide"], .slide, [data-slide]')) as HTMLElement[];
     let bestSlide: HTMLElement | null = null;
     let maxOverlap = 0;
     let bestPriority = -1;
