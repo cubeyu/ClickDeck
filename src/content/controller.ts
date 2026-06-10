@@ -282,9 +282,6 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
           }
           panel?.hideSavedEditsNotice();
         },
-        onDismiss: () => {
-          panel?.hideSavedEditsNotice();
-        },
         onClear: () => {
           clearPersistedPatches();
           panel?.hideSavedEditsNotice();

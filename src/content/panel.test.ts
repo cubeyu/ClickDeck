@@ -66,18 +66,16 @@ describe("createPanel selection context", () => {
 });
 
 describe("createPanel saved edits notice", () => {
-  it("shows Restore/Dismiss/Clear buttons and handles callbacks", () => {
+  it("shows Restore/Clear buttons and handles callbacks", () => {
     const panel = createPanel(() => undefined);
     document.body.appendChild(panel.element);
 
     let restoreCalled = false;
-    let dismissCalled = false;
     let clearCalled = false;
 
     panel.showSavedEditsNotice({
       count: 5,
       onRestore: () => { restoreCalled = true; },
-      onDismiss: () => { dismissCalled = true; },
       onClear: () => { clearCalled = true; }
     });
 
@@ -90,14 +88,11 @@ describe("createPanel saved edits notice", () => {
     const clearBtn = notice?.querySelector<HTMLButtonElement>("[data-notice-action='clear']");
 
     expect(restoreBtn).not.toBeNull();
-    expect(dismissBtn).not.toBeNull();
+    expect(dismissBtn).toBeNull();
     expect(clearBtn).not.toBeNull();
 
     restoreBtn?.click();
     expect(restoreCalled).toBe(true);
-
-    dismissBtn?.click();
-    expect(dismissCalled).toBe(true);
 
     clearBtn?.click();
     expect(clearCalled).toBe(true);
@@ -112,7 +107,6 @@ describe("createPanel saved edits notice", () => {
     panel.showSavedEditsNotice({
       count: 1,
       onRestore: () => {},
-      onDismiss: () => {},
       onClear: () => {}
     });
 
