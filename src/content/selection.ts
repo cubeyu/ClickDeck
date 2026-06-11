@@ -38,13 +38,45 @@ export function getTabSwitchTarget(
   return null;
 }
 
-export function getEditableTarget(target: EventTarget | null): HTMLElement | null {
+export function isLargeContainer(element: HTMLElement): boolean {
+  const tagName = element.tagName.toLowerCase();
+  
+  if (tagName === "img" || tagName === "video" || tagName === "svg" || tagName === "canvas") {
+    return false;
+  }
+  
+  if (["button", "input", "select", "textarea", "a"].includes(tagName)) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  const viewportArea = window.innerWidth * window.innerHeight;
+  const elementArea = rect.width * rect.height;
+
+  return elementArea > viewportArea * 0.4;
+}
+
+export function getEditableTarget(
+  target: EventTarget | null,
+  currentSelected?: HTMLElement | null
+): HTMLElement | null {
   if (!(target instanceof HTMLElement)) {
     return null;
   }
 
   if (!isSelectableElement(target)) {
     return null;
+  }
+
+  if (isLargeContainer(target)) {
+    if (currentSelected === target) {
+      return target;
+    }
+
+    const child = findFirstEditableDescendant(target);
+    if (child && isSelectableElement(child)) {
+      return child;
+    }
   }
 
   return target;

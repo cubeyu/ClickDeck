@@ -20,7 +20,7 @@ import { getAskGeminiPrompt, type AskGeminiPromptKey } from "../export/ask-gemin
 import { getPanelLabels, getPanelLanguage } from "./i18n";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel, type PanelAction, type SelectionContext } from "./panel";
-import { getEditableTarget, getTabSwitchTarget } from "./selection";
+import { getEditableTarget, getTabSwitchTarget, isLargeContainer } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
 import { buildAiEditPrompt } from "../export/change-summary";
@@ -416,7 +416,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
-    const target = getEditableTarget(event.target);
+    const target = getEditableTarget(event.target, selectedElement);
     if (target === hoveredElement) {
       return;
     }
@@ -432,13 +432,22 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
-    const target = getEditableTarget(event.target);
+    const rawTarget = event.target as HTMLElement;
 
     // If clicking inside the currently editing element, do not intercept
     // This allows the user to click to place the cursor.
-    if (editingElement && editingElement.contains(event.target as Node)) {
+    if (editingElement && editingElement.contains(rawTarget)) {
       return;
     }
+
+    if (selectedElement && rawTarget === selectedElement && isLargeContainer(selectedElement)) {
+      event.preventDefault();
+      event.stopPropagation();
+      clearSelection("double-click large container");
+      return;
+    }
+
+    const target = getEditableTarget(rawTarget, selectedElement);
 
     // Stop editing the previous element before selecting a new one
     stopEditing();
