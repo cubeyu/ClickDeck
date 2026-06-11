@@ -47,39 +47,68 @@ describe("getTabSwitchTarget", () => {
 });
 
 describe("isLargeContainer and getEditableTarget", () => {
-  it("identifies large containers based on area", async () => {
-    // We need to import isLargeContainer to test it directly or test via getEditableTarget
-    const { isLargeContainer } = await import("./selection");
+  describe("isLargeContainer refinements", () => {
+    it("identifies large containers based on area and tag", async () => {
+      const { isLargeContainer } = await import("./selection");
 
-    const el = document.createElement("div");
-    // Mock getBoundingClientRect
-    el.getBoundingClientRect = () => ({
-      left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000,
-      x: 0, y: 0, toJSON: () => {}
+      const el = document.createElement("div");
+      el.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000,
+        x: 0, y: 0, toJSON: () => {}
+      });
+
+      expect(isLargeContainer(el)).toBe(true);
+
+      // Make it small
+      el.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
+        x: 0, y: 0, toJSON: () => {}
+      });
+      expect(isLargeContainer(el)).toBe(false);
     });
 
-    // 1000x1000 is 1M. viewport is 1024x768 (786k). 40% is ~314k.
-    expect(isLargeContainer(el)).toBe(true);
-
-    // Make it small
-    el.getBoundingClientRect = () => ({
-      left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
-      x: 0, y: 0, toJSON: () => {}
+    it("rejects large elements that are not layout tags", async () => {
+      const { isLargeContainer } = await import("./selection");
+      const el = document.createElement("span");
+      el.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000,
+        x: 0, y: 0, toJSON: () => {}
+      });
+      expect(isLargeContainer(el)).toBe(false);
     });
-    expect(isLargeContainer(el)).toBe(false);
+
+    it("rejects large elements with role dialog/navigation", async () => {
+      const { isLargeContainer } = await import("./selection");
+      const el = document.createElement("div");
+      el.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000,
+        x: 0, y: 0, toJSON: () => {}
+      });
+      
+      el.setAttribute("role", "dialog");
+      expect(isLargeContainer(el)).toBe(false);
+      
+      el.removeAttribute("role");
+      el.setAttribute("aria-modal", "true");
+      expect(isLargeContainer(el)).toBe(false);
+    });
   });
 
-  it("getEditableTarget falls back to first specific editable child if target is large container", async () => {
+  it("getEditableTarget falls back to first meaningful child if target is large container", async () => {
     const { getEditableTarget } = await import("./selection");
 
     document.body.innerHTML = `
       <div id="large-container">
-        <span id="child">Target Text</span>
+        <div id="empty-div"></div>
+        <span id="layout-span"></span>
+        <button id="child">Target Text</button>
       </div>
     `;
 
     const largeContainer = document.getElementById("large-container") as HTMLElement;
     const child = document.getElementById("child") as HTMLElement;
+    const emptyDiv = document.getElementById("empty-div") as HTMLElement;
+    const layoutSpan = document.getElementById("layout-span") as HTMLElement;
 
     largeContainer.getBoundingClientRect = () => ({
       left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000,
@@ -90,8 +119,19 @@ describe("isLargeContainer and getEditableTarget", () => {
       left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
       x: 0, y: 0, toJSON: () => {}
     });
+    
+    emptyDiv.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
+      x: 0, y: 0, toJSON: () => {}
+    });
+    
+    layoutSpan.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
+      x: 0, y: 0, toJSON: () => {}
+    });
 
     // When clicking large container (and it's not currently selected), it falls back to child
+    // It should skip emptyDiv and layoutSpan because they are not meaningful
     expect(getEditableTarget(largeContainer)).toBe(child);
 
     // If large container IS already selected, it does NOT fall back (so controller can clear it)

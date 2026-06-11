@@ -1,4 +1,4 @@
-import { findFirstEditableDescendant, isClickDeckUiElement } from "./dom-utils";
+import { findFirstEditableDescendant, findMeaningfulDescendant, isClickDeckUiElement } from "./dom-utils";
 
 export type TabDirection = "forward" | "backward";
 
@@ -45,15 +45,47 @@ export function isLargeContainer(element: HTMLElement): boolean {
     return false;
   }
   
-  if (["button", "input", "select", "textarea", "a"].includes(tagName)) {
+  if (["button", "input", "select", "textarea", "a", "label"].includes(tagName)) {
     return false;
+  }
+
+  const role = element.getAttribute("role");
+  if (role === "dialog" || role === "toolbar" || role === "navigation") {
+    return false;
+  }
+  if (element.getAttribute("aria-modal") === "true") {
+    return false;
+  }
+  if (["dialog", "nav", "form", "table"].includes(tagName)) {
+    return false;
+  }
+  if (element.isContentEditable) {
+    return false;
+  }
+
+  try {
+    const style = window.getComputedStyle(element);
+    if (style.position === "fixed" || style.position === "sticky") {
+      return false;
+    }
+  } catch {
+    // ignore
   }
 
   const rect = element.getBoundingClientRect();
   const viewportArea = window.innerWidth * window.innerHeight;
   const elementArea = rect.width * rect.height;
 
-  return elementArea > viewportArea * 0.4;
+  if (elementArea <= viewportArea * 0.4) {
+    return false;
+  }
+
+  const layoutTags = ["div", "main", "section", "article", "header", "footer", "aside"];
+  if (!layoutTags.includes(tagName)) {
+    return false;
+  }
+
+  return true;
 }
 
 export function getEditableTarget(
@@ -73,7 +105,7 @@ export function getEditableTarget(
       return target;
     }
 
-    const child = findFirstEditableDescendant(target);
+    const child = findMeaningfulDescendant(target);
     if (child && isSelectableElement(child)) {
       return child;
     }

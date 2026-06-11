@@ -174,6 +174,58 @@ export function findFirstEditableDescendant(root: HTMLElement): HTMLElement | nu
   return null;
 }
 
+export function isMeaningfulElement(element: HTMLElement): boolean {
+  if (isClickDeckUiElement(element)) return false;
+
+  const rect = element.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return false;
+  
+  try {
+    const style = window.getComputedStyle(element);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+  } catch {
+    // ignore
+  }
+
+  const tagName = element.tagName.toLowerCase();
+  if (["img", "video", "svg", "canvas", "button", "input", "select", "textarea", "a", "label"].includes(tagName)) {
+    return true;
+  }
+
+  if (/^h[1-6]$/.test(tagName) || ["p", "li", "td", "th"].includes(tagName)) {
+    return true;
+  }
+
+  // Check direct text nodes
+  for (const child of Array.from(element.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE && child.textContent && child.textContent.trim().length > 0) {
+      return true;
+    }
+  }
+
+  const className = typeof element.className === "string" ? element.className.toLowerCase() : "";
+  if (className.includes("card") || className.includes("btn") || className.includes("item") || className.includes("icon")) {
+    return true;
+  }
+
+  if (element.isContentEditable) return true;
+
+  return false;
+}
+
+export function findMeaningfulDescendant(root: HTMLElement): HTMLElement | null {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let node = walker.nextNode();
+  while (node) {
+    const element = node as HTMLElement;
+    if (isMeaningfulElement(element) && element !== document.body && element !== document.documentElement) {
+      return element;
+    }
+    node = walker.nextNode();
+  }
+  return null;
+}
+
 function pickRoleHint(element: HTMLElement): string | undefined {
   const ariaLabel = element.getAttribute("aria-label")?.trim();
   if (ariaLabel) return ariaLabel.slice(0, 80);
