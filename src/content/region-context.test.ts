@@ -82,21 +82,21 @@ describe("Region Context", () => {
   it("findNearbyReferences finds closest elements", () => {
     const region = mockRegion({ left: 100, top: 100, width: 100, height: 100 });
     
-    const above1 = mockUnit("block", { left: 100, top: 0, width: 100, height: 50 });
-    const above2 = mockUnit("block", { left: 100, top: 60, width: 100, height: 20 }); // Closer!
-    const below = mockUnit("block", { left: 100, top: 250, width: 100, height: 50 });
+    const above1 = mockUnit("textBlock", { left: 100, top: 0, width: 100, height: 50 });
+    const above2 = mockUnit("textBlock", { left: 100, top: 60, width: 100, height: 20 }); // Closer!
+    const below = mockUnit("textBlock", { left: 100, top: 250, width: 100, height: 50 });
     
     const refs = findNearbyReferences(region, [above1, above2, below]);
     
     const aboveRef = refs.find(r => r.direction === "above");
     expect(aboveRef).toBeDefined();
     expect(aboveRef?.unit).toBe(above2); // Should pick the closer one
-    expect(aboveRef?.distance).toBe(20); // 100 - (60+20) = 20
+    expect(aboveRef?.distance).toBe(10); // actual 20 - bonus 10 = 10
     
     const belowRef = refs.find(r => r.direction === "below");
     expect(belowRef).toBeDefined();
     expect(belowRef?.unit).toBe(below);
-    expect(belowRef?.distance).toBe(50); // 250 - (100+100) = 50
+    expect(belowRef?.distance).toBe(40); // actual 50 - bonus 10 = 40
   });
 
   it("buildRegionContext returns correct confidence", () => {
@@ -114,13 +114,13 @@ describe("Region Context", () => {
     expect(ctx2.confidence).toBe("medium");
 
     // Empty, but has nearby -> medium confidence
-    const nearbyUnit = mockUnit("block", { left: 0, top: 150, width: 100, height: 50 });
+    const nearbyUnit = mockUnit("textBlock", { left: 0, top: 150, width: 100, height: 50 });
     const ctx3 = buildRegionContext(regionLow, [nearbyUnit]);
     expect(ctx3.empty).toBe(true);
     expect(ctx3.confidence).toBe("medium");
 
     // Empty, no nearby -> low confidence
-    const farUnit = mockUnit("block", { left: 0, top: 1000, width: 100, height: 50 });
+    const farUnit = mockUnit("textBlock", { left: 0, top: 1000, width: 100, height: 50 });
     const ctx4 = buildRegionContext(regionLow, [farUnit]); // Too far
     expect(ctx4.empty).toBe(true);
     expect(ctx4.confidence).toBe("low");

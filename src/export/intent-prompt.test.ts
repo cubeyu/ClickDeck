@@ -100,7 +100,7 @@ function addTargetContext(input: IntentPromptInput, userIntent = "", empty = tru
       createdAt: Date.now()
     },
     candidates: empty ? [] : [mockCandidate("textBlock", { text: "Target context" })],
-    nearby: [{ direction: "above", summary: "[Title]", distance: 24 } as any],
+    nearby: [{ direction: "above", summary: "[Title]", distance: 24, layoutSemantic: "place Target B below this reference / preserve vertical spacing" } as any],
     alignmentHints: [
       { summary: "Left edge aligns with [Title] left edge", deltaPx: 2, confidence: "high" },
       { summary: "Top edge is 24px below [Header] bottom edge", deltaPx: 24, confidence: "high" }
@@ -137,7 +137,7 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain('User note: "Add a title here"');
       expect(prompt).toContain("Visual box: [x:10, y:20, w:30, h:40] relative to anchor, placement hint only");
       expect(prompt).toContain("Empty visual area; use it as intended placement area");
-      expect(prompt).toContain("above: [Image] (distance: 12px)");
+      expect(prompt).toContain("- above: [Image], 12px away");
       expect(prompt).toContain("Completion checklist:");
       expect(prompt).not.toContain("Intent notes:");
       expect(prompt.match(/To do:/g)).toBeNull();
@@ -223,10 +223,14 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.");
       expect(prompt).toContain("Visual boxes are placement hints, not absolute CSS instructions");
       expect(prompt).toContain("Do not hard-code viewport coordinates as CSS top/left");
-      expect(prompt).toContain("Target B alignment hints:");
+      expect(prompt).toContain("Placement summary:");
+      expect(prompt).toContain("Treat Source A as the entire selected content group");
+      expect(prompt).toContain("Target B is below and shifted to the right of Source A.");
+      expect(prompt).toContain("Placement references:");
+      expect(prompt).toContain("- above: [Title], 24px away; place Target B below this reference / preserve vertical spacing.");
+      expect(prompt).toContain("Final alignment guide:");
       expect(prompt).toContain("- Left edge aligns with [Title] left edge (delta: 2px, confidence: high).");
       expect(prompt).toContain("- Top edge is 24px below [Header] bottom edge (delta: 24px, confidence: high).");
-      expect(prompt).toContain("above: [Title] (distance: 24px)");
       expect(result.hasMediaReplacement).toBe(true);
     }
   });
@@ -263,8 +267,8 @@ describe("Intent Prompt Builder", () => {
     const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.prompt).toContain("Target B alignment hints:");
-      expect(result.prompt).toContain("- None detected; use Target B visual box and nearby references conservatively.");
+      expect(result.prompt).toContain("Final alignment guide:");
+      expect(result.prompt).toContain("- None active at drop; use Placement references and Target B visual box.");
     }
   });
 

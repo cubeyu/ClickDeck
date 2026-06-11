@@ -77,15 +77,19 @@ export function appendRegionContents(lines: string[], context: RegionContext, in
   });
 }
 
-export function appendNearbyReferences(lines: string[], context: RegionContext, indent = ""): void {
-  lines.push(`${indent}Nearby references:`);
+export function appendNearbyReferences(lines: string[], context: RegionContext, indent = "", label = "Nearby references"): void {
+  lines.push(`${indent}${label}:`);
   if (context.nearby.length === 0) {
     lines.push(`${indent}- None found.`);
     return;
   }
 
-  context.nearby.slice(0, 4).forEach((nearby) => {
-    lines.push(`${indent}- ${nearby.direction}: ${nearby.summary} (distance: ${Math.round(nearby.distance)}px)`);
+  context.nearby.slice(0, 8).forEach((nearby) => {
+    let text = `${indent}- ${nearby.direction}: ${nearby.summary}, ${Math.round(nearby.distance)}px away`;
+    if (nearby.layoutSemantic) {
+      text += `; ${nearby.layoutSemantic}.`;
+    }
+    lines.push(text);
   });
 }
 
@@ -170,6 +174,35 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   appendRegionContents(lines, sourceContext);
   appendCssFacts(lines, sourceContext);
   lines.push("");
+
+  lines.push("Placement summary:");
+  lines.push("- Treat Source A as the entire selected content group, not as individual child spans or text fragments.");
+
+  const sBox = sourceContext.region.viewportBox;
+  const tBox = targetContext.region.viewportBox;
+  const sCenterX = sBox.left + sBox.width / 2;
+  const sCenterY = sBox.top + sBox.height / 2;
+  const tCenterX = tBox.left + tBox.width / 2;
+  const tCenterY = tBox.top + tBox.height / 2;
+
+  let horizontalWord = "";
+  if (tCenterX > sCenterX + sBox.width * 0.1) horizontalWord = "shifted to the right of";
+  else if (tCenterX < sCenterX - sBox.width * 0.1) horizontalWord = "shifted to the left of";
+
+  let verticalWord = "";
+  if (tCenterY < sCenterY - sBox.height * 0.1) verticalWord = "above";
+  else if (tCenterY > sCenterY + sBox.height * 0.1) verticalWord = "below";
+
+  if (horizontalWord && verticalWord) {
+    lines.push(`- Target B is ${verticalWord} and ${horizontalWord} Source A.`);
+  } else if (horizontalWord) {
+    lines.push(`- Target B is ${horizontalWord} Source A.`);
+  } else if (verticalWord) {
+    lines.push(`- Target B is ${verticalWord} Source A.`);
+  } else {
+    lines.push(`- Target B is roughly at the same position as Source A.`);
+  }
+  lines.push("");
   appendContextBlock(lines, "Target B", targetContext);
   lines.push("Target B placement reference:");
   if (targetContext.region.isGhostPreview) {
@@ -179,9 +212,11 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   lines.push("- Existing content inside Target B is visual context unless it physically blocks the move.");
   appendRegionContents(lines, targetContext, "", true);
   
-  lines.push("Target B alignment hints:");
+  appendNearbyReferences(lines, targetContext, "", "Placement references");
+  lines.push("");
+
+  lines.push("Final alignment guide:");
   if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
-    // Partition high and non-high confidence hints
     const highHints = targetContext.alignmentHints.filter(h => h.confidence === "high");
     const otherHints = targetContext.alignmentHints.filter(h => h.confidence !== "high");
     
@@ -190,7 +225,6 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
     });
     
     if (highHints.length === 0) {
-      // If only low/medium confidence hints, max 2, prefix with Low-confidence
       otherHints.slice(0, 2).forEach((hint) => {
         lines.push(`- Low-confidence: ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
       });
@@ -201,10 +235,9 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
       });
     }
   } else {
-    lines.push("- None detected; use Target B visual box and nearby references conservatively.");
+    lines.push("- None active at drop; use Placement references and Target B visual box.");
   }
   
-  appendNearbyReferences(lines, targetContext);
   appendCssFacts(lines, targetContext);
   if (!skipExpectedResult) {
     lines.push("Expected result:");

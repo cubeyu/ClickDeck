@@ -84,4 +84,53 @@ describe("buildUnifiedPrompt", () => {
       expect(prompt).toContain("Remove the selected region from the source HTML/CSS");
     }
   });
+
+  it("integrates Move intent prompt structure with Placement summary and Final alignment guide", () => {
+    const intent: IntentPromptInput = {
+      operation: { action: "move", id: "op1" } as any,
+      sourceContext: {
+        region: { 
+          id: "r1", 
+          viewportBox: { left: 10, top: 20, width: 30, height: 40, right: 40, bottom: 60 },
+          pageMode: "slide", 
+          userIntent: "move this block", 
+          anchor: { kind: "slide", confidence: "high" } 
+        },
+        empty: false,
+        candidates: [],
+        nearby: [],
+        confidence: "high"
+      } as any,
+      targetContext: {
+        region: {
+          id: "r2",
+          viewportBox: { left: 100, top: 100, width: 30, height: 40, right: 130, bottom: 140 },
+          pageMode: "slide",
+          userIntent: "",
+          anchor: { kind: "slide", confidence: "high" }
+        },
+        empty: true,
+        candidates: [],
+        nearby: [{ direction: "right", summary: "[Title]", distance: 10, layoutSemantic: "avoid overlap / preserve offset" } as any],
+        alignmentHints: [
+          { summary: "Left edge aligns with [Title] left edge", deltaPx: 0, confidence: "high" }
+        ],
+        confidence: "high"
+      } as any
+    };
+
+    const result = buildUnifiedPrompt([], [intent], { language: "en", page: dummyPage });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const prompt = result.prompt;
+      
+      expect(prompt).toContain("Placement summary:");
+      expect(prompt).toContain("Treat Source A as the entire selected content group");
+      expect(prompt).toContain("Target B is below and shifted to the right of Source A");
+      expect(prompt).toContain("Placement references:");
+      expect(prompt).toContain("- right: [Title], 10px away; avoid overlap / preserve offset.");
+      expect(prompt).toContain("Final alignment guide:");
+      expect(prompt).toContain("- Left edge aligns with [Title] left edge (delta: 0px, confidence: high).");
+    }
+  });
 });

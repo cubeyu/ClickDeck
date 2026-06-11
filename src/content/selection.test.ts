@@ -52,9 +52,18 @@ describe("isLargeContainer and getEditableTarget", () => {
       const { isLargeContainer } = await import("./selection");
 
       const el = document.createElement("div");
-      el.innerHTML = "<span>Meaningful descendant</span>";
+      const span = document.createElement("span");
+      span.textContent = "Meaningful descendant";
+      span.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
+        x: 0, y: 0, toJSON: () => {}
+      });
+      el.appendChild(span);
       document.body.appendChild(el);
       
+      Object.defineProperty(window, "innerWidth", { value: 1000, writable: true });
+      Object.defineProperty(window, "innerHeight", { value: 1000, writable: true });
+
       el.getBoundingClientRect = () => ({
         left: 0, top: 0, right: 1000, bottom: 1000, width: 1000, height: 1000,
         x: 0, y: 0, toJSON: () => {}
@@ -90,7 +99,13 @@ describe("isLargeContainer and getEditableTarget", () => {
     it("rejects large elements that are not layout tags", async () => {
       const { isLargeContainer } = await import("./selection");
       const el = document.createElement("span");
-      el.innerHTML = "<span>Meaningful descendant</span>";
+      const span = document.createElement("span");
+      span.textContent = "Meaningful descendant";
+      span.getBoundingClientRect = () => ({
+        left: 0, top: 0, right: 100, bottom: 100, width: 100, height: 100,
+        x: 0, y: 0, toJSON: () => {}
+      });
+      el.appendChild(span);
       document.body.appendChild(el);
       
       el.getBoundingClientRect = () => ({

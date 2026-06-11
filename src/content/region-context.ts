@@ -14,6 +14,7 @@ export type NearbyReference = {
   unit: VisualUnit;
   distance: number;
   summary: string;
+  layoutSemantic?: string;
 };
 
 export type AlignmentHint = {
@@ -101,6 +102,10 @@ export function findNearbyReferences(
   for (const unit of units) {
     if (unit.element.closest('[data-clickdeck="true"]')) continue;
 
+    // Filter out low value pure layout blocks
+    if (unit.kind === "background") continue;
+    if (unit.kind === "block" && !unit.roleHint) continue;
+
     const u = unit.rect;
     const uCenterX = u.left + u.width / 2;
     const uCenterY = u.top + u.height / 2;
@@ -138,10 +143,37 @@ export function findNearbyReferences(
   rights.sort(sortFn);
 
   const results: NearbyReference[] = [];
-  if (aboves.length > 0) results.push({ direction: "above", distance: Math.max(0, aboves[0].dist), unit: aboves[0].unit, summary: summarizeVisualUnit(aboves[0].unit) });
-  if (belows.length > 0) results.push({ direction: "below", distance: Math.max(0, belows[0].dist), unit: belows[0].unit, summary: summarizeVisualUnit(belows[0].unit) });
-  if (lefts.length > 0) results.push({ direction: "left", distance: Math.max(0, lefts[0].dist), unit: lefts[0].unit, summary: summarizeVisualUnit(lefts[0].unit) });
-  if (rights.length > 0) results.push({ direction: "right", distance: Math.max(0, rights[0].dist), unit: rights[0].unit, summary: summarizeVisualUnit(rights[0].unit) });
+
+  const addReferences = (direction: "above" | "below" | "left" | "right", list: {dist: number, unit: VisualUnit}[]) => {
+    let count = 0;
+    const seen = new Set<string>();
+    for (const item of list) {
+      if (count >= 2) break;
+      const summary = summarizeVisualUnit(item.unit);
+      if (seen.has(summary)) continue;
+      seen.add(summary);
+      
+      let layoutSemantic = "";
+      if (direction === "above") layoutSemantic = "place Target B below this reference / preserve vertical spacing";
+      else if (direction === "below") layoutSemantic = "place Target B above this reference / preserve vertical spacing";
+      else if (direction === "left") layoutSemantic = "use it as horizontal context / preserve offset";
+      else if (direction === "right") layoutSemantic = "avoid overlap / preserve offset";
+
+      results.push({
+        direction,
+        distance: Math.max(0, item.dist),
+        unit: item.unit,
+        summary,
+        layoutSemantic
+      });
+      count++;
+    }
+  };
+
+  addReferences("above", aboves);
+  addReferences("below", belows);
+  addReferences("left", lefts);
+  addReferences("right", rights);
 
   return results;
 }
