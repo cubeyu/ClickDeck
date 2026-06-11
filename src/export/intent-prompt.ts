@@ -49,7 +49,7 @@ function formatCandidate(candidate: RegionCandidate): string {
   return `${summary} (${details.join("; ")})`;
 }
 
-function appendContextBlock(lines: string[], label: string, context: RegionContext, indent = ""): void {
+export function appendContextBlock(lines: string[], label: string, context: RegionContext, indent = ""): void {
   lines.push(`${indent}${label}:`);
   lines.push(`${indent}- Page mode: ${context.region.pageMode}`);
   lines.push(`${indent}- Anchor: ${formatAnchor(context)}`);
@@ -57,7 +57,7 @@ function appendContextBlock(lines: string[], label: string, context: RegionConte
   lines.push(`${indent}- Region confidence: ${context.confidence}`);
 }
 
-function appendRegionContents(lines: string[], context: RegionContext, indent = "", isTargetB = false): void {
+export function appendRegionContents(lines: string[], context: RegionContext, indent = "", isTargetB = false): void {
   lines.push(`${indent}Region contents:`);
   if (context.empty) {
     lines.push(`${indent}- Empty visual area; use it as intended placement area, not as an existing element.`);
@@ -77,7 +77,7 @@ function appendRegionContents(lines: string[], context: RegionContext, indent = 
   });
 }
 
-function appendNearbyReferences(lines: string[], context: RegionContext, indent = ""): void {
+export function appendNearbyReferences(lines: string[], context: RegionContext, indent = ""): void {
   lines.push(`${indent}Nearby references:`);
   if (context.nearby.length === 0) {
     lines.push(`${indent}- None found.`);
@@ -117,7 +117,7 @@ export function extractStyleFacts(context: RegionContext): string[] {
   return collectPrimaryCssFacts(context).filter((line) => line !== "kind: unknown");
 }
 
-function appendCssFacts(lines: string[], context: RegionContext, indent = ""): void {
+export function appendCssFacts(lines: string[], context: RegionContext, indent = ""): void {
   const facts = collectPrimaryCssFacts(context);
   lines.push(`${indent}CSS facts:`);
   if (facts.length === 0) {
@@ -128,17 +128,17 @@ function appendCssFacts(lines: string[], context: RegionContext, indent = ""): v
   facts.forEach((fact) => lines.push(`${indent}- ${fact}`));
 }
 
-function getMoveNote(input: IntentPromptInput): string {
+export function getMoveNote(input: IntentPromptInput): string {
   const sourceNote = input.sourceContext.region.userIntent.trim();
   const targetNote = input.targetContext?.region.userIntent.trim() ?? "";
   return sourceNote || targetNote;
 }
 
-function contextHasImage(context: RegionContext): boolean {
+export function contextHasImage(context: RegionContext): boolean {
   return context.candidates.some((candidate) => candidate.unit.kind === "image");
 }
 
-function appendIntentOperation(lines: string[], input: IntentPromptInput, opId: string): boolean {
+export function appendIntentOperation(lines: string[], input: IntentPromptInput, opId: string, skipExpectedResult = false): boolean {
   const { sourceContext } = input;
   const userNote = sourceContext.region.userIntent || "[not provided]";
 
@@ -148,16 +148,18 @@ function appendIntentOperation(lines: string[], input: IntentPromptInput, opId: 
   appendRegionContents(lines, sourceContext);
   appendNearbyReferences(lines, sourceContext);
   appendCssFacts(lines, sourceContext);
-  lines.push("Expected result:");
-  lines.push("- Implement the user note only inside the selected region and directly related local layout.");
-  lines.push("- Infer whether the note means add, delete, replace, restyle, or a small local rearrangement from the wording.");
-  lines.push("- If the selected region is empty, use it as the intended placement area for new content.");
+  if (!skipExpectedResult) {
+    lines.push("Expected result:");
+    lines.push("- Implement the user note only inside the selected region and directly related local layout.");
+    lines.push("- Infer whether the note means add, delete, replace, restyle, or a small local rearrangement from the wording.");
+    lines.push("- If the selected region is empty, use it as the intended placement area for new content.");
+  }
   lines.push("");
 
   return contextHasImage(sourceContext);
 }
 
-function appendMoveOperation(lines: string[], input: IntentPromptInput, opId: string): boolean {
+export function appendMoveOperation(lines: string[], input: IntentPromptInput, opId: string, skipExpectedResult = false): boolean {
   const { sourceContext, targetContext } = input;
   if (!targetContext) return false;
   const moveNote = getMoveNote(input);
@@ -204,21 +206,23 @@ function appendMoveOperation(lines: string[], input: IntentPromptInput, opId: st
   
   appendNearbyReferences(lines, targetContext);
   appendCssFacts(lines, targetContext);
-  lines.push("Expected result:");
-  lines.push("- Move Source A content toward Target B using DOM structure, local container, current layout, nearby references, and CSS facts.");
-  lines.push("- Without a move note, infer conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.");
-  lines.push("- Treat Source A as one selected content unit and Target B as its desired final visual placement.");
-  lines.push("- Do not recreate or preserve ClickDeck editing UI such as selection boxes, target boxes, dashed outlines, badges, or marker labels.");
-  lines.push("- Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.");
-  lines.push("- Preserve source content, approximate size, proportions, visual hierarchy, and style unless local fit requires minor spacing adjustments.");
-  lines.push("- Preserve obvious alignment relationships such as edge alignment, centering, relative offset, and spacing rhythm.");
-  lines.push("- Do not hard-code viewport coordinates as CSS top/left unless the original layout is already explicitly absolute-positioned and that is the smallest safe change.");
+  if (!skipExpectedResult) {
+    lines.push("Expected result:");
+    lines.push("- Move Source A content toward Target B using DOM structure, local container, current layout, nearby references, and CSS facts.");
+    lines.push("- Without a move note, infer conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.");
+    lines.push("- Treat Source A as one selected content unit and Target B as its desired final visual placement.");
+    lines.push("- Do not recreate or preserve ClickDeck editing UI such as selection boxes, target boxes, dashed outlines, badges, or marker labels.");
+    lines.push("- Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.");
+    lines.push("- Preserve source content, approximate size, proportions, visual hierarchy, and style unless local fit requires minor spacing adjustments.");
+    lines.push("- Preserve obvious alignment relationships such as edge alignment, centering, relative offset, and spacing rhythm.");
+    lines.push("- Do not hard-code viewport coordinates as CSS top/left unless the original layout is already explicitly absolute-positioned and that is the smallest safe change.");
+  }
   lines.push("");
 
   return contextHasImage(sourceContext) || contextHasImage(targetContext);
 }
 
-function appendRemoveOperation(lines: string[], input: IntentPromptInput, opId: string): boolean {
+export function appendRemoveOperation(lines: string[], input: IntentPromptInput, opId: string, skipExpectedResult = false): boolean {
   const { sourceContext } = input;
   const userNote = sourceContext.region.userIntent.trim();
 
@@ -228,12 +232,14 @@ function appendRemoveOperation(lines: string[], input: IntentPromptInput, opId: 
   appendRegionContents(lines, sourceContext);
   appendNearbyReferences(lines, sourceContext);
   appendCssFacts(lines, sourceContext);
-  lines.push("Expected result:");
-  lines.push("- Remove the selected region from the source HTML/CSS, or hide it only if that matches the existing implementation style.");
-  lines.push("- Preserve surrounding layout where possible.");
-  lines.push("- If removal leaves an obvious gap, adjust only local spacing/layout.");
-  lines.push("- Avoid unintended layout shifts outside the selected region and directly related surrounding layout.");
-  lines.push("- Do not redesign unrelated sections, slides, scripts, or behavior.");
+  if (!skipExpectedResult) {
+    lines.push("Expected result:");
+    lines.push("- Remove the selected region from the source HTML/CSS, or hide it only if that matches the existing implementation style.");
+    lines.push("- Preserve surrounding layout where possible.");
+    lines.push("- If removal leaves an obvious gap, adjust only local spacing/layout.");
+    lines.push("- Avoid unintended layout shifts outside the selected region and directly related surrounding layout.");
+    lines.push("- Do not redesign unrelated sections, slides, scripts, or behavior.");
+  }
   lines.push("");
 
   return false;

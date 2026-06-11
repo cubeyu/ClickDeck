@@ -193,7 +193,7 @@ export function buildAiEditPrompt(patches: EditorPatch[], options: PromptBuildOp
   return { ok: true, prompt: lines.join("\n"), hasMediaReplacement };
 }
 
-function quoteSnippet(value: string): string {
+export function quoteSnippet(value: string): string {
   const raw = (value ?? "").toString().replace(/\s+/g, " ").trim();
   if (!raw) {
     return "\"\"";
@@ -203,7 +203,7 @@ function quoteSnippet(value: string): string {
   return JSON.stringify(clipped);
 }
 
-function summarizeTextChange(before: string, after: string, isZh: boolean): string[] {
+export function summarizeTextChange(before: string, after: string, isZh: boolean): string[] {
   const beforeText = normalizeText(before);
   const afterText = normalizeText(after);
 
@@ -271,7 +271,7 @@ function findTextDiff(before: string, after: string): { prefix: string; removed:
   };
 }
 
-function normalizeAttributeValue(attribute: string, value: string): string {
+export function normalizeAttributeValue(attribute: string, value: string): string {
   if (attribute !== "src") {
     return value;
   }

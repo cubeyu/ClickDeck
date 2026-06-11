@@ -23,14 +23,14 @@ import { createPanel, type ClickDeckPanel, type PanelAction, type SelectionConte
 import { getEditableTarget, getTabSwitchTarget, isLargeContainer } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
-import { buildAiEditPrompt } from "../export/change-summary";
+import { buildUnifiedPrompt } from "../export/unified-prompt";
+import type { IntentPromptInput } from "../export/intent-prompt";
 import { detectPresentationSlides, createPresentationController, type PresentationController } from "./presentation-mode";
 import { collectPresentationDiagnostics } from "./presentation-diagnostics";
 import { exportLongImageSnapshot } from "../export/long-image";
 import { exportImagePdfLongSnapshot, exportImagePdfA4Snapshot, exportImagePdfSlidesSnapshot } from "../export/image-pdf";
 import { createIntentOverlay, type IntentOverlay } from "./intent-overlay";
 import { createIntentDraftPanel, type IntentDraftPanel } from "./intent-draft-panel";
-import { buildIntentPrompt, type IntentPromptInput } from "../export/intent-prompt";
 import { createIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
 import { collectVisualUnits, type RectLike } from "./visual-units";
 import { buildRegionContext, type RegionContext } from "./region-context";
@@ -612,41 +612,21 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         targetContext: d.targetContext
       }));
 
-      const patchResultEn = buildAiEditPrompt(effective, { language: "en", page });
-      const intentResultEn = buildIntentPrompt(intentInputs, { language: "en", page });
+      const unifiedResultEn = buildUnifiedPrompt(effective, intentInputs, { language: "en", page });
 
-      if (!patchResultEn.ok && !intentResultEn.ok) {
+      if (!unifiedResultEn.ok) {
         logger.info("No effective edits or intents to summarize for AI prompt", {
-          intentMessage: intentResultEn.message
+          intentMessage: unifiedResultEn.message
         });
-        alert(intentDrafts.length > 0 ? intentResultEn.message : labels.noEdits);
+        alert(unifiedResultEn.message);
         return;
       }
 
-      let finalEn = "";
-      let finalZh = "";
-      let hasMediaReplacement = false;
+      let finalEn = unifiedResultEn.prompt;
+      let hasMediaReplacement = unifiedResultEn.hasMediaReplacement;
 
-      if (intentResultEn.ok) {
-        finalEn += intentResultEn.prompt;
-        hasMediaReplacement = hasMediaReplacement || intentResultEn.hasMediaReplacement;
-      }
-      if (patchResultEn.ok) {
-        if (finalEn) finalEn += "\n\n---\n\n";
-        finalEn += patchResultEn.prompt;
-        hasMediaReplacement = hasMediaReplacement || patchResultEn.hasMediaReplacement;
-      }
-
-      const patchResultZh = buildAiEditPrompt(effective, { language: "zh", page });
-      const intentResultZh = buildIntentPrompt(intentInputs, { language: "zh", page });
-      
-      if (intentResultZh.ok) {
-        finalZh += intentResultZh.prompt;
-      }
-      if (patchResultZh.ok) {
-        if (finalZh) finalZh += "\n\n---\n\n";
-        finalZh += patchResultZh.prompt;
-      }
+      const unifiedResultZh = buildUnifiedPrompt(effective, intentInputs, { language: "zh", page });
+      let finalZh = unifiedResultZh.ok ? unifiedResultZh.prompt : "";
 
       panel?.showPromptPreview({
         promptEn: finalEn,
