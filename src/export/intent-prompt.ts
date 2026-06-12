@@ -156,35 +156,82 @@ function pickReference(context: RegionContext, direction: NearbyReference["direc
   return references.find(ref => !ref.summary.startsWith("[")) ?? references[0];
 }
 
-function appendPrimaryPlacementConstraints(lines: string[], targetContext: RegionContext): void {
-  const constraints: string[] = [];
+function getProximity(distance: number): "adjacent" | "close" | "nearby context" {
+  if (distance <= 16) return "adjacent";
+  if (distance <= 64) return "close";
+  return "nearby context";
+}
 
-  targetContext.activeAlignmentGuides?.slice(0, 2).forEach((guide) => {
-    constraints.push(`- Preserve the recorded guide: Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)}.`);
-  });
+function formatAxisGap(distance: number, axis: "X" | "Y"): string {
+  const rounded = Math.round(distance);
+  return `with about ${rounded}px ${axis === "X" ? "horizontal" : "vertical"} gap`;
+}
+
+function formatXConstraint(reference: NearbyReference): string {
+  const proximity = getProximity(reference.distance);
+  const side = reference.direction === "left" ? "right" : "left";
+  const overlapText = reference.direction === "left" ? "while preserving adjacency" : "while avoiding overlap";
+  if (proximity === "adjacent") {
+    return `- X axis: place Source A immediately to the ${side} of ${quoteReference(reference.summary)}, ${formatAxisGap(reference.distance, "X")}.`;
+  }
+  if (proximity === "close") {
+    return `- X axis: place Source A close to the ${side} of ${quoteReference(reference.summary)}, ${formatAxisGap(reference.distance, "X")}.`;
+  }
+  return `- X axis: keep Source A to the ${side} of ${quoteReference(reference.summary)} as nearby context, ${formatAxisGap(reference.distance, "X")}, ${overlapText}.`;
+}
+
+function formatYConstraint(reference: NearbyReference): string {
+  const proximity = getProximity(reference.distance);
+  const side = reference.direction === "below" ? "above" : "below";
+  if (proximity === "adjacent") {
+    return `- Y axis: place Source A immediately ${side} ${quoteReference(reference.summary)}, ${formatAxisGap(reference.distance, "Y")}.`;
+  }
+  if (proximity === "close") {
+    return `- Y axis: keep Source A close ${side} ${quoteReference(reference.summary)}, ${formatAxisGap(reference.distance, "Y")}.`;
+  }
+  return `- Y axis: keep Source A ${side} ${quoteReference(reference.summary)} as nearby context, ${formatAxisGap(reference.distance, "Y")}.`;
+}
+
+function formatGuideConstraint(axis: "X" | "Y", guide: ActiveAlignmentGuide): string {
+  return `- ${axis} axis: use recorded guide, Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)}.`;
+}
+
+function appendPrimaryAxisConstraints(lines: string[], targetContext: RegionContext): void {
+  const guides = targetContext.activeAlignmentGuides ?? [];
+  const xGuide = guides.find(guide => guide.axis === "x");
+  const yGuide = guides.find(guide => guide.axis === "y");
 
   const left = pickReference(targetContext, "left");
   const right = pickReference(targetContext, "right");
   const below = pickReference(targetContext, "below");
   const above = pickReference(targetContext, "above");
 
+  lines.push("Primary axis constraints:");
   if (left) {
-    constraints.push(`- Place Source A to the right of ${quoteReference(left.summary)} while preserving the horizontal relationship.`);
+    lines.push(formatXConstraint(left));
   } else if (right) {
-    constraints.push(`- Place Source A to the left of ${quoteReference(right.summary)} while avoiding overlap.`);
+    lines.push(formatXConstraint(right));
+  } else if (xGuide) {
+    lines.push(formatGuideConstraint("X", xGuide));
+  } else {
+    lines.push("- X axis: use Placement offset and Target B visual box as the primary horizontal constraint.");
   }
 
   if (below) {
-    constraints.push(`- Keep Source A above ${quoteReference(below.summary)} and preserve the vertical spacing.`);
+    lines.push(formatYConstraint(below));
   } else if (above) {
-    constraints.push(`- Keep Source A below ${quoteReference(above.summary)} and preserve the vertical spacing.`);
+    lines.push(formatYConstraint(above));
+  } else if (yGuide) {
+    lines.push(formatGuideConstraint("Y", yGuide));
+  } else {
+    lines.push("- Y axis: use Placement offset and Target B visual box as the primary vertical constraint.");
   }
 
-  lines.push("Primary placement constraints:");
-  if (constraints.length === 0) {
-    lines.push("- Use Placement offset and Target B visual box as the primary placement constraints.");
-  } else {
-    constraints.slice(0, 4).forEach(line => lines.push(line));
+  if (guides.length > 0) {
+    lines.push("Secondary alignment guides:");
+    guides.slice(0, 2).forEach((guide) => {
+      lines.push(`- Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)} (delta: ${Math.round(guide.deltaPx)}px).`);
+    });
   }
   lines.push("");
 }
@@ -312,7 +359,7 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   }
   lines.push("");
   appendPlacementOffset(lines, sourceContext, targetContext);
-  appendPrimaryPlacementConstraints(lines, targetContext);
+  appendPrimaryAxisConstraints(lines, targetContext);
   appendContextBlock(lines, "Target B", targetContext);
   lines.push("Target B placement reference:");
   if (targetContext.region.isGhostPreview) {

@@ -240,8 +240,9 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Placement offset:");
       expect(prompt).toContain("Target B left edge is about 48% to the right of Source A left edge.");
       expect(prompt).toContain("Target B top edge is about 7% above Source A top edge.");
-      expect(prompt).toContain("Primary placement constraints:");
-      expect(prompt).toContain("Keep Source A below [Title] and preserve the vertical spacing.");
+      expect(prompt).toContain("Primary axis constraints:");
+      expect(prompt).toContain("X axis: use Placement offset and Target B visual box as the primary horizontal constraint.");
+      expect(prompt).toContain("Y axis: keep Source A close below [Title], with about 24px vertical gap.");
       expect(prompt).toContain("Placement references:");
       expect(prompt).toContain("- above: [Title], 24px away; place Target B below this reference / preserve vertical spacing.");
       expect(prompt).toContain("Final alignment guide:");
@@ -279,8 +280,8 @@ describe("Intent Prompt Builder", () => {
       expect(result.prompt).toContain("Exclude nearby labels/headings outside Source A's visual box");
       expect(result.prompt).toContain("Do not include nearby labels, headings, or parent-container text unless they overlap Source A");
       expect(result.prompt).toContain("- left: 适用场景与人群, 37px away; use it as horizontal context / preserve offset.");
-      expect(result.prompt).toContain("Primary placement constraints:");
-      expect(result.prompt).toContain('Place Source A to the right of "适用场景与人群" while preserving the horizontal relationship.');
+      expect(result.prompt).toContain("Primary axis constraints:");
+      expect(result.prompt).toContain('X axis: place Source A close to the right of "适用场景与人群", with about 37px horizontal gap.');
     }
   });
 
@@ -309,10 +310,11 @@ describe("Intent Prompt Builder", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const prompt = result.prompt;
-      expect(prompt).toContain("Primary placement constraints:");
-      expect(prompt).toContain('Preserve the recorded guide: Target B center Y aligns with "适用场景与人群" center Y.');
-      expect(prompt).toContain('Place Source A to the right of "适用场景与人群" while preserving the horizontal relationship.');
-      expect(prompt).toContain('Keep Source A above "超越代码补全：" and preserve the vertical spacing.');
+      expect(prompt).toContain("Primary axis constraints:");
+      expect(prompt).toContain('X axis: place Source A close to the right of "适用场景与人群", with about 43px horizontal gap.');
+      expect(prompt).toContain('Y axis: keep Source A close above "超越代码补全：", with about 51px vertical gap.');
+      expect(prompt).toContain("Secondary alignment guides:");
+      expect(prompt).toContain('Target B center Y aligns with "适用场景与人群" center Y (delta: 0px).');
     }
   });
 
