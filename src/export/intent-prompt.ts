@@ -1,6 +1,6 @@
 import { IntentOperation } from "../content/intent-region";
 import { collectCssFacts, CssFacts } from "../content/css-facts";
-import { RegionCandidate, RegionContext, summarizeVisualUnit } from "../content/region-context";
+import { ActiveAlignmentGuide, AlignmentEdge, RegionCandidate, RegionContext, summarizeVisualUnit } from "../content/region-context";
 
 export type IntentPromptOptions = {
   language: "en" | "zh";
@@ -93,6 +93,70 @@ export function appendNearbyReferences(lines: string[], context: RegionContext, 
   });
 }
 
+function hasMultipleSiblingCandidates(context: RegionContext): boolean {
+  if (context.candidates.length < 2) return false;
+  const parents = new Map<HTMLElement, number>();
+  context.candidates.forEach((candidate) => {
+    const parent = candidate.unit.element.parentElement;
+    if (!parent) return;
+    parents.set(parent, (parents.get(parent) ?? 0) + 1);
+  });
+  return Array.from(parents.values()).some(count => count >= 2);
+}
+
+function appendSourceImplementationHint(lines: string[], context: RegionContext): void {
+  if (!hasMultipleSiblingCandidates(context)) return;
+  lines.push("Source implementation hint:");
+  lines.push("- Source A contains multiple sibling items; prefer moving their shared row/wrapper container when that preserves the selected visual group.");
+  lines.push("- Exclude nearby labels/headings outside Source A's visual box, even when they share a parent container.");
+  lines.push("");
+}
+
+function formatOffsetAmount(value: number, unit: "%" | "px"): string {
+  const rounded = Math.round(Math.abs(value));
+  return `about ${rounded}${unit}`;
+}
+
+function appendPlacementOffset(lines: string[], sourceContext: RegionContext, targetContext: RegionContext): void {
+  const sourceBox = sourceContext.region.relativeBox;
+  const targetBox = targetContext.region.relativeBox;
+  const useRelative = Boolean(sourceBox && targetBox);
+  const sBox = sourceBox ?? sourceContext.region.viewportBox;
+  const tBox = targetBox ?? targetContext.region.viewportBox;
+  const unit = useRelative ? "%" : "px";
+
+  const leftDelta = tBox.left - sBox.left;
+  const topDelta = tBox.top - sBox.top;
+  const leftThreshold = useRelative ? 1 : Math.max(4, sBox.width * 0.05);
+  const topThreshold = useRelative ? 1 : Math.max(4, sBox.height * 0.05);
+  const details: string[] = [];
+
+  if (Math.abs(leftDelta) >= leftThreshold) {
+    const direction = leftDelta > 0 ? "to the right of" : "to the left of";
+    details.push(`- Target B left edge is ${formatOffsetAmount(leftDelta, unit)} ${direction} Source A left edge.`);
+  }
+
+  if (Math.abs(topDelta) >= topThreshold) {
+    const direction = topDelta > 0 ? "below" : "above";
+    details.push(`- Target B top edge is ${formatOffsetAmount(topDelta, unit)} ${direction} Source A top edge.`);
+  }
+
+  if (details.length === 0) return;
+  lines.push("Placement offset:");
+  details.forEach(line => lines.push(line));
+  lines.push("");
+}
+
+function formatAlignmentEdge(edge: AlignmentEdge): string {
+  if (edge === "centerX") return "center X";
+  if (edge === "centerY") return "center Y";
+  return `${edge} edge`;
+}
+
+function formatActiveGuide(guide: ActiveAlignmentGuide): string {
+  return `- Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with "${guide.unitSummary}" ${formatAlignmentEdge(guide.sourceEdge)} (delta: ${Math.round(guide.deltaPx)}px).`;
+}
+
 function compactFactGroup(label: keyof CssFacts, facts: CssFacts): string | null {
   const values = facts[label];
   if (!Array.isArray(values) || values.length === 0) return null;
@@ -173,10 +237,12 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   appendContextBlock(lines, "Source A", sourceContext);
   appendRegionContents(lines, sourceContext);
   appendCssFacts(lines, sourceContext);
+  appendSourceImplementationHint(lines, sourceContext);
   lines.push("");
 
   lines.push("Placement summary:");
-  lines.push("- Treat Source A as the entire selected content group, not as individual child spans or text fragments.");
+  lines.push("- Treat Source A as the selected visual content group inside Source A's visual box, not as individual child spans or text fragments.");
+  lines.push("- Do not include nearby labels, headings, or parent-container text unless they overlap Source A or are explicitly listed in Source A Region contents.");
 
   const sBox = sourceContext.region.viewportBox;
   const tBox = targetContext.region.viewportBox;
@@ -203,6 +269,7 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
     lines.push(`- Target B is roughly at the same position as Source A.`);
   }
   lines.push("");
+  appendPlacementOffset(lines, sourceContext, targetContext);
   appendContextBlock(lines, "Target B", targetContext);
   lines.push("Target B placement reference:");
   if (targetContext.region.isGhostPreview) {
@@ -216,14 +283,18 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   lines.push("");
 
   lines.push("Final alignment guide:");
-  if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
+  if (targetContext.activeAlignmentGuides && targetContext.activeAlignmentGuides.length > 0) {
+    targetContext.activeAlignmentGuides.forEach((guide) => {
+      lines.push(formatActiveGuide(guide));
+    });
+  } else if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
     const highHints = targetContext.alignmentHints.filter(h => h.confidence === "high");
     
     if (highHints.length === 0) {
       lines.push("- None active at drop; use Placement references and Target B visual box.");
     } else {
       highHints.forEach((hint) => {
-        lines.push(`- ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
+        lines.push(`- No recorded active guide at drop; calculated high-confidence fallback: ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
       });
     }
   } else {
@@ -235,7 +306,7 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
     lines.push("Expected result:");
     lines.push("- Move Source A content toward Target B using DOM structure, local container, current layout, nearby references, and CSS facts.");
     lines.push("- Without a move note, infer conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.");
-    lines.push("- Treat Source A as one selected content unit and Target B as its desired final visual placement.");
+    lines.push("- Treat Source A as the selected visual content group inside Source A's visual box and Target B as its desired final visual placement.");
     lines.push("- Do not recreate or preserve ClickDeck editing UI such as selection boxes, target boxes, dashed outlines, badges, or marker labels.");
     lines.push("- Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.");
     lines.push("- Preserve source content, approximate size, proportions, visual hierarchy, and style unless local fit requires minor spacing adjustments.");

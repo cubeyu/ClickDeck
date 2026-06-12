@@ -23,11 +23,31 @@ export type AlignmentHint = {
   confidence: "high" | "medium" | "low";
 };
 
+export type AlignmentEdge = "left" | "right" | "top" | "bottom" | "centerX" | "centerY";
+
+export type GuideCandidate = {
+  axis: "x" | "y";
+  position: number;
+  sourceEdge: AlignmentEdge;
+  unitSummary: string;
+  unitKind: VisualUnit["kind"];
+};
+
+export type ActiveAlignmentGuide = {
+  axis: "x" | "y";
+  position: number;
+  targetEdge: AlignmentEdge;
+  sourceEdge: AlignmentEdge;
+  unitSummary: string;
+  deltaPx: number;
+};
+
 export type RegionContext = {
   region: IntentRegion;
   candidates: RegionCandidate[];
   nearby: NearbyReference[];
   alignmentHints?: AlignmentHint[];
+  activeAlignmentGuides?: ActiveAlignmentGuide[];
   empty: boolean;
   confidence: "high" | "medium" | "low";
 };
@@ -86,7 +106,8 @@ function getPriorityBonus(unit: VisualUnit): number {
 
 export function findNearbyReferences(
   region: IntentRegion,
-  units: VisualUnit[]
+  units: VisualUnit[],
+  options?: RegionContextOptions
 ): NearbyReference[] {
   const MAX_DISTANCE = typeof window !== "undefined" ? window.innerHeight * 0.8 : 500;
   
@@ -102,6 +123,7 @@ export function findNearbyReferences(
 
   for (const unit of units) {
     if (unit.element.closest('[data-clickdeck="true"]')) continue;
+    if (shouldExcludeUnit(unit, options)) continue;
 
     // Filter out low value pure layout blocks
     if (unit.kind === "background") continue;
@@ -321,7 +343,17 @@ export function calculateAlignmentHints(
 
 export type RegionContextOptions = {
   excludeTextSnippets?: string[];
+  excludeElements?: HTMLElement[];
+  activeAlignmentGuides?: ActiveAlignmentGuide[];
 };
+
+function shouldExcludeUnit(unit: VisualUnit, options?: RegionContextOptions): boolean {
+  if (options?.excludeElements?.some(element => element === unit.element)) {
+    return true;
+  }
+  const textSnippet = unit.textSnippet?.trim();
+  return Boolean(textSnippet && options?.excludeTextSnippets?.includes(textSnippet));
+}
 
 export function buildRegionContext(
   region: IntentRegion,
@@ -331,7 +363,7 @@ export function buildRegionContext(
   const candidates = rankRegionCandidates(region, units);
   const empty = candidates.length === 0;
   
-  const nearby = findNearbyReferences(region, units);
+  const nearby = findNearbyReferences(region, units, options);
 
   let confidence: "high" | "medium" | "low" = "low";
 
@@ -350,6 +382,7 @@ export function buildRegionContext(
     candidates,
     nearby,
     alignmentHints,
+    activeAlignmentGuides: options?.activeAlignmentGuides,
     empty,
     confidence
   };

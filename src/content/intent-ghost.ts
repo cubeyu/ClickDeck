@@ -1,5 +1,6 @@
 import { getPanelLabels } from "./i18n";
 import { RectLike } from "./visual-units";
+import type { ActiveAlignmentGuide, AlignmentEdge, GuideCandidate } from "./region-context";
 
 export type MoveTargetBox = {
   element: HTMLDivElement;
@@ -14,11 +15,60 @@ export type MoveTargetBoxOptions = {
   anchorElement: HTMLElement | null;
   useRelativeBox: boolean;
   box: RectLike;
-  guideCandidatesX: number[];
-  guideCandidatesY: number[];
-  onChange: (finalRect: RectLike) => void;
+  guideCandidates: GuideCandidate[];
+  onChange: (finalRect: RectLike, activeGuides: ActiveAlignmentGuide[]) => void;
   onCancel: () => void;
 };
+
+type TargetGuidePosition = {
+  axis: "x" | "y";
+  position: number;
+  targetEdge: AlignmentEdge;
+};
+
+function getTargetGuidePositions(rect: RectLike): TargetGuidePosition[] {
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  return [
+    { axis: "x", position: rect.left, targetEdge: "left" },
+    { axis: "x", position: rect.right, targetEdge: "right" },
+    { axis: "x", position: centerX, targetEdge: "centerX" },
+    { axis: "y", position: rect.top, targetEdge: "top" },
+    { axis: "y", position: rect.bottom, targetEdge: "bottom" },
+    { axis: "y", position: centerY, targetEdge: "centerY" }
+  ];
+}
+
+export function computeActiveGuides(
+  rect: RectLike,
+  guideCandidates: GuideCandidate[],
+  threshold = 8
+): ActiveAlignmentGuide[] {
+  const targetPositions = getTargetGuidePositions(rect);
+  const bestByAxis = new Map<"x" | "y", ActiveAlignmentGuide>();
+
+  for (const target of targetPositions) {
+    for (const candidate of guideCandidates) {
+      if (candidate.axis !== target.axis) continue;
+      const deltaPx = Math.abs(target.position - candidate.position);
+      if (deltaPx > threshold) continue;
+
+      const current = bestByAxis.get(candidate.axis);
+      if (!current || deltaPx < current.deltaPx) {
+        bestByAxis.set(candidate.axis, {
+          axis: candidate.axis,
+          position: candidate.position,
+          targetEdge: target.targetEdge,
+          sourceEdge: candidate.sourceEdge,
+          unitSummary: candidate.unitSummary,
+          deltaPx
+        });
+      }
+    }
+  }
+
+  return Array.from(bestByAxis.values()).sort((a, b) => a.axis.localeCompare(b.axis));
+}
 
 export function createMoveTargetBox(options: MoveTargetBoxOptions): MoveTargetBox {
   injectBaseStyles();
@@ -118,45 +168,9 @@ export function createMoveTargetBox(options: MoveTargetBoxOptions): MoveTargetBo
     
     // Update guide lines
     clearGuideLines();
-    const threshold = 8;
     const currentRect = element.getBoundingClientRect();
-    const boxCenterX = currentRect.left + currentRect.width / 2;
-    const boxCenterY = currentRect.top + currentRect.height / 2;
-    
-    const candidatesX = [
-      ...options.guideCandidatesX.map(anchorPos => ({ anchorPos, boxPos: currentRect.left })),
-      ...options.guideCandidatesX.map(anchorPos => ({ anchorPos, boxPos: currentRect.right })),
-      ...options.guideCandidatesX.map(anchorPos => ({ anchorPos, boxPos: boxCenterX }))
-    ];
-    
-    const candidatesY = [
-      ...options.guideCandidatesY.map(anchorPos => ({ anchorPos, boxPos: currentRect.top })),
-      ...options.guideCandidatesY.map(anchorPos => ({ anchorPos, boxPos: currentRect.bottom })),
-      ...options.guideCandidatesY.map(anchorPos => ({ anchorPos, boxPos: boxCenterY }))
-    ];
-    
-    let closestX = null;
-    let minDx = Infinity;
-    for (const cx of candidatesX) {
-      const dist = Math.abs(cx.boxPos - cx.anchorPos);
-      if (dist <= threshold && dist < minDx) {
-        minDx = dist;
-        closestX = cx.anchorPos;
-      }
-    }
-    
-    let closestY = null;
-    let minDy = Infinity;
-    for (const cy of candidatesY) {
-      const dist = Math.abs(cy.boxPos - cy.anchorPos);
-      if (dist <= threshold && dist < minDy) {
-        minDy = dist;
-        closestY = cy.anchorPos;
-      }
-    }
-    
-    if (closestX !== null) drawGuideLine(true, closestX);
-    if (closestY !== null) drawGuideLine(false, closestY);
+    const activeGuides = computeActiveGuides(currentRect, options.guideCandidates);
+    activeGuides.forEach((guide) => drawGuideLine(guide.axis === "x", guide.position));
   }
 
   function onMouseUp() {
@@ -168,7 +182,8 @@ export function createMoveTargetBox(options: MoveTargetBoxOptions): MoveTargetBo
     tempDy = 0;
     element.classList.remove("clickdeck-ghost-preview--dragging");
     clearGuideLines();
-    options.onChange(element.getBoundingClientRect());
+    const finalRect = element.getBoundingClientRect();
+    options.onChange(finalRect, computeActiveGuides(finalRect, options.guideCandidates));
   }
 
   element.addEventListener("mousedown", onMouseDown);

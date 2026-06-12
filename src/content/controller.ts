@@ -33,7 +33,7 @@ import { createIntentOverlay, type IntentOverlay } from "./intent-overlay";
 import { createIntentDraftPanel, type IntentDraftPanel } from "./intent-draft-panel";
 import { createIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
 import { collectVisualUnits, type RectLike } from "./visual-units";
-import { buildRegionContext, type RegionContext } from "./region-context";
+import { buildRegionContext, summarizeVisualUnit, type GuideCandidate, type RegionContext, type ActiveAlignmentGuide } from "./region-context";
 import { createMoveTargetBox, type MoveTargetBox } from "./intent-ghost";
 
 export type ClickDeckController = {
@@ -1075,10 +1075,31 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                 const box = relativeBox ?? draft.context.region.documentBox;
 
                 const units = collectVisualUnits();
-                const guideCandidatesX = Array.from(new Set(units.flatMap(u => [u.rect.left, u.rect.right, u.rect.left + u.rect.width / 2])));
-                const guideCandidatesY = Array.from(new Set(units.flatMap(u => [u.rect.top, u.rect.bottom, u.rect.top + u.rect.height / 2])));
+                const sourceTextSnippets = draft.context.candidates
+                  .map(c => c.unit.textSnippet?.trim())
+                  .filter(Boolean) as string[];
+                const sourceTextSet = new Set(sourceTextSnippets);
+                const sourceElements = new Set(draft.context.candidates.map(c => c.unit.element));
+                const guideCandidates: GuideCandidate[] = units
+                  .filter(u => {
+                    const textSnippet = u.textSnippet?.trim();
+                    return !sourceElements.has(u.element) && (!textSnippet || !sourceTextSet.has(textSnippet));
+                  })
+                  .flatMap((u) => {
+                    const summary = summarizeVisualUnit(u);
+                    const centerX = u.rect.left + u.rect.width / 2;
+                    const centerY = u.rect.top + u.rect.height / 2;
+                    return [
+                      { axis: "x" as const, position: u.rect.left, sourceEdge: "left" as const, unitSummary: summary, unitKind: u.kind },
+                      { axis: "x" as const, position: u.rect.right, sourceEdge: "right" as const, unitSummary: summary, unitKind: u.kind },
+                      { axis: "x" as const, position: centerX, sourceEdge: "centerX" as const, unitSummary: summary, unitKind: u.kind },
+                      { axis: "y" as const, position: u.rect.top, sourceEdge: "top" as const, unitSummary: summary, unitKind: u.kind },
+                      { axis: "y" as const, position: u.rect.bottom, sourceEdge: "bottom" as const, unitSummary: summary, unitKind: u.kind },
+                      { axis: "y" as const, position: centerY, sourceEdge: "centerY" as const, unitSummary: summary, unitKind: u.kind }
+                    ];
+                  });
 
-                const updateTargetContext = (finalRect: RectLike) => {
+                const updateTargetContext = (finalRect: RectLike, activeGuides: ActiveAlignmentGuide[] = []) => {
                   const region = createIntentRegion({
                     action: "move",
                     userIntent: "",
@@ -1086,12 +1107,19 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     isGhostPreview: true
                   });
                   const idx = intentDrafts.findIndex(d => d.operation.id === opId);
-                  const excludeTexts = idx !== -1 
+                  const excludeTexts = idx !== -1
                     ? intentDrafts[idx].context.candidates
-                        .map(c => c.unit.textSnippet?.trim())
-                        .filter(Boolean) as string[]
+                      .map(c => c.unit.textSnippet?.trim())
+                      .filter(Boolean) as string[]
                     : undefined;
-                  const targetContext = buildRegionContext(region, units, { excludeTextSnippets: excludeTexts });
+                  const excludeElements = idx !== -1
+                    ? intentDrafts[idx].context.candidates.map(c => c.unit.element)
+                    : undefined;
+                  const targetContext = buildRegionContext(region, units, {
+                    excludeTextSnippets: excludeTexts,
+                    excludeElements,
+                    activeAlignmentGuides: activeGuides
+                  });
                   if (idx !== -1) {
                     intentDrafts[idx].targetContext = targetContext;
                     intentDrafts[idx].operation.target = targetContext.region;
@@ -1110,10 +1138,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                   anchorElement,
                   useRelativeBox,
                   box,
-                  guideCandidatesX,
-                  guideCandidatesY,
-                  onChange: (finalRect) => {
-                    updateTargetContext(finalRect);
+                  guideCandidates,
+                  onChange: (finalRect, activeGuides) => {
+                    updateTargetContext(finalRect, activeGuides);
                   },
                   onCancel: () => {
                     moveTargetBox?.destroy();

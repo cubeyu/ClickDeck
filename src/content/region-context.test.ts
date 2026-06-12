@@ -99,6 +99,35 @@ describe("Region Context", () => {
     expect(belowRef?.distance).toBe(50); // 250 - (100+100) = 50
   });
 
+  it("findNearbyReferences excludes source text snippets from placement references", () => {
+    const region = mockRegion({ left: 100, top: 100, width: 100, height: 100 });
+    const sourceChip = mockUnit("textLine", { left: 100, top: 250, width: 100, height: 20 }, { textSnippet: "产品经理 (PM)" });
+    const title = mockUnit("textLine", { left: 100, top: 280, width: 100, height: 20 }, { textSnippet: "超越代码补全" });
+
+    const refs = findNearbyReferences(region, [sourceChip, title], {
+      excludeTextSnippets: ["产品经理 (PM)"]
+    });
+
+    expect(refs.some(ref => ref.summary === "产品经理 (PM)")).toBe(false);
+    expect(refs.some(ref => ref.summary === "超越代码补全")).toBe(true);
+  });
+
+  it("findNearbyReferences prefers source element exclusion without removing same text elsewhere", () => {
+    const region = mockRegion({ left: 100, top: 100, width: 100, height: 100 });
+    const sourceElement = document.createElement("span");
+    const duplicateElement = document.createElement("span");
+    const sourceChip = mockUnit("textLine", { left: 100, top: 250, width: 100, height: 20 }, { textSnippet: "重复文本", element: sourceElement });
+    const duplicateNearby = mockUnit("textLine", { left: 100, top: 280, width: 100, height: 20 }, { textSnippet: "重复文本", element: duplicateElement });
+
+    const refs = findNearbyReferences(region, [sourceChip, duplicateNearby], {
+      excludeElements: [sourceElement]
+    });
+
+    expect(refs.some(ref => ref.unit === sourceChip)).toBe(false);
+    expect(refs.some(ref => ref.unit === duplicateNearby)).toBe(true);
+  });
+
+
   it("buildRegionContext returns correct confidence", () => {
     const regionHigh = mockRegion({ left: 0, top: 0, width: 100, height: 100 }, "high");
     const regionLow = mockRegion({ left: 0, top: 0, width: 100, height: 100 }, "low");
@@ -216,5 +245,20 @@ describe("Region Context", () => {
     
     const otherHint = hints.find(h => h.summary.includes("Other Content"));
     expect(otherHint).toBeDefined();
+  });
+
+  it("buildRegionContext carries recorded active alignment guides", () => {
+    const region = mockRegion({ left: 100, top: 100, width: 100, height: 100 });
+    const activeAlignmentGuides = [{
+      axis: "y" as const,
+      position: 150,
+      targetEdge: "centerY" as const,
+      sourceEdge: "centerY" as const,
+      unitSummary: "Title",
+      deltaPx: 0
+    }];
+
+    const ctx = buildRegionContext(region, [], { activeAlignmentGuides });
+    expect(ctx.activeAlignmentGuides).toEqual(activeAlignmentGuides);
   });
 });

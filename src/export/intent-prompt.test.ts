@@ -32,6 +32,16 @@ function mockVisualUnit(kind: VisualUnitKind, options: { text?: string; element?
   };
 }
 
+function mockCandidateFromElement(element: HTMLElement, text: string, rank: number): RegionCandidate {
+  return {
+    unit: mockVisualUnit("textLine", { text, element }),
+    rank,
+    reason: "Primary content (textLine)",
+    overlapRatio: 1,
+    centerInBox: true
+  };
+}
+
 function mockCandidate(kind: VisualUnitKind, options: { text?: string; element?: HTMLElement } = {}): RegionCandidate {
   return {
     unit: mockVisualUnit(kind, options),
@@ -224,14 +234,49 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Visual boxes are placement hints, not absolute CSS instructions");
       expect(prompt).toContain("Do not hard-code viewport coordinates as CSS top/left");
       expect(prompt).toContain("Placement summary:");
-      expect(prompt).toContain("Treat Source A as the entire selected content group");
+      expect(prompt).toContain("Treat Source A as the selected visual content group inside Source A's visual box");
+      expect(prompt).toContain("Do not include nearby labels, headings, or parent-container text unless they overlap Source A");
       expect(prompt).toContain("Target B is below and shifted to the right of Source A.");
+      expect(prompt).toContain("Placement offset:");
+      expect(prompt).toContain("Target B left edge is about 48% to the right of Source A left edge.");
+      expect(prompt).toContain("Target B top edge is about 7% above Source A top edge.");
       expect(prompt).toContain("Placement references:");
       expect(prompt).toContain("- above: [Title], 24px away; place Target B below this reference / preserve vertical spacing.");
       expect(prompt).toContain("Final alignment guide:");
-      expect(prompt).toContain("- Left edge aligns with [Title] left edge (delta: 2px, confidence: high).");
-      expect(prompt).toContain("- Top edge is 24px below [Header] bottom edge (delta: 24px, confidence: high).");
+      expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Left edge aligns with [Title] left edge (delta: 2px, confidence: high).");
+      expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Top edge is 24px below [Header] bottom edge (delta: 24px, confidence: high).");
       expect(result.hasMediaReplacement).toBe(true);
+    }
+  });
+
+  it("scopes grouped source semantics to the visual box and adds implementation hint for sibling items", () => {
+    const row = document.createElement("div");
+    const label = document.createElement("span");
+    label.textContent = "适用场景与人群";
+    const chip1 = document.createElement("span");
+    chip1.textContent = "PPT 演示 / 汇报";
+    const chip2 = document.createElement("span");
+    chip2.textContent = "产品经理 (PM)";
+    row.append(label, chip1, chip2);
+    document.body.appendChild(row);
+
+    const input = mockRegionContext("move", "", false, [
+      mockCandidateFromElement(chip1, "PPT 演示 / 汇报", 1),
+      mockCandidateFromElement(chip2, "产品经理 (PM)", 2)
+    ]);
+    addTargetContext(input, "", true);
+    input.targetContext!.nearby = [
+      { direction: "left", summary: "适用场景与人群", distance: 37, layoutSemantic: "use it as horizontal context / preserve offset" } as any
+    ];
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Source implementation hint:");
+      expect(result.prompt).toContain("Source A contains multiple sibling items; prefer moving their shared row/wrapper container");
+      expect(result.prompt).toContain("Exclude nearby labels/headings outside Source A's visual box");
+      expect(result.prompt).toContain("Do not include nearby labels, headings, or parent-container text unless they overlap Source A");
+      expect(result.prompt).toContain("- left: 适用场景与人群, 37px away; use it as horizontal context / preserve offset.");
     }
   });
 
@@ -324,9 +369,32 @@ describe("Intent Prompt Builder", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       const prompt = result.prompt;
-      expect(prompt).toContain("- High edge aligns (delta: 2px, confidence: high).");
+      expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: High edge aligns (delta: 2px, confidence: high).");
       expect(prompt).not.toContain("Low edge aligns");
       expect(prompt).not.toContain("Medium edge aligns");
+    }
+  });
+
+  it("uses recorded active guides before calculated fallback hints", () => {
+    const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
+    addTargetContext(input, "", true);
+    input.targetContext!.activeAlignmentGuides = [
+      {
+        axis: "y",
+        position: 220,
+        targetEdge: "centerY",
+        sourceEdge: "centerY",
+        unitSummary: "超越代码补全：直接引入页面级的评审诊断",
+        deltaPx: 0
+      }
+    ];
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const prompt = result.prompt;
+      expect(prompt).toContain('Target B center Y aligns with "超越代码补全：直接引入页面级的评审诊断" center Y (delta: 0px).');
+      expect(prompt).not.toContain("calculated high-confidence fallback");
     }
   });
 

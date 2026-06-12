@@ -125,12 +125,13 @@ describe("buildUnifiedPrompt", () => {
       const prompt = result.prompt;
       
       expect(prompt).toContain("Placement summary:");
-      expect(prompt).toContain("Treat Source A as the entire selected content group");
+      expect(prompt).toContain("Treat Source A as the selected visual content group inside Source A's visual box");
       expect(prompt).toContain("Target B is below and shifted to the right of Source A");
+      expect(prompt).toContain("Placement offset:");
       expect(prompt).toContain("Placement references:");
       expect(prompt).toContain("- right: [Title], 10px away; avoid overlap / preserve offset.");
       expect(prompt).toContain("Final alignment guide:");
-      expect(prompt).toContain("- Left edge aligns with [Title] left edge (delta: 0px, confidence: high).");
+      expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Left edge aligns with [Title] left edge (delta: 0px, confidence: high).");
     }
   });
 });
