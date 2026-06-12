@@ -91,12 +91,12 @@ describe("Region Context", () => {
     const aboveRef = refs.find(r => r.direction === "above");
     expect(aboveRef).toBeDefined();
     expect(aboveRef?.unit).toBe(above2); // Should pick the closer one
-    expect(aboveRef?.distance).toBe(10); // actual 20 - bonus 10 = 10
+    expect(aboveRef?.distance).toBe(20); // 100 - (60+20) = 20
     
     const belowRef = refs.find(r => r.direction === "below");
     expect(belowRef).toBeDefined();
     expect(belowRef?.unit).toBe(below);
-    expect(belowRef?.distance).toBe(40); // actual 50 - bonus 10 = 40
+    expect(belowRef?.distance).toBe(50); // 250 - (100+100) = 50
   });
 
   it("buildRegionContext returns correct confidence", () => {

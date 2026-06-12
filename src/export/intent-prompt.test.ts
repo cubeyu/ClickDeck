@@ -272,6 +272,24 @@ describe("Intent Prompt Builder", () => {
     }
   });
 
+  it("handles move operation with only low-confidence alignment hints", () => {
+    const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
+    addTargetContext(input, "", true);
+    input.targetContext!.alignmentHints = [
+      { summary: "Center aligns with [Something]", deltaPx: 10, confidence: "low" },
+      { summary: "Top aligns with [Something Else]", deltaPx: 8, confidence: "medium" }
+    ];
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Final alignment guide:");
+      expect(result.prompt).toContain("- None active at drop; use Placement references and Target B visual box.");
+      expect(result.prompt).not.toContain("Center aligns with");
+      expect(result.prompt).not.toContain("Top aligns with");
+    }
+  });
+
   it("replaces low-overlap block contents with fallback in Target B", () => {
     const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
     addTargetContext(input, "", false);
@@ -292,33 +310,23 @@ describe("Intent Prompt Builder", () => {
     }
   });
 
-  it("sorts high confidence hints before low confidence and prefixes low confidence when no high exist", () => {
+  it("only includes high confidence hints and drops low/medium confidence ones", () => {
     const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
     addTargetContext(input, "", false);
     
     input.targetContext!.alignmentHints = [
       { summary: "Low edge aligns", deltaPx: 12, confidence: "low" },
+      { summary: "Medium edge aligns", deltaPx: 5, confidence: "medium" },
       { summary: "High edge aligns", deltaPx: 2, confidence: "high" }
     ];
 
-    const result1 = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
-    expect(result1.ok).toBe(true);
-    if (result1.ok) {
-      const prompt = result1.prompt;
-      const highIdx = prompt.indexOf("- High edge aligns (delta: 2px, confidence: high).");
-      const lowIdx = prompt.indexOf("- Low edge aligns (delta: 12px, confidence: low).");
-      expect(highIdx).toBeLessThan(lowIdx);
-    }
-
-    input.targetContext!.alignmentHints = [
-      { summary: "Low edge aligns", deltaPx: 12, confidence: "low" }
-    ];
-    
-    const result2 = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
-    expect(result2.ok).toBe(true);
-    if (result2.ok) {
-      expect(result2.prompt).toContain("- Low-confidence: Low edge aligns");
-      expect(result2.prompt).toContain("- Only low-confidence references found");
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const prompt = result.prompt;
+      expect(prompt).toContain("- High edge aligns (delta: 2px, confidence: high).");
+      expect(prompt).not.toContain("Low edge aligns");
+      expect(prompt).not.toContain("Medium edge aligns");
     }
   });
 

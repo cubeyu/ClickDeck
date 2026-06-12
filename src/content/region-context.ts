@@ -94,10 +94,11 @@ export function findNearbyReferences(
   const boxCenterX = box.left + box.width / 2;
   const boxCenterY = box.top + box.height / 2;
 
-  const aboves: {dist: number, unit: VisualUnit}[] = [];
-  const belows: {dist: number, unit: VisualUnit}[] = [];
-  const lefts: {dist: number, unit: VisualUnit}[] = [];
-  const rights: {dist: number, unit: VisualUnit}[] = [];
+  type RefItem = { score: number; actualDist: number; unit: VisualUnit };
+  const aboves: RefItem[] = [];
+  const belows: RefItem[] = [];
+  const lefts: RefItem[] = [];
+  const rights: RefItem[] = [];
 
   for (const unit of units) {
     if (unit.element.closest('[data-clickdeck="true"]')) continue;
@@ -121,22 +122,22 @@ export function findNearbyReferences(
 
     if (verticallyAligned) {
       if (distYAbove >= 0 && distYAbove < MAX_DISTANCE) {
-        aboves.push({ dist: distYAbove - getPriorityBonus(unit), unit });
+        aboves.push({ score: distYAbove - getPriorityBonus(unit), actualDist: distYAbove, unit });
       } else if (distYBelow >= 0 && distYBelow < MAX_DISTANCE) {
-        belows.push({ dist: distYBelow - getPriorityBonus(unit), unit });
+        belows.push({ score: distYBelow - getPriorityBonus(unit), actualDist: distYBelow, unit });
       }
     }
 
     if (horizontallyAligned) {
       if (distXLeft >= 0 && distXLeft < MAX_DISTANCE) {
-        lefts.push({ dist: distXLeft - getPriorityBonus(unit), unit });
+        lefts.push({ score: distXLeft - getPriorityBonus(unit), actualDist: distXLeft, unit });
       } else if (distXRight >= 0 && distXRight < MAX_DISTANCE) {
-        rights.push({ dist: distXRight - getPriorityBonus(unit), unit });
+        rights.push({ score: distXRight - getPriorityBonus(unit), actualDist: distXRight, unit });
       }
     }
   }
 
-  const sortFn = (a: {dist: number}, b: {dist: number}) => a.dist - b.dist;
+  const sortFn = (a: RefItem, b: RefItem) => a.score - b.score;
   aboves.sort(sortFn);
   belows.sort(sortFn);
   lefts.sort(sortFn);
@@ -144,7 +145,7 @@ export function findNearbyReferences(
 
   const results: NearbyReference[] = [];
 
-  const addReferences = (direction: "above" | "below" | "left" | "right", list: {dist: number, unit: VisualUnit}[]) => {
+  const addReferences = (direction: "above" | "below" | "left" | "right", list: RefItem[]) => {
     let count = 0;
     const seen = new Set<string>();
     for (const item of list) {
@@ -161,7 +162,7 @@ export function findNearbyReferences(
 
       results.push({
         direction,
-        distance: Math.max(0, item.dist),
+        distance: Math.max(0, item.actualDist),
         unit: item.unit,
         summary,
         layoutSemantic

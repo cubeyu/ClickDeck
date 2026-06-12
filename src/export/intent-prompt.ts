@@ -218,19 +218,11 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   lines.push("Final alignment guide:");
   if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
     const highHints = targetContext.alignmentHints.filter(h => h.confidence === "high");
-    const otherHints = targetContext.alignmentHints.filter(h => h.confidence !== "high");
-    
-    highHints.forEach((hint) => {
-      lines.push(`- ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
-    });
     
     if (highHints.length === 0) {
-      otherHints.slice(0, 2).forEach((hint) => {
-        lines.push(`- Low-confidence: ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
-      });
-      lines.push("- Only low-confidence references found; use Target B visual box conservatively.");
+      lines.push("- None active at drop; use Placement references and Target B visual box.");
     } else {
-      otherHints.forEach((hint) => {
+      highHints.forEach((hint) => {
         lines.push(`- ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
       });
     }
