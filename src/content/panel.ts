@@ -244,7 +244,7 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
       </div>
     </div>
     <div class="clickdeck-panel__footer">
-      <span>v1.3.1</span>
+      <span>v1.3.2</span>
       <a href="https://github.com/ningsiii/ClickDeck/issues" target="_blank" rel="noopener noreferrer">Feedback</a>
       <a href="https://github.com/ningsiii/ClickDeck" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>
