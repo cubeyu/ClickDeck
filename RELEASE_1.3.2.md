@@ -9,7 +9,7 @@ ClickDeck v1.3.2 is a release-preparation update for the current MVP. It package
 - Improved toolbar activation feedback for old tabs, local HTML files, and browser-restricted pages.
 - Refreshed the README download references for the `v1.3.2` package.
 - Prepared a fuller English listing description that covers visual edit suggestions and external AI review handoff.
-- Rebuilt the extension package as a fresh `v1.3.2` ZIP artifact.
+- Rebuilt the extension package as a fresh `v1.3.2` ZIP artifact with a dedicated top-level install folder and bundled install note.
 
 ## What this release is for
 
@@ -19,13 +19,15 @@ ClickDeck v1.3.2 is a release-preparation update for the current MVP. It package
 
 ## Installation / Update
 
-1. Download `ClickDeck-v1.3.2.zip` from the GitHub Releases page.
-2. Extract the ZIP file to a local folder.
-3. Open `chrome://extensions/` or `edge://extensions/`.
-4. Enable **Developer mode**.
-5. Click **Load unpacked** and choose the extracted folder.
-6. If you want to edit local `file://` HTML files, open ClickDeck's **Details** page in `chrome://extensions/` and enable **Allow access to file URLs**.
-7. If you already installed an older unpacked version, reload it after replacing the files.
+1. Download the attached release asset `ClickDeck-v1.3.2.zip` from the GitHub Releases page.
+2. Do **not** use GitHub's auto-generated **Source code (zip)** archive for installation. That archive is the source repository, not the unpacked extension package.
+3. Extract the ZIP file to a local folder.
+4. After extraction, open the `ClickDeck-v1.3.2/` folder and confirm it contains `manifest.json`.
+5. Open `chrome://extensions/` or `edge://extensions/`.
+6. Enable **Developer mode**.
+7. Click **Load unpacked** and choose the extracted `ClickDeck-v1.3.2/` folder.
+8. If you want to edit local `file://` HTML files, open ClickDeck's **Details** page in `chrome://extensions/` and enable **Allow access to file URLs**.
+9. If you already installed an older unpacked version, reload it after replacing the files.
 
 ## Local HTML Permission
 
@@ -80,10 +82,24 @@ Recommended release attachments:
 
 Do **not** upload these as release attachments:
 
+- GitHub auto-generated `Source code (zip)` / `Source code (tar.gz)` archives as if they were extension install packages
 - internal docs such as `docs/执行路线图.md`
 - temporary local folders such as `scratch/`
 - test materials under `fixtures/` or `feedback/`
 - source-only directories that are not needed for manual extension install
+
+The uploaded release asset should extract to:
+
+```text
+ClickDeck-v1.3.2/
+  manifest.json
+  background.js
+  content.js
+  icons/
+  brand/
+  _locales/
+  INSTALL.txt
+```
 
 ## 中文说明
 
@@ -96,7 +112,14 @@ ClickDeck v1.3.2 是一次发布准备版本，重点是把当前 MVP 的安装�
 - 改进旧标签页、本地 HTML 和浏览器受限页面上的插件图标点击反馈
 - README 的下载链接和 release 指向更新为 `v1.3.2`
 - 补充了更完整的英文描述，覆盖“修改意见”和“评审 prompt 交接”
-- 重新生成了 `v1.3.2` 发布包
+- 重新生成了 `v1.3.2` 发布包，并让压缩包内部结构更接近“解压即可安装”
+
+### 安装提醒
+
+- 请下载 GitHub Release 附件里的 `ClickDeck-v1.3.2.zip`
+- 不要把 GitHub 自动生成的 **Source code (zip)** 当成扩展安装包
+- 解压后应选择 `ClickDeck-v1.3.2/` 这个包含 `manifest.json` 的文件夹
+- 本地 `file://` HTML 页面仍需在扩展详情里开启 **允许访问文件网址**
 
 ### 这次发布主要用于
 

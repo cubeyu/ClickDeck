@@ -9,6 +9,7 @@
     "build": "vite build",
     "dev": "vite build --watch",
     "e2e": "playwright test",
+    "package:release": "npm exec -- node scripts/package-release.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run src"
   },

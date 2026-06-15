@@ -53,6 +53,10 @@ docs/工程*
 docs/执行*
 docs/assets/logo*-original.png
 /scripts
+!/scripts/
+/scripts/*
+!/scripts/capture-demo.mjs
+!/scripts/package-release.mjs
 /chrome-store-assets
 /chrome-store-screenshots
 tools/
