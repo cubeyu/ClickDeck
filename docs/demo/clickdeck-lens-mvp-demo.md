@@ -4,135 +4,79 @@ _A case study on editing AI-generated HTML artifacts as presentation material_
 
 ## 摘要
 
-ClickDeck 是一个开源 Chrome/Edge 扩展，当前定位是对浏览器里已经渲染出来的 HTML 页面做可视化微调。它不试图替代代码编辑器，也不把网页变成自由画布，而是补上一个经常被忽略的环节：AI 已经生成了第一版 HTML，但人还需要对内容、版式、图片和强调关系做最后的判断与修正。
+ClickDeck 是一个开源 Chrome/Edge 扩展，面向已经在浏览器中渲染出来的 HTML 页面做可视化编辑。它的重点不是生成第一版页面，而是在 AI 已经生成初稿之后，让用户继续判断哪些字需要改、哪些图片需要替换、哪些层级需要调整，以及最终应该导出成什么形式。
 
-从工作流角度看，ClickDeck 处理的是“AI 生成之后”的问题。用户可以直接在页面上调整字体、行距、对齐、颜色、文本与图片，也可以添加结构化修改意见，或者生成可继续交给外部 AI 的编辑与评审 Prompt。它保留了 HTML 作为中间产物的灵活性，同时降低了普通用户必须手改代码的门槛。
+这类工具之所以有意义，是因为 AI 生成 HTML 的速度已经足够快，但“可以看”和“可以交付”之间仍然有明显差距。对于演示稿、项目说明页、静态落地页或者 HTML 形式的报告来说，人工修订往往不是大幅重写，而是一系列视觉和表达层面的微调。ClickDeck 的价值，就在于把这轮微调从代码层移到页面本身。
 
-这份文档刻意采用案例文章的写法，而不是产品宣传页。它包含摘要、多级标题、英文段落、工作流、表格、图示、判断性段落与结论，适合后续转换为 PDF 并导入 Lens，用于演示大纲、图表速览、划线、Explain、Summary、Bullets、Note、My Vision 以及 Portable HTML 导出。
+这份文档写成介绍性案例文章，而不是操作说明。它会把 ClickDeck 的定位、问题背景、典型流程、项目事实信息和判断性结论放在同一篇文档里，适合作为后续 PDF 化材料导入 Lens，用来展示目录导航、Explain、Summary、Bullets、表格预览、图像预览以及基于原文生成 Note 的过程。
 
-## 1. ClickDeck 是什么？
+## 一、ClickDeck 的定位
 
-ClickDeck 是一个基于 Manifest V3 的 Chrome/Edge 扩展，当前版本为 `1.3.2`。从仓库与 manifest 可以确认，它以 content script 的方式运行在当前网页上，主要权限围绕 `activeTab`、`scripting` 与 `storage` 展开。它的功能边界相对清楚：在浏览器里直接微调当前 HTML 页面，并把修改结果导出为适合分享、归档或继续协作的材料。
+ClickDeck 当前版本为 `1.3.2`，从仓库里的 `package.json`、Manifest V3 配置以及 README 可以确认，它是一个运行在当前页面上的浏览器扩展，而不是独立的桌面编辑器。它主要依赖 `activeTab`、`scripting` 和 `storage` 权限，在正常网页、本地 HTML 或演示型页面上工作，通过 content script 把编辑能力直接叠加到已渲染的 HTML 上。
 
-从 README 和界面文案来看，ClickDeck 当前的真实能力包括：
+从已有功能命名看，ClickDeck 的定位并不模糊。它支持页面元素选择、文字与样式微调、图片替换、撤销重做、浏览器演示模式、HTML 快照、长图、图片型 PDF，以及两类很有代表性的协作能力：一类是 **Copy AI Edit Prompt**，把视觉修改转成结构化 prompt；另一类是 **Review Prompt Handoff** 与页面级“修改意见”，把用户能看出来但不想手写成技术描述的问题，转成更适合继续交给外部 AI 的输入。
 
-- 在当前页面上选择元素并显示可视化描边
-- 编辑文本、调整字号、字重、颜色、对齐和间距
-- 替换图片
-- 撤销与重做
-- 添加“修改意见”，包括与移动相关的双区域意图标记
-- 生成 **Copy AI Edit Prompt** 与 **Review Prompt Handoff**
-- 导出 HTML 快照、长图、图片型 PDF
-- 进入浏览器演示模式
-- 复制诊断日志用于问题反馈
+这说明 ClickDeck 不是“重新设计页面”的工具，也不是“自动回写源码”的工具。更准确的描述是：它承担的是 AI 生成 HTML 之后的人工控制层，让页面从一个初稿产物变成一个更接近可展示、可说明、可交付的材料。
 
-这些能力说明 ClickDeck 不是单纯的 HTML 预览器，也不是自动改源码的系统。更准确的说法是：它是一个介于 AI 生成结果和最终交付材料之间的人工控制层。
+## 二、为什么 AI 生成 HTML 之后仍然需要人工编辑
 
-## 2. 为什么是 HTML，而不是传统 PPT？
+AI 生成 HTML 的能力解决了第一阶段的问题：用户不用从空白页面开始，可以快速得到一个结构完整、信息基本齐全的初稿。对于产品介绍页、项目说明页、演示稿样式页面甚至轻量文档页来说，这一步已经大大缩短了从想法到页面的距离。
 
-AI 系统生成 HTML 的能力，通常早于它稳定生成“好用的 PPT 文件”的能力。HTML 的优势在于天然承载文字、图片、布局、层级和交互，而且可以直接在浏览器中打开、分享和继续修改。对于 AI 工作流来说，HTML 既是生成结果，也是可被再次加工的中间格式。
+但第二阶段的问题并没有被自动消除。页面的重点是否清楚，标题是否过弱，段落是不是过长，图片是不是贴题，某些词语是否需要收紧，某一页是否可以直接拿来展示，这些判断仍然需要人来完成。很多时候，用户并不是想重新提示 AI 再生成一版，而是希望在“已经差不多对了”的页面上继续做最后的修订。
 
-但问题也恰恰在这里。HTML 足够灵活，普通用户却未必愿意打开 DevTools、搜索 DOM、手调 CSS。传统 PPT 工具虽然更符合习惯，却往往不是 AI 最先产出的格式。于是工作流中会出现一个空档：AI 已经生成了一份“差不多能看”的 HTML 材料，但离真正可演示、可交付、可分享的版本，还差一轮人工修订。
+如果这一步仍然要求用户打开 DevTools、找 DOM 节点、调 CSS、猜选择器，那么 AI 生成带来的效率就会被重新抵消。ClickDeck 要处理的，正是这个非常具体但普遍存在的缺口：AI 负责生成第一页，人负责把这一页变成真正可用的版本，而编辑界面应该尽可能贴近页面本身。
 
-ClickDeck 试图补上的就是这一轮修订。它不改变 HTML 作为 AI 中间产物的地位，也不要求用户放弃浏览器环境；它只是把“最后一公里”的细调动作前移到了页面本身。这一节很适合在 Lens 里做 Summary，因为它同时包含背景、问题、折中方案与产品定位四个层次。
+## 三、English Source Block
 
-## 3. English Source Block for Lens Demo
+An AI-generated HTML artifact is not just a static web page. It is an editable communication object created by a language model, reviewed by a human, and often reused as a presentation, report, or product explanation. The first version can be produced quickly, but the final version still depends on human judgment. Users usually need to revise wording, replace images, adjust visual emphasis, and decide how the material should be delivered. In many workflows, the problem is not generation but revision: once the page exists, people want to keep the structure, preserve context, and make targeted changes without restarting the whole process. A useful editing layer should therefore work directly on the rendered result, support inspection and correction, and leave room for later export or AI handoff. That is why a visual HTML editor can become an important bridge between model output and real presentation material.
 
-An AI-generated HTML artifact is not just a static web page. It is an editable communication object created by a language model, reviewed by a human, and often reused as a presentation, report, or product explanation. The challenge is that AI can generate the first version quickly, but the final version still requires human judgment. Users need to correct wording, replace images, adjust emphasis, and export the result without asking the model to regenerate everything from scratch. In practice, the artifact moves across several stages: generation, inspection, visual correction, structured feedback, and delivery. A useful tool in this workflow should reduce friction between those stages. It should let the user work directly on the rendered page, preserve context, and support handoff to other systems. This is why visual editing, review prompts, and export formats matter: they turn a generated artifact into a controllable working document.
+## 四、ClickDeck 的典型使用流程
 
-## 4. ClickDeck 的基本工作流
+一个比较常见的流程是：用户先用通用 AI 或代码模型生成一版 HTML 页面，把它当成演示页、项目说明页或内容草稿；然后直接在浏览器中打开，先检查结构、图文关系、强调层级和整体观感；接着通过 ClickDeck 在页面上直接改字、调大小、换图、补充“修改意见”，把看得出来但还没被说清楚的问题落到具体区域上；最后，再根据用途决定导出为 HTML 快照、长图、图片型 PDF，或者保留为浏览器演示页面继续展示。如果还需要进一步回到源码层，则可以把当前页面状态整理成结构化的 edit / review prompt，继续交给外部 AI 或开发者处理。这一整段适合在阅读界面里做 Bullets，因为它本质上描述的是一个完整但连续的工作流。
 
-### Step 1：用 AI 生成 HTML 初稿
+## 五、项目信号表
 
-用户通常先从通用大模型、代码模型或模板系统获得第一版 HTML。这个初稿已经包含页面结构、标题、图片、段落和基础布局，但质量并不稳定，尤其是在重点层次、字词准确性、视觉强调和图片匹配上，往往仍需要人来判断。
-
-### Step 2：在浏览器中打开页面
-
-接下来，用户直接在浏览器里查看这份 HTML，而不是先回到源码层。这个阶段主要做整体检查：结构是否通顺，信息是否完整，图片是否合适，哪一部分需要改大、改弱、替换或重排。浏览器在这里既是预览器，也是接下来编辑操作的现场。
-
-### Step 3：用 ClickDeck 可视化修改
-
-在 ClickDeck 中，用户可以直接点选元素并调整字体、间距、对齐、颜色和文本，也可以替换图片。对于说得清的改动，这种方式比重新提示 AI 或手动搜索代码更直接；对于说不清但能看出来的问题，用户可以补充“修改意见”或生成 Review Prompt，把页面局部问题转成结构化的协作输入。
-
-### Step 4：导出或继续交给 AI
-
-修改完成后，用户可以导出 HTML 快照、长图、图片型 PDF，或者进入浏览器演示模式继续展示。如果还需要进一步重构源码，则可以使用 **Copy AI Edit Prompt** 或 **Review Prompt Handoff**，把页面现状和修改意图继续交给外部 AI 处理。这一节适合在 Lens 中演示 Bullets，也适合把步骤提炼后加入 My Vision。
-
-## 5. 功能与使用场景表
-
-| 模块 | 作用 | Lens 演示用途 |
-| --- | --- | --- |
-| 可视化编辑 | 直接修改 HTML 页面中的文字、字号、颜色、对齐和间距 | 适合作为结构化功能说明表加入 My Vision |
-| 图片替换 | 在不离开浏览器的情况下替换页面图片 | 说明“AI 初稿之后仍需人工修正素材” |
-| HTML 快照 | 导出编辑后的页面快照，保留当前浏览器中的修改结果 | 可讨论“导出的是当前工作状态，而不是源码回写” |
-| 长图 / 图片型 PDF | 生成适合分享与归档的静态材料 | 适合对比不同交付格式 |
-| 浏览器演示模式 | 让 HTML 页面以演示稿方式全屏展示 | 适合讨论 HTML 与传统 PPT 的边界 |
-| Copy AI Edit Prompt | 把视觉修改转成结构化 Prompt，继续交给外部 AI 改源码 | 适合演示人机协作闭环 |
-| Review Prompt Handoff | 把页面里“看得出但不容易说清”的问题整理成评审 Prompt | 适合演示 Explain / Summary 后的再加工 |
-| 修改意见 | 直接在页面上记录移动、删除或局部意图 | 适合讨论“页面即批注面板”的工作方式 |
-
-## 6. 项目信号与占位数据
-
-下表只填写仓库中可以确认的内容；无法确认的数据保留 TODO，不虚构。
+下表只保留目前可以确认，或明确标记为待补的数据。这里的作用不是做“宣传指标展示”，而是给读者一个快速了解项目状态、入口和阶段的事实卡片。
 
 | 项目 | 内容 |
 | --- | --- |
 | 项目名称 | ClickDeck |
 | 产品类型 | Chrome / Edge 扩展 |
 | 当前版本 | 1.3.2 |
-| GitHub 地址 | https://github.com/ningsiii/ClickDeck |
-| Chrome Web Store 地址 | TODO：仓库中未找到公开链接 |
-| GitHub Stars | TODO：请在录制前填写当前数据 |
-| Chrome Web Store 用户数 | TODO：请在录制前填写当前数据 |
+| GitHub 仓库 | https://github.com/ningsiii/ClickDeck |
+| GitHub Stars | TODO：录制前填写当前数据 |
+| Chrome Web Store | https://chromewebstore.google.com/detail/clickdeck/dejmgkhjgibolmfhfpgacfhpoindohmg?hl=zh-CN |
+| Chrome Web Store 用户量 / 评价数 | 400+（用户提供，录制前建议再核对） |
+| Lens 项目地址 | https://github.com/ningsiii/Lens |
+| 更多演示或主页入口 | TODO：录制前补充 |
 | 当前阶段 | Early MVP / 持续迭代中 |
 | 许可证 | MIT |
 
-## 7. 图片 / 界面示意
+## 六、产品界面与展示材料
+
+下面这张图可以作为文档中的主图。它的作用不是精确说明每一个操作，而是让读者先形成对 ClickDeck 视觉形态的直觉：这是一个在浏览器里直接工作的轻量编辑层，而不是一个脱离页面的独立设计工具。
 
 ![ClickDeck 界面示意图](../assets/clickdeck-showcase.png)
 
-图 1：ClickDeck 的界面示意图。该图可用于 Lens 中的 Figure / 图表速览演示；如果后续需要更贴近视频脚本的画面，也可以替换为 Chrome Store 截图或最新操作截图。
+图 1：ClickDeck 的界面示意图。后续如果你希望把 Chrome Web Store 页面截图或 GitHub 仓库首页截图也加入视频材料，可以插在这一节后面，但正文本身不必依赖那些截图才能成立。
 
-## 8. 从 ClickDeck 到 Lens：共同的问题
+## 七、ClickDeck 所面对的实际问题
 
-AI 会生成越来越多的材料，格式可能是网页、PDF、Markdown、长文档、方案页或演示稿。真正困难的地方并不在“第一版能不能生成”，而在“生成之后，谁来负责理解、筛选、修改、重排和复用这些材料”。ClickDeck 面向的是 AI 生成 HTML 之后的编辑与导出，Lens 面向的是长文档导入之后的阅读、标注、重构与再输出。两者解决的问题不同，但它们面对的是同一个变化：内容生成速度在上升，而人工控制界面仍然稀缺。
+ClickDeck 面对的实际问题并不复杂，但很典型：AI 已经越来越擅长生成第一版页面，可第一版并不自动等于最终版。用户真正反复消耗时间的，往往不是从零开始搭内容，而是在已有结果上继续判断、修正、重排、强调和导出。页面里的很多问题并不是“完全错误”，而是“差一点就能用”，而这一点差距通常只能由人来决定。
 
-真正的问题不是 AI 能不能生成内容，而是人在 AI 生成之后，如何继续理解、整理、修改和复用这些材料。
+真正困难的地方，不是让 AI 生成第一版页面，而是让人能够在不重新改代码的情况下，继续判断、修正和交付这份材料。
 
-这段判断适合在 Lens 里写 Note，因为它不是功能列表，而是对工作流的立场判断。用户可以围绕这句话继续补充自己的观察，例如：哪些材料适合直接发布，哪些材料必须经过人工重构，哪些工具只是“生成器”，哪些工具才是真正的工作台。
+这段话本身就适合作为 Note 的来源。它既不是口号，也不是功能清单，而是一个对 AI 工作流的具体判断：生成速度提高之后，编辑界面和重构界面会比单纯的生成按钮更重要。对 ClickDeck 来说，这个判断解释了它为什么存在；对阅读者来说，这也提供了一个理解类似工具的角度。
 
-## 9. 为什么这份文档适合 Lens MVP 演示？
+## 八、结论
 
-这份文档故意包含了 Lens 演示所需要的关键元素：有清晰的大纲层级，有适合 Explain 的英文概念段，有适合 Summary 的背景说明，有适合 Bullets 的 4 步工作流，有功能表和项目信号表，也有一张真实相对路径图片。
+如果把 ClickDeck 放回更大的工作流里看，它最值得注意的地方，不是“它能不能取代 PPT”或者“它是不是另一个网页编辑器”，而是它把 AI 生成 HTML 之后常常被忽视的一段人工工作显式化了。它让用户不必马上回到源码，也不必完全依赖重新提示 AI，而是在浏览器里直接接管这一份已经成形的材料。
 
-除此之外，它还包含两个对 Lens 很重要的内容类型。第一类是判断性段落，例如上一节关于“AI 生成之后的人类控制”的论述，适合用户划线并写 Note。第二类是可重组的结构化材料，例如工作流、功能表格、产品信号与结论段，适合加入 My Vision 后重新组织成一份新的研究页。
+从这个角度说，ClickDeck 的意义不在于扩大 AI 的生成能力，而在于承认一个更现实的事实：未来的内容生产中，生成会越来越便宜，但理解、修正、组织和交付仍然需要更好的界面。这也是为什么一篇关于 ClickDeck 的介绍文档，本身可以成为一个很好的阅读与标注样本。
 
-如果要演示 Lens 不是“只会总结 PDF”，而是一个可以把阅读结果进一步重构、组合并导出的工作台，那么这份文档的形态是合适的。它不像广告页那样只有口号，也不像纯论文那样过度抽象，而是保留了案例、概念、表格和结论之间的张力。
+## 附：项目链接
 
-## 10. Lens 演示动作建议
-
-以下清单可直接作为录制视频时的动作参考：
-
-1. 导入这份文档的 PDF 版本。
-2. 展示 Original 大纲。
-3. 打开图表速览。
-4. 选中英文段落里的 `AI-generated HTML artifact`。
-5. 使用 AI Explain。
-6. 选中第 4 节的工作流段落。
-7. 使用 Summary / Bullets。
-8. 写一条 Note：`这说明 AI 生成之后，人仍然需要控制和重构材料。`
-9. 把这条 Note 加入 My Vision。
-10. 把“功能与使用场景表”加入 My Vision。
-11. 把图片加入 My Vision。
-12. 切换到 My Vision。
-13. 导出 Portable HTML。
-14. 用浏览器 AI，例如 Ask Gemini / Ask GPT，对导出的 HTML 继续总结或问答。
-
-## 11. 核心信息
-
-ClickDeck 不是单纯的 HTML 编辑器，而是 AI 生成内容之后的人工控制层。Lens 也不应被理解成单纯的 PDF 总结器，而更像是长文档阅读之后的重构工作台。
-
-如果把这两个项目放在同一条线上看，它们指向的是同一件事：当 AI 持续生成更多材料之后，真正稀缺的不是生成按钮，而是更好的界面，用来帮助人理解、整理、修改和复用这些材料。
-
-这也是这份文档最适合加入 My Vision 的结论段：未来的知识工作流，不只需要生成器，还需要能够承接生成结果、并允许人继续接管的工作台。
-
+- ClickDeck GitHub：<https://github.com/ningsiii/ClickDeck>
+- Lens GitHub：<https://github.com/ningsiii/Lens>
+- ClickDeck Chrome Web Store：<https://chromewebstore.google.com/detail/clickdeck/dejmgkhjgibolmfhfpgacfhpoindohmg?hl=zh-CN>
+- 更多演示或视频主页：TODO：录制前补充
