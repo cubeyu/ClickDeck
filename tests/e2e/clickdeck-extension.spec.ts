@@ -601,4 +601,46 @@ test.describe("ClickDeck core editing workflows", () => {
     expect(newText).not.toEqual("Quarterly Product ReviewTEST-");
   });
 
+  test("14. Background clicks should not let the host page reset a just-applied style edit", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    const heading = page.getByRole("heading", { name: "Quarterly Product Review" });
+    const initialFontSize = await heading.evaluate((element) => getComputedStyle(element).fontSize);
+
+    await page.evaluate((originalSize) => {
+      const bg = document.createElement("div");
+      bg.id = "host-reset-background";
+      Object.assign(bg.style, {
+        position: "fixed",
+        right: "16px",
+        top: "16px",
+        width: "120px",
+        height: "120px",
+        background: "rgba(255,0,0,0.01)",
+        zIndex: "10"
+      });
+      bg.addEventListener("click", () => {
+        const heading = document.querySelector("h1");
+        if (heading instanceof HTMLElement) {
+          heading.style.fontSize = originalSize;
+          document.body.dataset.hostResetTriggered = "true";
+        }
+      });
+      document.body.appendChild(bg);
+    }, initialFontSize);
+
+    await heading.click();
+    await page.locator("[data-action='font-larger']").click();
+
+    const updatedFontSize = await heading.evaluate((element) => getComputedStyle(element).fontSize);
+    expect(parseFloat(updatedFontSize)).toBeGreaterThan(parseFloat(initialFontSize));
+
+    await page.locator("#host-reset-background").click({ force: true });
+
+    const finalFontSize = await heading.evaluate((element) => getComputedStyle(element).fontSize);
+    expect(finalFontSize).toBe(updatedFontSize);
+    await expect.poll(() => page.evaluate(() => document.body.dataset.hostResetTriggered ?? "false")).toBe("false");
+  });
+
 });

@@ -15,7 +15,7 @@ import {
   type EditorPatch
 } from "../state/editor-state";
 import { createEditHistory } from "../state/history";
-import { canAutoStartTextEditing, createElementLocator, describeElement, placeCaretFromPoint, isElementVisible } from "./dom-utils";
+import { canAutoStartTextEditing, createElementLocator, describeElement, placeCaretFromPoint, isClickDeckUiElement, isElementVisible } from "./dom-utils";
 import { getAskGeminiPrompt, type AskGeminiPromptKey } from "../export/ask-gemini";
 import { getPanelLabels, getPanelLanguage } from "./i18n";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
@@ -515,6 +515,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     }
 
     const rawTarget = event.target as HTMLElement;
+    const hadSelectionContext = Boolean(selectedElement || editingElement);
 
     // If clicking inside the currently editing element, do not intercept
     // This allows the user to click to place the cursor.
@@ -535,6 +536,15 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     stopEditing();
 
     if (!target) {
+      if (rawTarget instanceof HTMLElement && isClickDeckUiElement(rawTarget)) {
+        return;
+      }
+
+      if (hadSelectionContext) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearSelection("background click");
+      }
       return;
     }
 
