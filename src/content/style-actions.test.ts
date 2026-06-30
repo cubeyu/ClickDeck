@@ -144,11 +144,16 @@ describe("applyStyleAction", () => {
     document.body.appendChild(img);
 
     img.style.width = "200px";
-    applyStyleAction(logger, img, "image-width-larger");
+    img.style.height = "100px";
+    const largerChanges = applyStyleAction(logger, img, "image-width-larger");
     expect(img.style.width).toBe("220px");
+    expect(img.style.height).toBe("auto");
+    expect(largerChanges?.map(change => change.property)).toEqual(["width", "height"]);
 
-    applyStyleAction(logger, img, "image-width-smaller");
+    const smallerChanges = applyStyleAction(logger, img, "image-width-smaller");
     expect(img.style.width).toBe("200px");
+    expect(img.style.height).toBe("auto");
+    expect(smallerChanges?.map(change => change.property)).toEqual(["width", "height"]);
 
     applyStyleAction(logger, img, "image-maxwidth-100");
     expect(img.style.maxWidth).toBe("100%");

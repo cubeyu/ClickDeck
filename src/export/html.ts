@@ -21,9 +21,27 @@ function ensureBaseTag(clone: HTMLElement): void {
   }
 }
 
+function syncInlineStyles(sourceRoot: HTMLElement, cloneRoot: HTMLElement): void {
+  const sourceElements = [sourceRoot, ...Array.from(sourceRoot.querySelectorAll<HTMLElement>("*"))];
+  const cloneElements = [cloneRoot, ...Array.from(cloneRoot.querySelectorAll<HTMLElement>("*"))];
+
+  const length = Math.min(sourceElements.length, cloneElements.length);
+  for (let index = 0; index < length; index += 1) {
+    const source = sourceElements[index];
+    const clone = cloneElements[index];
+    const styleAttr = source.getAttribute("style");
+    if (styleAttr === null) {
+      clone.removeAttribute("style");
+      continue;
+    }
+    clone.setAttribute("style", styleAttr);
+  }
+}
+
 export function exportHtmlSnapshot(logger: ClickDeckLogger): void {
   try {
     const clone = document.documentElement.cloneNode(true) as HTMLElement;
+    syncInlineStyles(document.documentElement, clone);
     
     // Remove ClickDeck UI
     const elementsToRemove = clone.querySelectorAll("[data-clickdeck='true'], #clickdeck-style, .clickdeck-panel, .clickdeck-outline");

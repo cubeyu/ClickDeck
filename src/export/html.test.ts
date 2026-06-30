@@ -92,6 +92,9 @@ describe("exportHtmlSnapshot", () => {
     heading.textContent = "Edited headline";
     heading.style.fontSize = "48px";
     heading.style.color = "rgb(255, 0, 0)";
+    heading.style.textAlign = "center";
+    heading.style.lineHeight = "1.7";
+    heading.style.letterSpacing = "0.08em";
     image.src = "data:image/png;base64,ZmFrZS1pbWFnZQ==";
 
     exportHtmlSnapshot(logger);
@@ -100,7 +103,11 @@ describe("exportHtmlSnapshot", () => {
     const parts = (blobArgs?.[0] as unknown[]) ?? [];
     const html = parts.join("");
     expect(html).toContain("Edited headline");
-    expect(html).toContain('style="font-size: 48px; color: rgb(255, 0, 0);"');
+    expect(html).toContain("font-size: 48px;");
+    expect(html).toContain("color: rgb(255, 0, 0);");
+    expect(html).toContain("text-align: center;");
+    expect(html).toContain("line-height: 1.7;");
+    expect(html).toContain("letter-spacing: 0.08em;");
     expect(html).toContain("data:image/png;base64,ZmFrZS1pbWFnZQ==");
   });
 });

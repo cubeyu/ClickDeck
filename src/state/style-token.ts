@@ -10,5 +10,6 @@ export type StyleProperty =
   | "letterSpacing"
   | "borderRadius"
   | "width"
+  | "height"
   | "maxWidth"
   | "objectFit";

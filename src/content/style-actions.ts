@@ -47,45 +47,45 @@ export function applyStyleAction(
   logger: ClickDeckLogger,
   element: HTMLElement,
   action: StyleAction
-): AppliedStyleChange | null {
+): AppliedStyleChange[] | null {
   const computed = window.getComputedStyle(element);
-  let change: AppliedStyleChange | null = null;
+  let changes: AppliedStyleChange[] | null = null;
 
   switch (action) {
     case "font-smaller":
-      change = {
+      changes = [{
         property: "fontSize",
         before: element.style.fontSize,
         after: `${parseFloat(computed.fontSize) - 2}px`
-      };
+      }];
       break;
     case "font-larger":
-      change = {
+      changes = [{
         property: "fontSize",
         before: element.style.fontSize,
         after: `${parseFloat(computed.fontSize) + 2}px`
-      };
+      }];
       break;
     case "align-left":
-      change = {
+      changes = [{
         property: "textAlign",
         before: element.style.textAlign,
         after: "left"
-      };
+      }];
       break;
     case "align-center":
-      change = {
+      changes = [{
         property: "textAlign",
         before: element.style.textAlign,
         after: "center"
-      };
+      }];
       break;
     case "align-right":
-      change = {
+      changes = [{
         property: "textAlign",
         before: element.style.textAlign,
         after: "right"
-      };
+      }];
       break;
     case "pick-bg-color": {
       // Walk up the DOM tree to find the nearest ancestor with a non-transparent background
@@ -104,244 +104,264 @@ export function applyStyleAction(
         logger.info("No non-transparent background found in ancestors");
         return null;
       }
-      change = {
+      changes = [{
         property: "color",
         before: element.style.color,
         after: bg
-      };
+      }];
       break;
     }
     case "reset-color":
-      change = {
+      changes = [{
         property: "color",
         before: element.style.color,
         after: ""
-      };
+      }];
       break;
     case "weight-decrease": {
       const current = readFontWeight(computed.fontWeight);
-      change = {
+      changes = [{
         property: "fontWeight",
         before: element.style.fontWeight,
         after: `${clamp(current - 100, 100, 900)}`
-      };
+      }];
       break;
     }
     case "weight-increase": {
       const current = readFontWeight(computed.fontWeight);
-      change = {
+      changes = [{
         property: "fontWeight",
         before: element.style.fontWeight,
         after: `${clamp(current + 100, 100, 900)}`
-      };
+      }];
       break;
     }
     case "lineheight-decrease": {
       const current = readLineHeightRatio(computed);
-      change = {
+      changes = [{
         property: "lineHeight",
         before: element.style.lineHeight,
         after: `${roundTo(clamp(current - 0.1, 1.0, 2.4), 1)}`
-      };
+      }];
       break;
     }
     case "lineheight-increase": {
       const current = readLineHeightRatio(computed);
-      change = {
+      changes = [{
         property: "lineHeight",
         before: element.style.lineHeight,
         after: `${roundTo(clamp(current + 0.1, 1.0, 2.4), 1)}`
-      };
+      }];
       break;
     }
     case "letterspacing-decrease": {
       const current = readLetterSpacingEm(computed);
-      change = {
+      changes = [{
         property: "letterSpacing",
         before: element.style.letterSpacing,
         after: `${roundTo(clamp(current - 0.02, -0.08, 0.16), 2)}em`
-      };
+      }];
       break;
     }
     case "letterspacing-increase": {
       const current = readLetterSpacingEm(computed);
-      change = {
+      changes = [{
         property: "letterSpacing",
         before: element.style.letterSpacing,
         after: `${roundTo(clamp(current + 0.02, -0.08, 0.16), 2)}em`
-      };
+      }];
       break;
     }
     case "margin-decrease": {
       const current = readPixelValue(computed.marginTop, 0);
-      change = {
+      changes = [{
         property: "margin",
         before: element.style.margin,
         after: `${clamp(current - 4, 0, 96)}px`
-      };
+      }];
       break;
     }
     case "margin-increase": {
       const current = readPixelValue(computed.marginTop, 0);
-      change = {
+      changes = [{
         property: "margin",
         before: element.style.margin,
         after: `${clamp(current + 4, 0, 96)}px`
-      };
+      }];
       break;
     }
     case "padding-decrease": {
       const current = readPixelValue(computed.paddingTop, 0);
-      change = {
+      changes = [{
         property: "padding",
         before: element.style.padding,
         after: `${clamp(current - 4, 0, 96)}px`
-      };
+      }];
       break;
     }
     case "padding-increase": {
       const current = readPixelValue(computed.paddingTop, 0);
-      change = {
+      changes = [{
         property: "padding",
         before: element.style.padding,
         after: `${clamp(current + 4, 0, 96)}px`
-      };
+      }];
       break;
     }
     case "bg-warm":
-      change = {
+      changes = [{
         property: "backgroundColor",
         before: element.style.backgroundColor,
         after: "#f7f3ea"
-      };
+      }];
       break;
     case "bg-white":
-      change = {
+      changes = [{
         property: "backgroundColor",
         before: element.style.backgroundColor,
         after: "#ffffff"
-      };
+      }];
       break;
     case "bg-transparent":
-      change = {
+      changes = [{
         property: "backgroundColor",
         before: element.style.backgroundColor,
         after: "transparent"
-      };
+      }];
       break;
     case "bg-reset":
-      change = {
+      changes = [{
         property: "backgroundColor",
         before: element.style.backgroundColor,
         after: ""
-      };
+      }];
       break;
     default:
       if (action.startsWith("bg-custom:")) {
         const bgVal = action.replace("bg-custom:", "");
-        change = {
+        changes = [{
           property: "backgroundColor",
           before: element.style.backgroundColor,
           after: bgVal
-        };
+        }];
       }
       break;
     case "radius-decrease": {
       const current = readPixelValue(computed.borderTopLeftRadius, 0);
-      change = {
+      changes = [{
         property: "borderRadius",
         before: element.style.borderRadius,
         after: `${clamp(current - 2, 0, 48)}px`
-      };
+      }];
       break;
     }
     case "radius-increase": {
       const current = readPixelValue(computed.borderTopLeftRadius, 0);
-      change = {
+      changes = [{
         property: "borderRadius",
         before: element.style.borderRadius,
         after: `${clamp(current + 2, 0, 48)}px`
-      };
+      }];
       break;
     }
     case "image-width-smaller": {
       const current = element.style.width || computed.width;
       const next = stepSize(current, -1);
-      change = {
-        property: "width",
-        before: element.style.width,
-        after: next
-      };
+      changes = buildImageScaleChanges(element, computed, next);
       break;
     }
     case "image-width-larger": {
       const current = element.style.width || computed.width;
       const next = stepSize(current, +1);
-      change = {
-        property: "width",
-        before: element.style.width,
-        after: next
-      };
+      changes = buildImageScaleChanges(element, computed, next);
       break;
     }
     case "image-maxwidth-100":
-      change = {
+      changes = [{
         property: "maxWidth",
         before: element.style.maxWidth,
         after: "100%"
-      };
+      }];
       break;
     case "image-fit-contain":
-      change = {
+      changes = [{
         property: "objectFit",
         before: element.style.objectFit,
         after: "contain"
-      };
+      }];
       break;
     case "image-fit-cover":
-      change = {
+      changes = [{
         property: "objectFit",
         before: element.style.objectFit,
         after: "cover"
-      };
+      }];
       break;
     case "image-radius-none":
-      change = {
+      changes = [{
         property: "borderRadius",
         before: element.style.borderRadius,
         after: "0"
-      };
+      }];
       break;
     case "image-radius-sm":
-      change = {
+      changes = [{
         property: "borderRadius",
         before: element.style.borderRadius,
         after: "8px"
-      };
+      }];
       break;
     case "image-radius-lg":
-      change = {
+      changes = [{
         property: "borderRadius",
         before: element.style.borderRadius,
         after: "16px"
-      };
+      }];
       break;
     case "image-radius-round":
-      change = {
+      changes = [{
         property: "borderRadius",
         before: element.style.borderRadius,
         after: "9999px"
-      };
+      }];
       break;
   }
 
-  if (!change) {
+  if (!changes || changes.length === 0) {
     return null;
   }
 
-  element.style[change.property] = change.after;
+  for (const change of changes) {
+    element.style[change.property] = change.after;
+  }
   logger.info("Style action applied", { action, target: describeElement(element) });
-  return change;
+  return changes;
+}
+
+function buildImageScaleChanges(
+  element: HTMLElement,
+  computed: CSSStyleDeclaration,
+  nextWidth: string
+): AppliedStyleChange[] {
+  const changes: AppliedStyleChange[] = [
+    {
+      property: "width",
+      before: element.style.width,
+      after: nextWidth
+    }
+  ];
+
+  const currentHeightInline = element.style.height;
+  const currentHeightComputed = computed.height.trim();
+  if (currentHeightInline || (currentHeightComputed && currentHeightComputed !== "auto")) {
+    changes.push({
+      property: "height",
+      before: currentHeightInline,
+      after: "auto"
+    });
+  }
+
+  return changes;
 }
 
 function stepSize(value: string, direction: -1 | 1): string {

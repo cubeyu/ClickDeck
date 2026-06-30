@@ -357,6 +357,39 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     panel?.setHistoryAvailability(history.undoStack.length > 0, history.redoStack.length > 0);
   }
 
+  function popPatchGroup(stack: EditorPatch[]): EditorPatch[] {
+    const last = stack.pop();
+    if (!last) {
+      return [];
+    }
+
+    const groupCreatedAt = last.createdAt;
+    const groupTarget = last.targetDescriptor;
+    const collected: EditorPatch[] = [last];
+
+    while (stack.length > 0) {
+      const previous = stack[stack.length - 1];
+      if (
+        !previous ||
+        previous.kind !== "style" ||
+        last.kind !== "style" ||
+        previous.createdAt !== groupCreatedAt ||
+        previous.targetDescriptor !== groupTarget
+      ) {
+        break;
+      }
+      collected.push(stack.pop() as EditorPatch);
+    }
+
+    return collected.reverse();
+  }
+
+  function pushPatchGroup(stack: EditorPatch[], patches: EditorPatch[]): void {
+    for (const patch of patches) {
+      stack.push(patch);
+    }
+  }
+
   function applyPatchValue(patch: EditorPatch, value: string): void {
     if (patch.kind === "style") {
       patch.targetElement.style[patch.property] = value;
@@ -376,28 +409,38 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function undoLastPatch(): void {
-    const patch = history.undoStack.pop();
-    if (!patch) {
+    const patches = popPatchGroup(history.undoStack);
+    if (patches.length === 0) {
       return;
     }
 
-    applyPatchValue(patch, patch.before);
-    history.redoStack.push(patch);
-    logger.info("Undo applied", { patchId: patch.id, target: patch.targetDescriptor });
+    for (const patch of [...patches].reverse()) {
+      applyPatchValue(patch, patch.before);
+    }
+    pushPatchGroup(history.redoStack, patches);
+    logger.info("Undo applied", {
+      patchIds: patches.map(patch => patch.id),
+      target: patches[0]?.targetDescriptor
+    });
     updateOutline();
     refreshHistoryButtons();
     persistPatches();
   }
 
   function redoLastPatch(): void {
-    const patch = history.redoStack.pop();
-    if (!patch) {
+    const patches = popPatchGroup(history.redoStack);
+    if (patches.length === 0) {
       return;
     }
 
-    applyPatchValue(patch, patch.after);
-    history.undoStack.push(patch);
-    logger.info("Redo applied", { patchId: patch.id, target: patch.targetDescriptor });
+    for (const patch of patches) {
+      applyPatchValue(patch, patch.after);
+    }
+    pushPatchGroup(history.undoStack, patches);
+    logger.info("Redo applied", {
+      patchIds: patches.map(patch => patch.id),
+      target: patches[0]?.targetDescriptor
+    });
     updateOutline();
     refreshHistoryButtons();
     persistPatches();
@@ -558,29 +601,38 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
-    const change = applyStyleAction(logger, selectedElement, action);
-    if (!change) {
+    const changes = applyStyleAction(logger, selectedElement, action);
+    if (!changes || changes.length === 0) {
       return;
     }
 
-    const patch: StylePatch = {
-      id: `${Date.now()}-${state.patches.length + 1}`,
-      kind: "style",
-      targetElement: selectedElement,
-      targetDescriptor: describeElement(selectedElement),
-      targetLocator: createElementLocator(selectedElement),
-      property: change.property,
-      before: change.before,
-      after: change.after,
-      createdAt: Date.now()
-    };
-    recordStylePatch(state, patch);
-    history.undoStack.push(patch);
+    const createdAt = Date.now();
+    const baseId = `${createdAt}-${state.patches.length + 1}`;
+    const targetElement = selectedElement;
+    const targetDescriptor = describeElement(targetElement);
+    const targetLocator = createElementLocator(targetElement);
+    const patches = changes.map((change, index) => {
+      const patch: StylePatch = {
+        id: `${baseId}-${index + 1}`,
+        kind: "style",
+        targetElement,
+        targetDescriptor,
+        targetLocator,
+        property: change.property,
+        before: change.before,
+        after: change.after,
+        createdAt
+      };
+      recordStylePatch(state, patch);
+      return patch;
+    });
+
+    pushPatchGroup(history.undoStack, patches);
     history.redoStack.length = 0;
     logger.info("Style patch recorded", {
-      patchId: patch.id,
-      property: patch.property,
-      target: patch.targetDescriptor
+      patchIds: patches.map(patch => patch.id),
+      properties: patches.map(patch => patch.property),
+      target: targetDescriptor
     });
     updateOutline();
     refreshHistoryButtons();
