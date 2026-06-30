@@ -477,6 +477,7 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
 
       const render = (): void => {
         const promptText = currentLang === "zh" ? options.promptZh : options.promptEn;
+        const promptNote = currentLang === "zh" ? labels.promptChineseReferenceNote : labels.promptEnglishPrimaryNote;
         
         overlay.innerHTML = `
           <div class="clickdeck-prompt-modal">
@@ -487,6 +488,7 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
                 <button class="clickdeck-button${currentLang === "zh" ? " clickdeck-button--active" : ""}" data-lang="zh" type="button">${labels.promptLangZh}</button>
               </div>
             </div>
+            <div class="clickdeck-prompt-modal__note">${promptNote}</div>
             ${options.hasMediaReplacement ? `<div class="clickdeck-prompt-modal__warning">${labels.promptMediaUIReminder}</div>` : ""}
             <textarea class="clickdeck-prompt-modal__textarea" spellcheck="false">${promptText}</textarea>
             <div class="clickdeck-prompt-modal__footer">

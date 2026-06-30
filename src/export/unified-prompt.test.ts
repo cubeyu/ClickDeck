@@ -21,6 +21,28 @@ describe("buildUnifiedPrompt", () => {
     }
   });
 
+  it("makes the zh variant explicitly reference-only instead of pretending to be the primary execution prompt", () => {
+    const targetElement = document.createElement("div");
+    const patch: EditorPatch = {
+      id: "p-zh",
+      createdAt: Date.now(),
+      targetElement,
+      targetDescriptor: "div",
+      targetLocator: { cssPath: "div", descriptor: "div" },
+      kind: "style",
+      property: "font-size",
+      before: "12px",
+      after: "14px"
+    } as unknown as EditorPatch;
+
+    const resultZh = buildUnifiedPrompt([patch], [], { language: "zh", page: dummyPage });
+    expect(resultZh.ok).toBe(true);
+    if (resultZh.ok) {
+      expect(resultZh.prompt).toContain("ClickDeck AI edit prompt");
+      expect(resultZh.prompt).toContain("样式修改");
+    }
+  });
+
   it("generates a TodoList with both intent ops and normal changes", () => {
     const targetElement = document.createElement("div");
     targetElement.className = "test test-class";

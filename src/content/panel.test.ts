@@ -185,3 +185,29 @@ describe("createPanel Ask Gemini section", () => {
     panel.destroy();
   });
 });
+
+describe("createPanel prompt preview language roles", () => {
+  it("shows English as the primary execution view and Chinese as reference", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    panel.showPromptPreview({
+      promptEn: "English prompt body",
+      promptZh: "中文参考说明\n\nChinese prompt body",
+      hasMediaReplacement: false,
+      onCopy: () => undefined
+    });
+
+    const overlay = panel.element.querySelector<HTMLElement>(".clickdeck-prompt-overlay");
+    expect(overlay?.textContent).toContain("English is the primary execution prompt");
+    expect(overlay?.textContent).toContain("Chinese ref");
+
+    const zhButton = overlay?.querySelector<HTMLButtonElement>("[data-lang='zh']");
+    zhButton?.click();
+
+    expect(overlay?.textContent).toContain("Chinese is a review-only reference");
+    expect((overlay?.querySelector("textarea") as HTMLTextAreaElement).value).toContain("中文参考说明");
+
+    panel.destroy();
+  });
+});

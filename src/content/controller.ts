@@ -717,7 +717,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       let hasMediaReplacement = unifiedResultEn.hasMediaReplacement;
 
       const unifiedResultZh = buildUnifiedPrompt(effective, intentInputs, { language: "zh", page });
-      let finalZh = unifiedResultZh.ok ? unifiedResultZh.prompt : "";
+      let finalZh = unifiedResultZh.ok
+        ? [
+            "中文参考说明：以下内容只用于人工核对任务是否完整、目标是否准确、是否存在歧义。实际复制给 coding AI 执行时，优先使用 English 版本。",
+            "",
+            unifiedResultZh.prompt
+          ].join("\n")
+        : "";
 
       panel?.showPromptPreview({
         promptEn: finalEn,

@@ -74,6 +74,8 @@ export type PanelLabels = {
   promptPreviewTitle: string;
   promptLangEn: string;
   promptLangZh: string;
+  promptEnglishPrimaryNote: string;
+  promptChineseReferenceNote: string;
   promptCopy: string;
   promptCopied: string;
   promptClose: string;
@@ -220,7 +222,9 @@ const englishLabels: PanelLabels = {
   pickBgColor: "Pick bg color",
   promptPreviewTitle: "AI edit prompt",
   promptLangEn: "English",
-  promptLangZh: "中文",
+  promptLangZh: "Chinese ref",
+  promptEnglishPrimaryNote: "English is the primary execution prompt. Use this version when copying to coding AI.",
+  promptChineseReferenceNote: "Chinese is a review-only reference for checking task intent and completeness. Prefer the English version for actual execution.",
   promptCopy: "Copy",
   promptCopied: "Copied!",
   promptClose: "Close",
@@ -367,7 +371,9 @@ const chineseLabels: PanelLabels = {
   pickBgColor: "自定义背景",
   promptPreviewTitle: "AI edit prompt",
   promptLangEn: "English",
-  promptLangZh: "中文",
+  promptLangZh: "中文参考",
+  promptEnglishPrimaryNote: "English 是正式执行版 prompt。复制给 coding AI 时，优先使用这个版本。",
+  promptChineseReferenceNote: "中文仅用于人工核对任务是否完整、目标是否准确、是否有歧义。真正执行时，优先复制 English 版本。",
   promptCopy: "复制",
   promptCopied: "已复制！",
   promptClose: "关闭",
