@@ -129,6 +129,26 @@ describe("Intent Prompt Builder", () => {
     }
   });
 
+  it("builds a zh prompt with Chinese section headers and rule blocks", () => {
+    const input = mockRegionContext("intent", "Add a title here", true, [], [
+      { direction: "above", summary: "[Image]", distance: 12 }
+    ]);
+
+    const result = buildIntentPrompt([input], { language: "zh", page: { url: "test.com", title: "Test" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const prompt = result.prompt;
+      expect(prompt).toContain("页面上下文:");
+      expect(prompt).toContain("定位信息使用说明:");
+      expect(prompt).toContain("全局编辑规则:");
+      expect(prompt).toContain("操作列表:");
+      expect(prompt).toContain("OP-1 | 类型: 意图");
+      expect(prompt).toContain("用户说明:");
+      expect(prompt).toContain("近邻参考:");
+      expect(prompt).toContain("完成核对清单:");
+    }
+  });
+
   it("builds ordinary intent prompt with layered sections and no repeated To do / Do not blocks", () => {
     const input = mockRegionContext("intent", "Add a title here", true, [], [
       { direction: "above", summary: "[Image]", distance: 12 }

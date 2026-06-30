@@ -20,6 +20,16 @@ export type PromptBuildResult =
   | { ok: true; prompt: string; hasMediaReplacement: boolean }
   | { ok: false; reason: "empty"; message: string };
 
+type PromptLanguage = IntentPromptOptions["language"];
+
+function isZh(language: PromptLanguage): boolean {
+  return language === "zh";
+}
+
+function t(language: PromptLanguage, en: string, zh: string): string {
+  return isZh(language) ? zh : en;
+}
+
 function formatRect(rect: { left: number; top: number; width: number; height: number; right: number; bottom: number }): string {
   return `[x:${Math.round(rect.left)}, y:${Math.round(rect.top)}, w:${Math.round(rect.width)}, h:${Math.round(rect.height)}]`;
 }
@@ -49,25 +59,42 @@ function formatCandidate(candidate: RegionCandidate): string {
   return `${summary} (${details.join("; ")})`;
 }
 
-export function appendContextBlock(lines: string[], label: string, context: RegionContext, indent = ""): void {
-  lines.push(`${indent}${label}:`);
-  lines.push(`${indent}- Page mode: ${context.region.pageMode}`);
-  lines.push(`${indent}- Anchor: ${formatAnchor(context)}`);
-  lines.push(`${indent}- Visual box: ${formatBox(context)}`);
-  lines.push(`${indent}- Region confidence: ${context.confidence}`);
+function formatDirection(direction: NearbyReference["direction"], language: PromptLanguage): string {
+  if (!isZh(language)) return direction;
+  if (direction === "above") return "上方";
+  if (direction === "below") return "下方";
+  if (direction === "left") return "左侧";
+  return "右侧";
 }
 
-export function appendRegionContents(lines: string[], context: RegionContext, indent = "", isTargetB = false): void {
-  lines.push(`${indent}Region contents:`);
+function translateSemantic(text: string, language: PromptLanguage): string {
+  if (!isZh(language)) return text;
+  return text
+    .replace("place Target B below this reference / preserve vertical spacing", "将 Target B 放在该参考项下方 / 保持垂直间距")
+    .replace("place Target B above this reference / preserve vertical spacing", "将 Target B 放在该参考项上方 / 保持垂直间距")
+    .replace("use it as horizontal context / preserve offset", "将其作为横向参考 / 保持相对偏移")
+    .replace("avoid overlap / preserve offset", "避免重叠 / 保持相对偏移");
+}
+
+export function appendContextBlock(lines: string[], label: string, context: RegionContext, indent = "", language: PromptLanguage = "en"): void {
+  lines.push(`${indent}${label}:`);
+  lines.push(`${indent}- ${t(language, "Page mode", "页面模式")}: ${context.region.pageMode}`);
+  lines.push(`${indent}- ${t(language, "Anchor", "锚点")}: ${formatAnchor(context)}`);
+  lines.push(`${indent}- ${t(language, "Visual box", "视觉框")}: ${formatBox(context)}`);
+  lines.push(`${indent}- ${t(language, "Region confidence", "区域置信度")}: ${context.confidence}`);
+}
+
+export function appendRegionContents(lines: string[], context: RegionContext, indent = "", isTargetB = false, language: PromptLanguage = "en"): void {
+  lines.push(`${indent}${t(language, "Region contents", "区域内容")}:`);
   if (context.empty) {
-    lines.push(`${indent}- Empty visual area; use it as intended placement area, not as an existing element.`);
+    lines.push(`${indent}- ${t(language, "Empty visual area; use it as intended placement area, not as an existing element.", "当前是空白视觉区域；应将其视为预期放置区域，而不是已存在元素。")}`);
     return;
   }
 
   if (isTargetB && context.candidates.length > 0) {
     const allLowOverlapBlocks = context.candidates.every(c => c.unit.kind === "block" && c.overlapRatio < 0.1);
     if (allLowOverlapBlocks) {
-      lines.push(`${indent}- Mostly empty/structural area; use nearby references and alignment hints as placement context.`);
+      lines.push(`${indent}- ${t(language, "Mostly empty/structural area; use nearby references and alignment hints as placement context.", "这里主要是空白或结构性区域；请使用近邻参考和对齐提示作为放置依据。")}`);
       return;
     }
   }
@@ -77,17 +104,19 @@ export function appendRegionContents(lines: string[], context: RegionContext, in
   });
 }
 
-export function appendNearbyReferences(lines: string[], context: RegionContext, indent = "", label = "Nearby references"): void {
+export function appendNearbyReferences(lines: string[], context: RegionContext, indent = "", label = "Nearby references", language: PromptLanguage = "en"): void {
   lines.push(`${indent}${label}:`);
   if (context.nearby.length === 0) {
-    lines.push(`${indent}- None found.`);
+    lines.push(`${indent}- ${t(language, "None found.", "未找到。")}`);
     return;
   }
 
   context.nearby.slice(0, 8).forEach((nearby) => {
-    let text = `${indent}- ${nearby.direction}: ${nearby.summary}, ${Math.round(nearby.distance)}px away`;
+    let text = isZh(language)
+      ? `${indent}- ${formatDirection(nearby.direction, language)}: ${nearby.summary}，距离 ${Math.round(nearby.distance)}px`
+      : `${indent}- ${formatDirection(nearby.direction, language)}: ${nearby.summary}, ${Math.round(nearby.distance)}px away`;
     if (nearby.layoutSemantic) {
-      text += `; ${nearby.layoutSemantic}.`;
+      text += `; ${translateSemantic(nearby.layoutSemantic, language)}.`;
     }
     lines.push(text);
   });
@@ -104,11 +133,11 @@ function hasMultipleSiblingCandidates(context: RegionContext): boolean {
   return Array.from(parents.values()).some(count => count >= 2);
 }
 
-function appendSourceImplementationHint(lines: string[], context: RegionContext): void {
+function appendSourceImplementationHint(lines: string[], context: RegionContext, language: PromptLanguage): void {
   if (!hasMultipleSiblingCandidates(context)) return;
-  lines.push("Source implementation hint:");
-  lines.push("- Source A contains multiple sibling items; prefer moving their shared row/wrapper container when that preserves the selected visual group.");
-  lines.push("- Exclude nearby labels/headings outside Source A's visual box, even when they share a parent container.");
+  lines.push(t(language, "Source implementation hint:", "Source A 实现提示:"));
+  lines.push(t(language, "- Source A contains multiple sibling items; prefer moving their shared row/wrapper container when that preserves the selected visual group.", "- Source A 包含多个同级项；如果能保留当前视觉分组，应优先移动它们共享的整行或外层容器。"));
+  lines.push(t(language, "- Exclude nearby labels/headings outside Source A's visual box, even when they share a parent container.", "- 即使与 Source A 共用父容器，也不要把视觉框外的邻近标签或标题一起纳入移动范围。"));
   lines.push("");
 }
 
@@ -117,7 +146,7 @@ function formatOffsetAmount(value: number, unit: "%" | "px"): string {
   return `about ${rounded}${unit}`;
 }
 
-function appendPlacementOffset(lines: string[], sourceContext: RegionContext, targetContext: RegionContext): void {
+function appendPlacementOffset(lines: string[], sourceContext: RegionContext, targetContext: RegionContext, language: PromptLanguage): void {
   const sourceBox = sourceContext.region.relativeBox;
   const targetBox = targetContext.region.relativeBox;
   const useRelative = Boolean(sourceBox && targetBox);
@@ -133,16 +162,20 @@ function appendPlacementOffset(lines: string[], sourceContext: RegionContext, ta
 
   if (Math.abs(leftDelta) >= leftThreshold) {
     const direction = leftDelta > 0 ? "to the right of" : "to the left of";
-    details.push(`- Target B left edge is ${formatOffsetAmount(leftDelta, unit)} ${direction} Source A left edge.`);
+    details.push(isZh(language)
+      ? `- Target B 左边界位于 Source A 左边界${leftDelta > 0 ? "右侧" : "左侧"}，偏移约 ${Math.round(Math.abs(leftDelta))}${unit}。`
+      : `- Target B left edge is ${formatOffsetAmount(leftDelta, unit)} ${direction} Source A left edge.`);
   }
 
   if (Math.abs(topDelta) >= topThreshold) {
     const direction = topDelta > 0 ? "below" : "above";
-    details.push(`- Target B top edge is ${formatOffsetAmount(topDelta, unit)} ${direction} Source A top edge.`);
+    details.push(isZh(language)
+      ? `- Target B 上边界位于 Source A 上边界${topDelta > 0 ? "下方" : "上方"}，偏移约 ${Math.round(Math.abs(topDelta))}${unit}。`
+      : `- Target B top edge is ${formatOffsetAmount(topDelta, unit)} ${direction} Source A top edge.`);
   }
 
   if (details.length === 0) return;
-  lines.push("Placement offset:");
+  lines.push(t(language, "Placement offset:", "放置偏移:"));
   details.forEach(line => lines.push(line));
   lines.push("");
 }
@@ -196,7 +229,38 @@ function formatGuideConstraint(axis: "X" | "Y", guide: ActiveAlignmentGuide): st
   return `- ${axis} axis: use recorded guide, Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)}.`;
 }
 
-function appendPrimaryAxisConstraints(lines: string[], targetContext: RegionContext): void {
+function formatXConstraintLocalized(reference: NearbyReference, language: PromptLanguage): string {
+  if (!isZh(language)) return formatXConstraint(reference);
+  const side = reference.direction === "left" ? "右侧" : "左侧";
+  const proximity = getProximity(reference.distance);
+  if (proximity === "adjacent") {
+    return `- X 轴：将 Source A 紧贴放在 ${quoteReference(reference.summary)} 的${side}，约保持 ${Math.round(reference.distance)}px 横向间距。`;
+  }
+  if (proximity === "close") {
+    return `- X 轴：将 Source A 放在 ${quoteReference(reference.summary)} 的${side}附近，约保持 ${Math.round(reference.distance)}px 横向间距。`;
+  }
+  return `- X 轴：以 ${quoteReference(reference.summary)} 作为横向邻近参考，将 Source A 保持在其${side}，约保持 ${Math.round(reference.distance)}px 横向间距。`;
+}
+
+function formatYConstraintLocalized(reference: NearbyReference, language: PromptLanguage): string {
+  if (!isZh(language)) return formatYConstraint(reference);
+  const side = reference.direction === "below" ? "上方" : "下方";
+  const proximity = getProximity(reference.distance);
+  if (proximity === "adjacent") {
+    return `- Y 轴：将 Source A 紧贴放在 ${quoteReference(reference.summary)} 的${side}，约保持 ${Math.round(reference.distance)}px 纵向间距。`;
+  }
+  if (proximity === "close") {
+    return `- Y 轴：将 Source A 保持在 ${quoteReference(reference.summary)} 的${side}附近，约保持 ${Math.round(reference.distance)}px 纵向间距。`;
+  }
+  return `- Y 轴：以 ${quoteReference(reference.summary)} 作为纵向邻近参考，将 Source A 保持在其${side}，约保持 ${Math.round(reference.distance)}px 纵向间距。`;
+}
+
+function formatGuideConstraintLocalized(axis: "X" | "Y", guide: ActiveAlignmentGuide, language: PromptLanguage): string {
+  if (!isZh(language)) return formatGuideConstraint(axis, guide);
+  return `- ${axis} 轴：使用已记录参考线，Target B 的${formatAlignmentEdge(guide.targetEdge)}与 ${quoteReference(guide.unitSummary)} 的${formatAlignmentEdge(guide.sourceEdge)}对齐。`;
+}
+
+function appendPrimaryAxisConstraints(lines: string[], targetContext: RegionContext, language: PromptLanguage): void {
   const guides = targetContext.activeAlignmentGuides ?? [];
   const xGuide = guides.find(guide => guide.axis === "x");
   const yGuide = guides.find(guide => guide.axis === "y");
@@ -206,31 +270,33 @@ function appendPrimaryAxisConstraints(lines: string[], targetContext: RegionCont
   const below = pickReference(targetContext, "below");
   const above = pickReference(targetContext, "above");
 
-  lines.push("Primary axis constraints:");
+  lines.push(t(language, "Primary axis constraints:", "主轴约束:"));
   if (left) {
-    lines.push(formatXConstraint(left));
+    lines.push(formatXConstraintLocalized(left, language));
   } else if (right) {
-    lines.push(formatXConstraint(right));
+    lines.push(formatXConstraintLocalized(right, language));
   } else if (xGuide) {
-    lines.push(formatGuideConstraint("X", xGuide));
+    lines.push(formatGuideConstraintLocalized("X", xGuide, language));
   } else {
-    lines.push("- X axis: use Placement offset and Target B visual box as the primary horizontal constraint.");
+    lines.push(t(language, "- X axis: use Placement offset and Target B visual box as the primary horizontal constraint.", "- X 轴：使用“放置偏移”和 Target B 视觉框作为主要横向约束。"));
   }
 
   if (below) {
-    lines.push(formatYConstraint(below));
+    lines.push(formatYConstraintLocalized(below, language));
   } else if (above) {
-    lines.push(formatYConstraint(above));
+    lines.push(formatYConstraintLocalized(above, language));
   } else if (yGuide) {
-    lines.push(formatGuideConstraint("Y", yGuide));
+    lines.push(formatGuideConstraintLocalized("Y", yGuide, language));
   } else {
-    lines.push("- Y axis: use Placement offset and Target B visual box as the primary vertical constraint.");
+    lines.push(t(language, "- Y axis: use Placement offset and Target B visual box as the primary vertical constraint.", "- Y 轴：使用“放置偏移”和 Target B 视觉框作为主要纵向约束。"));
   }
 
   if (guides.length > 0) {
-    lines.push("Secondary alignment guides:");
+    lines.push(t(language, "Secondary alignment guides:", "次级对齐参考线:"));
     guides.slice(0, 2).forEach((guide) => {
-      lines.push(`- Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)} (delta: ${Math.round(guide.deltaPx)}px).`);
+      lines.push(isZh(language)
+        ? `- Target B 的${formatAlignmentEdge(guide.targetEdge)}与 ${quoteReference(guide.unitSummary)} 的${formatAlignmentEdge(guide.sourceEdge)}对齐（delta: ${Math.round(guide.deltaPx)}px）。`
+        : `- Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)} (delta: ${Math.round(guide.deltaPx)}px).`);
     });
   }
   lines.push("");
@@ -242,7 +308,10 @@ function formatAlignmentEdge(edge: AlignmentEdge): string {
   return `${edge} edge`;
 }
 
-function formatActiveGuide(guide: ActiveAlignmentGuide): string {
+function formatActiveGuide(guide: ActiveAlignmentGuide, language: PromptLanguage): string {
+  if (isZh(language)) {
+    return `- Target B 的${formatAlignmentEdge(guide.targetEdge)}与 "${guide.unitSummary}" 的${formatAlignmentEdge(guide.sourceEdge)}对齐（delta: ${Math.round(guide.deltaPx)}px）。`;
+  }
   return `- Target B ${formatAlignmentEdge(guide.targetEdge)} aligns with "${guide.unitSummary}" ${formatAlignmentEdge(guide.sourceEdge)} (delta: ${Math.round(guide.deltaPx)}px).`;
 }
 
@@ -274,11 +343,11 @@ export function extractStyleFacts(context: RegionContext): string[] {
   return collectPrimaryCssFacts(context).filter((line) => line !== "kind: unknown");
 }
 
-export function appendCssFacts(lines: string[], context: RegionContext, indent = ""): void {
+export function appendCssFacts(lines: string[], context: RegionContext, indent = "", language: PromptLanguage = "en"): void {
   const facts = collectPrimaryCssFacts(context);
-  lines.push(`${indent}CSS facts:`);
+  lines.push(`${indent}${t(language, "CSS facts", "CSS 事实")}:`);
   if (facts.length === 0) {
-    lines.push(`${indent}- Not available; use DOM structure and surrounding visual context.`);
+    lines.push(`${indent}- ${t(language, "Not available; use DOM structure and surrounding visual context.", "不可用；请结合 DOM 结构和周围视觉上下文判断。")}`);
     return;
   }
 
@@ -298,18 +367,19 @@ export function contextHasImage(context: RegionContext): boolean {
 export function appendIntentOperation(lines: string[], input: IntentPromptInput, opId: string, skipExpectedResult = false): boolean {
   const { sourceContext } = input;
   const userNote = sourceContext.region.userIntent || "[not provided]";
+  const language = ((input as any).__promptLanguage ?? "en") as PromptLanguage;
 
-  lines.push(`${opId} | type: intent`);
-  lines.push(`User note: "${userNote}"`);
-  appendContextBlock(lines, "Target", sourceContext);
-  appendRegionContents(lines, sourceContext);
-  appendNearbyReferences(lines, sourceContext);
-  appendCssFacts(lines, sourceContext);
+  lines.push(`${opId} | ${t(language, "type", "类型")}: ${t(language, "intent", "意图")}`);
+  lines.push(`${t(language, "User note", "用户说明")}: "${userNote}"`);
+  appendContextBlock(lines, t(language, "Target", "目标区域"), sourceContext, "", language);
+  appendRegionContents(lines, sourceContext, "", false, language);
+  appendNearbyReferences(lines, sourceContext, "", t(language, "Nearby references", "近邻参考"), language);
+  appendCssFacts(lines, sourceContext, "", language);
   if (!skipExpectedResult) {
-    lines.push("Expected result:");
-    lines.push("- Implement the user note only inside the selected region and directly related local layout.");
-    lines.push("- Infer whether the note means add, delete, replace, restyle, or a small local rearrangement from the wording.");
-    lines.push("- If the selected region is empty, use it as the intended placement area for new content.");
+    lines.push(t(language, "Expected result:", "预期结果:"));
+    lines.push(t(language, "- Implement the user note only inside the selected region and directly related local layout.", "- 只在所选区域及其直接相关的局部布局内落实这条用户说明。"));
+    lines.push(t(language, "- Infer whether the note means add, delete, replace, restyle, or a small local rearrangement from the wording.", "- 根据措辞判断这条说明是新增、删除、替换、重设样式，还是局部小范围重排。"));
+    lines.push(t(language, "- If the selected region is empty, use it as the intended placement area for new content.", "- 如果所选区域为空白，应将其视为新内容的预期放置区域。"));
   }
   lines.push("");
 
@@ -320,18 +390,19 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   const { sourceContext, targetContext } = input;
   if (!targetContext) return false;
   const moveNote = getMoveNote(input);
+  const language = ((input as any).__promptLanguage ?? "en") as PromptLanguage;
 
-  lines.push(`${opId} | type: move`);
-  lines.push(`Move note: ${moveNote ? `"${moveNote}"` : "[not provided]"}`);
-  appendContextBlock(lines, "Source A", sourceContext);
-  appendRegionContents(lines, sourceContext);
-  appendCssFacts(lines, sourceContext);
-  appendSourceImplementationHint(lines, sourceContext);
+  lines.push(`${opId} | ${t(language, "type", "类型")}: ${t(language, "move", "移动")}`);
+  lines.push(`${t(language, "Move note", "移动说明")}: ${moveNote ? `"${moveNote}"` : "[not provided]"}`);
+  appendContextBlock(lines, t(language, "Source A", "Source A"), sourceContext, "", language);
+  appendRegionContents(lines, sourceContext, "", false, language);
+  appendCssFacts(lines, sourceContext, "", language);
+  appendSourceImplementationHint(lines, sourceContext, language);
   lines.push("");
 
-  lines.push("Placement summary:");
-  lines.push("- Treat Source A as the selected visual content group inside Source A's visual box, not as individual child spans or text fragments.");
-  lines.push("- Do not include nearby labels, headings, or parent-container text unless they overlap Source A or are explicitly listed in Source A Region contents.");
+  lines.push(t(language, "Placement summary:", "放置摘要:"));
+  lines.push(t(language, "- Treat Source A as the selected visual content group inside Source A's visual box, not as individual child spans or text fragments.", "- 将 Source A 视为视觉框内被选中的整体内容组，而不是若干独立子 span 或零散文本片段。"));
+  lines.push(t(language, "- Do not include nearby labels, headings, or parent-container text unless they overlap Source A or are explicitly listed in Source A Region contents.", "- 不要把 Source A 视觉框外的邻近标签、标题或父容器文本纳入移动范围，除非它们与 Source A 发生重叠，或已明确列在 Source A 的区域内容中。"));
 
   const sBox = sourceContext.region.viewportBox;
   const tBox = targetContext.region.viewportBox;
@@ -349,59 +420,67 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   else if (tCenterY > sCenterY + sBox.height * 0.1) verticalWord = "below";
 
   if (horizontalWord && verticalWord) {
-    lines.push(`- Target B is ${verticalWord} and ${horizontalWord} Source A.`);
+    lines.push(isZh(language)
+      ? `- Target B 位于 Source A 的${verticalWord === "above" ? "上方" : "下方"}，并且相对${horizontalWord.includes("right") ? "右移" : "左移"}。`
+      : `- Target B is ${verticalWord} and ${horizontalWord} Source A.`);
   } else if (horizontalWord) {
-    lines.push(`- Target B is ${horizontalWord} Source A.`);
+    lines.push(isZh(language)
+      ? `- Target B 相对 Source A ${horizontalWord.includes("right") ? "向右偏移" : "向左偏移"}。`
+      : `- Target B is ${horizontalWord} Source A.`);
   } else if (verticalWord) {
-    lines.push(`- Target B is ${verticalWord} Source A.`);
+    lines.push(isZh(language)
+      ? `- Target B 位于 Source A 的${verticalWord === "above" ? "上方" : "下方"}。`
+      : `- Target B is ${verticalWord} Source A.`);
   } else {
-    lines.push(`- Target B is roughly at the same position as Source A.`);
+    lines.push(t(language, `- Target B is roughly at the same position as Source A.`, `- Target B 与 Source A 的位置大致相同。`));
   }
   lines.push("");
-  appendPlacementOffset(lines, sourceContext, targetContext);
-  appendPrimaryAxisConstraints(lines, targetContext);
-  appendContextBlock(lines, "Target B", targetContext);
-  lines.push("Target B placement reference:");
+  appendPlacementOffset(lines, sourceContext, targetContext, language);
+  appendPrimaryAxisConstraints(lines, targetContext, language);
+  appendContextBlock(lines, t(language, "Target B", "Target B"), targetContext, "", language);
+  lines.push(t(language, "Target B placement reference:", "Target B 放置参考:"));
   if (targetContext.region.isGhostPreview) {
-    lines.push("- Target B source: dragged target box.");
+    lines.push(t(language, "- Target B source: dragged target box.", "- Target B 来源：拖拽得到的目标框。"));
   }
-  lines.push("- Target B is the destination guide for placement and alignment, not replacement content.");
-  lines.push("- Existing content inside Target B is visual context unless it physically blocks the move.");
-  appendRegionContents(lines, targetContext, "", true);
+  lines.push(t(language, "- Target B is the destination guide for placement and alignment, not replacement content.", "- Target B 是放置和对齐参考，不代表要替换这里原有内容。"));
+  lines.push(t(language, "- Existing content inside Target B is visual context unless it physically blocks the move.", "- 除非现有内容会物理阻挡移动结果，否则应将其视为视觉上下文。"));
+  appendRegionContents(lines, targetContext, "", true, language);
   
-  appendNearbyReferences(lines, targetContext, "", "Placement references");
+  appendNearbyReferences(lines, targetContext, "", t(language, "Placement references", "放置参考"), language);
   lines.push("");
 
-  lines.push("Final alignment guide:");
+  lines.push(t(language, "Final alignment guide:", "最终对齐参考:"));
   if (targetContext.activeAlignmentGuides && targetContext.activeAlignmentGuides.length > 0) {
     targetContext.activeAlignmentGuides.forEach((guide) => {
-      lines.push(formatActiveGuide(guide));
+      lines.push(formatActiveGuide(guide, language));
     });
   } else if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
     const highHints = targetContext.alignmentHints.filter(h => h.confidence === "high");
     
     if (highHints.length === 0) {
-      lines.push("- None active at drop; use Placement references and Target B visual box.");
+      lines.push(t(language, "- None active at drop; use Placement references and Target B visual box.", "- 松手时没有激活参考线；请改用放置参考和 Target B 视觉框判断。"));
     } else {
       highHints.forEach((hint) => {
-        lines.push(`- No recorded active guide at drop; calculated high-confidence fallback: ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
+        lines.push(isZh(language)
+          ? `- 松手时没有记录到激活参考线；改用高置信度回退参考：${hint.summary}（delta: ${Math.round(hint.deltaPx)}px，confidence: ${hint.confidence}）。`
+          : `- No recorded active guide at drop; calculated high-confidence fallback: ${hint.summary} (delta: ${Math.round(hint.deltaPx)}px, confidence: ${hint.confidence}).`);
       });
     }
   } else {
-    lines.push("- None active at drop; use Placement references and Target B visual box.");
+    lines.push(t(language, "- None active at drop; use Placement references and Target B visual box.", "- 松手时没有激活参考线；请改用放置参考和 Target B 视觉框判断。"));
   }
   
-  appendCssFacts(lines, targetContext);
+  appendCssFacts(lines, targetContext, "", language);
   if (!skipExpectedResult) {
-    lines.push("Expected result:");
-    lines.push("- Move Source A content toward Target B using DOM structure, local container, current layout, nearby references, and CSS facts.");
-    lines.push("- Without a move note, infer conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.");
-    lines.push("- Treat Source A as the selected visual content group inside Source A's visual box and Target B as its desired final visual placement.");
-    lines.push("- Do not recreate or preserve ClickDeck editing UI such as selection boxes, target boxes, dashed outlines, badges, or marker labels.");
-    lines.push("- Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.");
-    lines.push("- Preserve source content, approximate size, proportions, visual hierarchy, and style unless local fit requires minor spacing adjustments.");
-    lines.push("- Preserve obvious alignment relationships such as edge alignment, centering, relative offset, and spacing rhythm.");
-    lines.push("- Do not hard-code viewport coordinates as CSS top/left unless the original layout is already explicitly absolute-positioned and that is the smallest safe change.");
+    lines.push(t(language, "Expected result:", "预期结果:"));
+    lines.push(t(language, "- Move Source A content toward Target B using DOM structure, local container, current layout, nearby references, and CSS facts.", "- 结合 DOM 结构、局部容器、当前布局、近邻参考和 CSS 事实，将 Source A 移动到 Target B。"));
+    lines.push(t(language, "- Without a move note, infer conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.", "- 如果没有移动说明，应基于 Source A、Target B、视觉框、区域内容、近邻参考和 CSS 事实做保守推断。"));
+    lines.push(t(language, "- Treat Source A as the selected visual content group inside Source A's visual box and Target B as its desired final visual placement.", "- 将 Source A 视为 Source A 视觉框内的整体内容组，并将 Target B 视为其预期的最终视觉落点。"));
+    lines.push(t(language, "- Do not recreate or preserve ClickDeck editing UI such as selection boxes, target boxes, dashed outlines, badges, or marker labels.", "- 不要重建或保留 ClickDeck 的编辑 UI，例如选择框、目标框、虚线轮廓、徽标或标记标签。"));
+    lines.push(t(language, "- Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.", "- 优先通过页面现有布局流实现移动，例如父级对齐、flex/grid 排布、margin、max-width、gap、order 或局部 wrapper。"));
+    lines.push(t(language, "- Preserve source content, approximate size, proportions, visual hierarchy, and style unless local fit requires minor spacing adjustments.", "- 除非局部适配确实需要小幅间距调整，否则应保留源内容、大致尺寸、比例、视觉层级和样式。"));
+    lines.push(t(language, "- Preserve obvious alignment relationships such as edge alignment, centering, relative offset, and spacing rhythm.", "- 保留明显的对齐关系，例如边缘对齐、居中、相对偏移和间距节奏。"));
+    lines.push(t(language, "- Do not hard-code viewport coordinates as CSS top/left unless the original layout is already explicitly absolute-positioned and that is the smallest safe change.", "- 除非原布局本来就是明确的 absolute 定位，且这是最小安全改动，否则不要把视口坐标硬编码成 CSS top/left。"));
   }
   lines.push("");
 
@@ -411,20 +490,21 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
 export function appendRemoveOperation(lines: string[], input: IntentPromptInput, opId: string, skipExpectedResult = false): boolean {
   const { sourceContext } = input;
   const userNote = sourceContext.region.userIntent.trim();
+  const language = ((input as any).__promptLanguage ?? "en") as PromptLanguage;
 
-  lines.push(`${opId} | type: remove`);
-  lines.push(`Remove note: ${userNote ? `"${userNote}"` : "[not provided]"}`);
-  appendContextBlock(lines, "Target", sourceContext);
-  appendRegionContents(lines, sourceContext);
-  appendNearbyReferences(lines, sourceContext);
-  appendCssFacts(lines, sourceContext);
+  lines.push(`${opId} | ${t(language, "type", "类型")}: ${t(language, "remove", "删除")}`);
+  lines.push(`${t(language, "Remove note", "删除说明")}: ${userNote ? `"${userNote}"` : "[not provided]"}`);
+  appendContextBlock(lines, t(language, "Target", "目标区域"), sourceContext, "", language);
+  appendRegionContents(lines, sourceContext, "", false, language);
+  appendNearbyReferences(lines, sourceContext, "", t(language, "Nearby references", "近邻参考"), language);
+  appendCssFacts(lines, sourceContext, "", language);
   if (!skipExpectedResult) {
-    lines.push("Expected result:");
-    lines.push("- Remove the selected region from the source HTML/CSS, or hide it only if that matches the existing implementation style.");
-    lines.push("- Preserve surrounding layout where possible.");
-    lines.push("- If removal leaves an obvious gap, adjust only local spacing/layout.");
-    lines.push("- Avoid unintended layout shifts outside the selected region and directly related surrounding layout.");
-    lines.push("- Do not redesign unrelated sections, slides, scripts, or behavior.");
+    lines.push(t(language, "Expected result:", "预期结果:"));
+    lines.push(t(language, "- Remove the selected region from the source HTML/CSS, or hide it only if that matches the existing implementation style.", "- 从源 HTML/CSS 中移除所选区域；只有当这更符合原实现风格时，才使用隐藏而非删除。"));
+    lines.push(t(language, "- Preserve surrounding layout where possible.", "- 在可能的情况下保留周围布局。"));
+    lines.push(t(language, "- If removal leaves an obvious gap, adjust only local spacing/layout.", "- 如果删除后留下明显空隙，只调整局部间距或布局。"));
+    lines.push(t(language, "- Avoid unintended layout shifts outside the selected region and directly related surrounding layout.", "- 避免在所选区域及其直接相关周边之外引入非预期布局偏移。"));
+    lines.push(t(language, "- Do not redesign unrelated sections, slides, scripts, or behavior.", "- 不要重做无关的 section、slide、脚本或行为。"));
   }
   lines.push("");
 
@@ -449,63 +529,67 @@ export function buildIntentPrompt(
   let hasMediaReplacement = false;
   const hasMove = inputs.some((input) => input.operation.action === "move");
   const opIds = inputs.map((_, index) => `OP-${index + 1}`);
+  const language = options.language;
 
   lines.push("ClickDeck AI edit prompt");
   lines.push("");
-  lines.push("Page context:");
+  lines.push(t(language, "Page context:", "页面上下文:"));
   lines.push(`- URL: ${options.page.url || "unknown"}`);
   lines.push(`- Title: ${options.page.title || "unknown"}`);
-  lines.push("- Scope: Current active browser page only.");
+  lines.push(t(language, "- Scope: Current active browser page only.", "- 范围：仅限当前活动浏览器页面。"));
   lines.push("");
 
-  lines.push("How to use location hints:");
-  lines.push("1. Use the original HTML structure as the source of truth, then use anchors, region contents, nearby references, and CSS facts to locate the edit.");
-  lines.push("2. Visual boxes are placement hints, not absolute CSS instructions. Do not blindly convert viewport boxes into hard-coded top/left coordinates.");
-  lines.push("3. Use Target B relativeBox and alignment hints as spatial intent. Prefer stable local layout edits over coordinate-only CSS.");
-  lines.push("4. CSS facts are a short factual snapshot of the selected element, not a full computed-style dump and not a classification rule system.");
+  lines.push(t(language, "How to use location hints:", "定位信息使用说明:"));
+  lines.push(t(language, "1. Use the original HTML structure as the source of truth, then use anchors, region contents, nearby references, and CSS facts to locate the edit.", "1. 以原始 HTML 结构为准，再结合锚点、区域内容、近邻参考和 CSS 事实定位需要修改的对象。"));
+  lines.push(t(language, "2. Visual boxes are placement hints, not absolute CSS instructions. Do not blindly convert viewport boxes into hard-coded top/left coordinates.", "2. 视觉框只是放置提示，不是绝对 CSS 指令。不要把视口框盲目转换成硬编码的 top/left 坐标。"));
+  lines.push(t(language, "3. Use Target B relativeBox and alignment hints as spatial intent. Prefer stable local layout edits over coordinate-only CSS.", "3. 将 Target B 的 relativeBox 和对齐提示视为空间意图。应优先使用稳定的局部布局修改，而不是仅靠坐标写 CSS。"));
+  lines.push(t(language, "4. CSS facts are a short factual snapshot of the selected element, not a full computed-style dump and not a classification rule system.", "4. CSS 事实只是所选元素的简短事实快照，不是完整的 computed-style 导出，也不是一套分类规则系统。"));
   lines.push("");
 
-  lines.push("Global editing rules:");
-  lines.push("1. Treat each user note as natural-language editing intent. It may mean adding, deleting, replacing, restyling, or locally rearranging content.");
-  lines.push("2. Preserve the user's wording and intent. Do not treat the user note as literal page copy unless the user clearly asks to insert, write as, or replace with exact text.");
-  lines.push("3. Keep changes limited to the selected region and directly related surrounding layout.");
-  lines.push("4. Match the existing visual style unless the user explicitly asks for another style.");
-  lines.push("5. If the intent, target, or placement is ambiguous, ask a clarifying question before editing instead of guessing broadly.");
-  lines.push("6. Do not redesign the whole slide/page or modify unrelated pages, slides, sections, content, scripts, or behavior.");
+  lines.push(t(language, "Global editing rules:", "全局编辑规则:"));
+  lines.push(t(language, "1. Treat each user note as natural-language editing intent. It may mean adding, deleting, replacing, restyling, or locally rearranging content.", "1. 将每条用户说明视为自然语言编辑意图。它可能表示新增、删除、替换、重设样式，或局部重排内容。"));
+  lines.push(t(language, "2. Preserve the user's wording and intent. Do not treat the user note as literal page copy unless the user clearly asks to insert, write as, or replace with exact text.", "2. 保留用户原始措辞和意图。除非用户明确要求插入、写成、或替换为某段精确文本，否则不要把用户说明当成页面字面文案。"));
+  lines.push(t(language, "3. Keep changes limited to the selected region and directly related surrounding layout.", "3. 将改动限制在所选区域及其直接相关的周边布局内。"));
+  lines.push(t(language, "4. Match the existing visual style unless the user explicitly asks for another style.", "4. 除非用户明确要求另一种风格，否则应匹配现有视觉样式。"));
+  lines.push(t(language, "5. If the intent, target, or placement is ambiguous, ask a clarifying question before editing instead of guessing broadly.", "5. 如果意图、目标或放置关系存在歧义，应先提澄清问题，而不是宽泛猜测。"));
+  lines.push(t(language, "6. Do not redesign the whole slide/page or modify unrelated pages, slides, sections, content, scripts, or behavior.", "6. 不要重做整个 slide/page，也不要修改无关页面、slide、section、内容、脚本或行为。"));
   lines.push("");
 
   if (hasMove) {
-    lines.push("Move operation rules:");
-    lines.push("1. If Move note is provided, treat it as the primary semantic explanation of the move.");
-    lines.push("2. If Move note is [not provided], infer the intent conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.");
-    lines.push("3. Target B is a placement reference, not replacement content.");
-    lines.push("4. Interpret the move as the desired final visual placement of Source A content, not as an instruction to recreate ClickDeck selection boxes, dashed outlines, labels, or target markers.");
-    lines.push("5. Before changing CSS, identify the existing layout mechanism that controls Source A placement.");
-    lines.push("6. Prefer stable local layout edits such as flex/grid alignment, parent alignment, margin, max-width, gap, order, or local wrapper placement.");
-    lines.push("7. Preserve source size/proportion/style and only make local spacing adjustments needed to fit.");
-    lines.push("8. Avoid brittle coordinate-only fixes unless the original layout is already absolute-positioned and no safer local layout edit exists.");
+    lines.push(t(language, "Move operation rules:", "移动操作规则:"));
+    lines.push(t(language, "1. If Move note is provided, treat it as the primary semantic explanation of the move.", "1. 如果提供了 Move note，应将其视为这次移动的首要语义说明。"));
+    lines.push(t(language, "2. If Move note is [not provided], infer the intent conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.", "2. 如果 Move note 为 [not provided]，应基于 Source A、Target B、视觉框、区域内容、近邻参考和 CSS 事实做保守推断。"));
+    lines.push(t(language, "3. Target B is a placement reference, not replacement content.", "3. Target B 是放置参考，不代表要替换那里的现有内容。"));
+    lines.push(t(language, "4. Interpret the move as the desired final visual placement of Source A content, not as an instruction to recreate ClickDeck selection boxes, dashed outlines, labels, or target markers.", "4. 将这次移动理解为 Source A 内容的最终视觉落点，而不是要求重建 ClickDeck 的选择框、虚线轮廓、标签或目标标记。"));
+    lines.push(t(language, "5. Before changing CSS, identify the existing layout mechanism that controls Source A placement.", "5. 在修改 CSS 前，先识别当前控制 Source A 放置位置的原有布局机制。"));
+    lines.push(t(language, "6. Prefer stable local layout edits such as flex/grid alignment, parent alignment, margin, max-width, gap, order, or local wrapper placement.", "6. 优先使用稳定的局部布局修改，例如 flex/grid 对齐、父级对齐、margin、max-width、gap、order 或局部 wrapper 放置。"));
+    lines.push(t(language, "7. Preserve source size/proportion/style and only make local spacing adjustments needed to fit.", "7. 保留源内容的尺寸、比例和样式，只做满足落位所需的局部间距调整。"));
+    lines.push(t(language, "8. Avoid brittle coordinate-only fixes unless the original layout is already absolute-positioned and no safer local layout edit exists.", "8. 除非原布局本来就是 absolute 定位且没有更安全的局部布局改法，否则不要采用脆弱的纯坐标修补。"));
     lines.push("");
   }
 
-  lines.push("Operations:");
+  lines.push(t(language, "Operations:", "操作列表:"));
   lines.push("");
 
   inputs.forEach((input, index) => {
     const opId = opIds[index];
     if (input.operation.action === "move") {
+      (input as any).__promptLanguage = language;
       hasMediaReplacement = appendMoveOperation(lines, input, opId) || hasMediaReplacement;
     } else if (input.operation.action === "remove") {
+      (input as any).__promptLanguage = language;
       hasMediaReplacement = appendRemoveOperation(lines, input, opId) || hasMediaReplacement;
     } else {
+      (input as any).__promptLanguage = language;
       hasMediaReplacement = appendIntentOperation(lines, input, opId) || hasMediaReplacement;
     }
   });
 
-  lines.push("Completion checklist:");
-  lines.push(`1. Complete every operation exactly once: ${opIds.join(", ")}.`);
-  lines.push("2. Before finishing, verify that no operation ID was skipped, merged accidentally, or applied to the wrong region.");
-  lines.push("3. If any operation is ambiguous or unsafe, list it under `Unresolved` and ask the user a clarifying question instead of silently ignoring it.");
-  lines.push("4. Keep the output as source HTML/CSS changes only; do not add AI APIs, remote code, or unrelated behavior.");
+  lines.push(t(language, "Completion checklist:", "完成核对清单:"));
+  lines.push(t(language, `1. Complete every operation exactly once: ${opIds.join(", ")}.`, `1. 逐项完成每个操作且只完成一次：${opIds.join(", ")}。`));
+  lines.push(t(language, "2. Before finishing, verify that no operation ID was skipped, merged accidentally, or applied to the wrong region.", "2. 完成前请核对：没有遗漏任何操作 ID，没有意外合并，也没有把操作应用到错误区域。"));
+  lines.push(t(language, "3. If any operation is ambiguous or unsafe, list it under `Unresolved` and ask the user a clarifying question instead of silently ignoring it.", "3. 如果某个操作存在歧义或不安全，请将其列入 `Unresolved`，并向用户提澄清问题，而不是直接忽略。"));
+  lines.push(t(language, "4. Keep the output as source HTML/CSS changes only; do not add AI APIs, remote code, or unrelated behavior.", "4. 输出应仅包含源 HTML/CSS 变更；不要加入 AI API、远程代码或无关行为。"));
 
   return {
     ok: true,

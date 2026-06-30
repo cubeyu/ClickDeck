@@ -39,6 +39,12 @@ describe("buildUnifiedPrompt", () => {
     expect(resultZh.ok).toBe(true);
     if (resultZh.ok) {
       expect(resultZh.prompt).toContain("ClickDeck AI edit prompt");
+      expect(resultZh.prompt).toContain("页面上下文:");
+      expect(resultZh.prompt).toContain("执行待办清单:");
+      expect(resultZh.prompt).toContain("定位信息使用说明:");
+      expect(resultZh.prompt).toContain("全局编辑规则:");
+      expect(resultZh.prompt).toContain("任务详情:");
+      expect(resultZh.prompt).toContain("最终核对清单:");
       expect(resultZh.prompt).toContain("样式修改");
     }
   });
@@ -156,6 +162,50 @@ describe("buildUnifiedPrompt", () => {
       expect(prompt).toContain("- right: [Title], 10px away; avoid overlap / preserve offset.");
       expect(prompt).toContain("Final alignment guide:");
       expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Left edge aligns with [Title] left edge (delta: 0px, confidence: high).");
+    }
+  });
+
+  it("localizes zh move prompt structure while keeping technical fields raw", () => {
+    const intent: IntentPromptInput = {
+      operation: { action: "move", id: "op1" } as any,
+      sourceContext: {
+        region: {
+          id: "r1",
+          viewportBox: { left: 10, top: 20, width: 30, height: 40, right: 40, bottom: 60 },
+          pageMode: "slide",
+          userIntent: "",
+          anchor: { kind: "slide", confidence: "high" }
+        },
+        empty: false,
+        candidates: [],
+        nearby: [],
+        confidence: "high"
+      } as any,
+      targetContext: {
+        region: {
+          id: "r2",
+          viewportBox: { left: 100, top: 100, width: 30, height: 40, right: 130, bottom: 140 },
+          pageMode: "slide",
+          userIntent: "",
+          anchor: { kind: "slide", confidence: "high" }
+        },
+        empty: true,
+        candidates: [],
+        nearby: [{ direction: "left", summary: "适用场景与人群", distance: 43, layoutSemantic: "use it as horizontal context / preserve offset" } as any],
+        alignmentHints: [],
+        confidence: "high"
+      } as any
+    };
+
+    const resultZh = buildUnifiedPrompt([], [intent], { language: "zh", page: dummyPage });
+    expect(resultZh.ok).toBe(true);
+    if (resultZh.ok) {
+      expect(resultZh.prompt).toContain("移动操作规则:");
+      expect(resultZh.prompt).toContain("放置摘要:");
+      expect(resultZh.prompt).toContain("主轴约束:");
+      expect(resultZh.prompt).toContain("放置参考:");
+      expect(resultZh.prompt).toContain("最终对齐参考:");
+      expect(resultZh.prompt).toContain("X 轴：将 Source A 放在 \"适用场景与人群\" 的右侧附近");
     }
   });
 });
