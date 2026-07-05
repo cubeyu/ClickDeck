@@ -20,7 +20,7 @@ import { getAskGeminiPrompt, type AskGeminiPromptKey } from "../export/ask-gemin
 import { getPanelLabels, getPanelLanguage } from "./i18n";
 import { createOverlay, type ClickDeckOverlay } from "./overlay";
 import { createPanel, type ClickDeckPanel, type PanelAction, type SelectionContext } from "./panel";
-import { getEditableTarget, getTabSwitchTarget, isLargeContainer } from "./selection";
+import { getEditableTarget, getTabSwitchTarget, isLargeContainer, resolveEditableTarget } from "./selection";
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
 import { buildUnifiedPrompt } from "../export/unified-prompt";
@@ -530,7 +530,8 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       return;
     }
 
-    const target = getEditableTarget(rawTarget, selectedElement);
+    const resolution = resolveEditableTarget(rawTarget, selectedElement);
+    const target = resolution.target;
 
     // Stop editing the previous element before selecting a new one
     stopEditing();
@@ -545,6 +546,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         event.stopPropagation();
         clearSelection("background click");
       }
+      return;
+    }
+
+    if (hadSelectionContext && resolution.source !== "direct") {
+      event.preventDefault();
+      event.stopPropagation();
+      clearSelection(`non-direct click: ${resolution.source}`);
       return;
     }
 

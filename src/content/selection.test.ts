@@ -182,7 +182,7 @@ describe("isLargeContainer and getEditableTarget", () => {
   });
 
   it("getEditableTarget falls back to first meaningful child if target is large container", async () => {
-    const { getEditableTarget } = await import("./selection");
+    const { getEditableTarget, resolveEditableTarget } = await import("./selection");
 
     document.body.innerHTML = `
       <div id="large-container">
@@ -220,9 +220,44 @@ describe("isLargeContainer and getEditableTarget", () => {
     // When clicking large container (and it's not currently selected), it falls back to child
     // It should skip emptyDiv and layoutSpan because they are not meaningful
     expect(getEditableTarget(largeContainer)).toBe(child);
+    expect(resolveEditableTarget(largeContainer)).toEqual({
+      target: child,
+      source: "large-container-fallback"
+    });
 
     // If large container IS already selected, it does NOT fall back (so controller can clear it)
     expect(getEditableTarget(largeContainer, largeContainer)).toBe(largeContainer);
+    expect(resolveEditableTarget(largeContainer, largeContainer)).toEqual({
+      target: largeContainer,
+      source: "direct"
+    });
+  });
+
+  it("marks generic container blocks as background targets instead of direct content targets", async () => {
+    const { resolveEditableTarget } = await import("./selection");
+
+    document.body.innerHTML = `
+      <div id="poster">
+        <div id="background-block"><div id="child-card"></div></div>
+      </div>
+    `;
+
+    const block = document.getElementById("background-block") as HTMLElement;
+    const card = document.getElementById("child-card") as HTMLElement;
+
+    block.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 600, bottom: 400, width: 600, height: 400,
+      x: 0, y: 0, toJSON: () => {}
+    });
+
+    card.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 200, bottom: 100, width: 200, height: 100,
+      x: 0, y: 0, toJSON: () => {}
+    });
+
+    expect(resolveEditableTarget(block)).toEqual({
+      target: null,
+      source: "background-block"
+    });
   });
 });
-

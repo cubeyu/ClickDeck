@@ -643,4 +643,64 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect.poll(() => page.evaluate(() => document.body.dataset.hostResetTriggered ?? "false")).toBe("false");
   });
 
+  test("15. Clicking a poster background block clears selection instead of escalating to a container", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    await page.evaluate(() => {
+      const host = document.createElement("section");
+      host.id = "selection-poster";
+      Object.assign(host.style, {
+        position: "relative",
+        width: "720px",
+        height: "520px",
+        margin: "24px auto",
+        background: "#141414",
+        border: "1px solid rgba(255,255,255,0.08)"
+      });
+
+      const title = document.createElement("span");
+      title.id = "selection-poster-title";
+      title.textContent = "Poster Headline";
+      Object.assign(title.style, {
+        display: "inline-block",
+        margin: "48px",
+        fontSize: "48px",
+        fontWeight: "700",
+        color: "#f5f5f5"
+      });
+
+      const blank = document.createElement("div");
+      blank.id = "selection-poster-blank";
+      Object.assign(blank.style, {
+        position: "absolute",
+        left: "24px",
+        right: "24px",
+        bottom: "24px",
+        height: "220px",
+        background: "rgba(255,255,255,0.02)"
+      });
+
+      host.appendChild(title);
+      host.appendChild(blank);
+      document.body.appendChild(host);
+    });
+
+    const title = page.locator("#selection-poster-title");
+    await title.click();
+
+    const initialFontSize = await title.evaluate((element) => getComputedStyle(element).fontSize);
+    await page.locator("[data-action='font-larger']").click();
+    const updatedFontSize = await title.evaluate((element) => getComputedStyle(element).fontSize);
+    expect(parseFloat(updatedFontSize)).toBeGreaterThan(parseFloat(initialFontSize));
+
+    await page.locator("#selection-poster-blank").click({ force: true });
+
+    await expect(page.locator(".clickdeck-panel__hint")).toHaveText("Select an element on the page.");
+    await expect(page.locator("#clickdeck-root .clickdeck-outline")).toBeHidden();
+
+    const finalFontSize = await title.evaluate((element) => getComputedStyle(element).fontSize);
+    expect(finalFontSize).toBe(updatedFontSize);
+  });
+
 });

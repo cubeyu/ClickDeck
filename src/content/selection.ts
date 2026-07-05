@@ -1,6 +1,15 @@
 import { findFirstEditableDescendant, findMeaningfulDescendant, isClickDeckUiElement } from "./dom-utils";
 
 export type TabDirection = "forward" | "backward";
+export type EditableTargetResolutionSource =
+  | "none"
+  | "direct"
+  | "large-container-fallback"
+  | "background-block";
+export type EditableTargetResolution = {
+  target: HTMLElement | null;
+  source: EditableTargetResolutionSource;
+};
 
 export function isSelectableElement(element: HTMLElement): boolean {
   if (isClickDeckUiElement(element)) {
@@ -96,24 +105,82 @@ export function getEditableTarget(
   target: EventTarget | null,
   currentSelected?: HTMLElement | null
 ): HTMLElement | null {
+  return resolveEditableTarget(target, currentSelected).target;
+}
+
+export function resolveEditableTarget(
+  target: EventTarget | null,
+  currentSelected?: HTMLElement | null
+): EditableTargetResolution {
   if (!(target instanceof HTMLElement)) {
-    return null;
+    return { target: null, source: "none" };
   }
 
   if (!isSelectableElement(target)) {
-    return null;
+    return { target: null, source: "none" };
   }
 
   if (isLargeContainer(target)) {
     if (currentSelected === target) {
-      return target;
+      return { target, source: "direct" };
     }
 
     const child = findMeaningfulDescendant(target);
     if (child && isSelectableElement(child)) {
-      return child;
+      return { target: child, source: "large-container-fallback" };
     }
   }
 
-  return target;
+  if (!isExplicitContentTarget(target)) {
+    return { target: null, source: "background-block" };
+  }
+
+  return { target, source: "direct" };
+}
+
+function isExplicitContentTarget(element: HTMLElement): boolean {
+  const tagName = element.tagName.toLowerCase();
+  if (
+    /^h[1-6]$/.test(tagName) ||
+    [
+      "span",
+      "p",
+      "li",
+      "td",
+      "th",
+      "strong",
+      "em",
+      "b",
+      "i",
+      "small",
+      "mark",
+      "code",
+      "pre",
+      "blockquote",
+      "img",
+      "video",
+      "svg",
+      "canvas",
+      "button",
+      "input",
+      "select",
+      "textarea",
+      "a",
+      "label"
+    ].includes(tagName)
+  ) {
+    return true;
+  }
+
+  if (element.isContentEditable) {
+    return true;
+  }
+
+  for (const child of Array.from(element.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE && child.textContent?.trim()) {
+      return true;
+    }
+  }
+
+  return false;
 }
