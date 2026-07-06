@@ -39,6 +39,7 @@ nul
 release/
 RELEASE_1.2.1.md
 RELEASE_1.3.1.md
+RELEASE_1.3.2.md
 test-extension.cjs
 
 # Local/internal planning docs
@@ -67,6 +68,6 @@ docs
 docs/*
 !docs/assets/
 docs/assets/*
-!docs/assets/clickdeck-demo.gif
-!docs/assets/clickdeck-showcase.png
+!docs/assets/alipay.png
+!docs/assets/wechat.png
 fixtures
