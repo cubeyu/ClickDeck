@@ -7,7 +7,7 @@ ClickDeck v1.3.3 is a release-packaging and public-material cleanup update. It k
 - Updated the shipped extension version to `1.3.3`.
 - Updated the in-panel version label to `v1.3.3`.
 - Refreshed the README install references for `ClickDeck-v1.3.3.zip`.
-- Restored sponsorship entry points for `WeChat Pay` and `Alipay`, and added a visible `Buy me a coffee` placeholder entry for later link completion.
+- Restored sponsorship entry points for `WeChat Pay`, `Alipay`, and Ko-fi.
 - Reduced public Git tracking for local-only materials such as the internal roadmap, local demo markdown, and extra demo screenshots.
 - Rebuilt the extension package as a fresh `v1.3.3` ZIP artifact with the existing self-describing install structure.
 
@@ -71,7 +71,7 @@ This release restores the README donation section for:
 
 - `WeChat Pay`
 - `Alipay`
-- `Buy me a coffee` (link placeholder kept until the final URL is confirmed)
+- `Ko-fi`: https://ko-fi.com/ningsiii
 
 ## 中文说明
 
@@ -82,7 +82,7 @@ ClickDeck v1.3.3 是一次发布整理版本，重点不是新增能力，而是
 - 扩展版本号升级到 `1.3.3`
 - 面板中的版本显示同步更新到 `v1.3.3`
 - README 安装说明改为 `ClickDeck-v1.3.3.zip`
-- 恢复 `微信赞赏`、`支付宝` 和 `Buy me a coffee` 的 README 入口
+- 恢复 `微信赞赏`、`支付宝` 和 Ko-fi 的 README 入口
 - 将内部执行路线、本地 demo 文档和额外 demo 图片从 Git 跟踪中移除，但保留本地文件
 - 重新生成 `v1.3.3` 发布包，继续保持“解压后可直接加载”的结构
 
@@ -106,4 +106,4 @@ README 中恢复：
 
 - 微信赞赏码
 - 支付宝收款码
-- Buy me a coffee 占位入口（待补最终链接）
+- Ko-fi 赞助入口：https://ko-fi.com/ningsiii
