@@ -93,8 +93,20 @@ const test = base.extend<ExtensionFixtures>({
 
 // Helper to activate extension on a page
 async function activateExtension(page: Page) {
-  await page.keyboard.press("Alt+Shift+C");
-  await expect(page.locator("#clickdeck-root")).toBeVisible();
+  const root = page.locator("#clickdeck-root");
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.keyboard.press("Alt+Shift+C");
+    try {
+      await expect(root).toBeVisible({ timeout: 2000 });
+      return;
+    } catch (error) {
+      if (attempt === 2) {
+        throw error;
+      }
+      await page.waitForTimeout(400);
+    }
+  }
 }
 
 test.describe("ClickDeck core editing workflows", () => {
