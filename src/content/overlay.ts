@@ -239,6 +239,15 @@ function injectBaseStyles(rootId: string): void {
       white-space: nowrap;
     }
 
+    .clickdeck-panel__group--media-replace {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .clickdeck-panel__group--media-size {
+      grid-template-columns: 44px 44px minmax(0, 1fr);
+      align-items: stretch;
+    }
+
     .clickdeck-panel__spacing-label {
       font-size: 11px;
       color: #8a6a4e;
@@ -289,6 +298,19 @@ function injectBaseStyles(rootId: string): void {
       font-size: 12px;
       line-height: 1;
       cursor: pointer;
+    }
+
+    .clickdeck-button--media-source {
+      min-height: 34px;
+      white-space: nowrap;
+      padding: 0 12px;
+    }
+
+    .clickdeck-button--media-size {
+      min-width: 44px;
+      padding: 0;
+      font-size: 16px;
+      font-weight: 600;
     }
 
     .clickdeck-button:hover {

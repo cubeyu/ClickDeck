@@ -134,16 +134,16 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
       <div class="clickdeck-panel__section-title">${labels.image}</div>
       <div class="clickdeck-panel__sub-section">
         <div class="clickdeck-panel__sub-title">${labels.imageSource}</div>
-        <div class="clickdeck-panel__group">
-          ${buttonMarkup("replace-image", labels.replaceImage, true)}
-          ${buttonMarkup("replace-video", labels.replaceVideo, true)}
+        <div class="clickdeck-panel__group clickdeck-panel__group--media-replace">
+          ${buttonMarkup("replace-image", labels.replaceImage, true, undefined, "clickdeck-button--media-source")}
+          ${buttonMarkup("replace-video", labels.replaceVideo, true, undefined, "clickdeck-button--media-source")}
         </div>
       </div>
       <div class="clickdeck-panel__sub-section">
         <div class="clickdeck-panel__sub-title">${labels.imageSize}</div>
-        <div class="clickdeck-panel__group">
-          ${buttonMarkup("image-width-smaller", labels.smaller)}
-          ${buttonMarkup("image-width-larger", labels.larger)}
+        <div class="clickdeck-panel__group clickdeck-panel__group--media-size">
+          ${buttonMarkup("image-width-smaller", labels.smaller, false, undefined, "clickdeck-button--media-size")}
+          ${buttonMarkup("image-width-larger", labels.larger, false, undefined, "clickdeck-button--media-size")}
           ${buttonMarkup("image-maxwidth-100", labels.imageMax100)}
         </div>
       </div>
@@ -595,9 +595,10 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
   };
 }
 
-function buttonMarkup(action: PanelAction, label: string, disabled = false, title?: string): string {
+function buttonMarkup(action: PanelAction, label: string, disabled = false, title?: string, extraClass = ""): string {
   const titleAttr = title ? ` title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"` : "";
-  return `<button class="clickdeck-button" data-action="${action}" type="button"${disabled ? " disabled" : ""}${titleAttr}>${label}</button>`;
+  const className = ["clickdeck-button", extraClass].filter(Boolean).join(" ");
+  return `<button class="${className}" data-action="${action}" type="button"${disabled ? " disabled" : ""}${titleAttr}>${label}</button>`;
 }
 
 function iconButtonMarkup(action: PanelAction, icon: string, label: string, disabled = false): string {

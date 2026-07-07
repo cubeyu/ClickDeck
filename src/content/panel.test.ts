@@ -63,6 +63,31 @@ describe("createPanel selection context", () => {
 
     panel.destroy();
   });
+
+  it("uses widened media source buttons and compact +/- size controls", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    const replaceImage = panel.element.querySelector<HTMLButtonElement>("[data-action='replace-image']");
+    const replaceVideo = panel.element.querySelector<HTMLButtonElement>("[data-action='replace-video']");
+    const smaller = panel.element.querySelector<HTMLButtonElement>("[data-action='image-width-smaller']");
+    const larger = panel.element.querySelector<HTMLButtonElement>("[data-action='image-width-larger']");
+    const sourceGroup = panel.element.querySelector<HTMLElement>(".clickdeck-panel__group--media-replace");
+    const sizeGroup = panel.element.querySelector<HTMLElement>(".clickdeck-panel__group--media-size");
+
+    expect(replaceImage?.textContent).toBe("Replace image");
+    expect(replaceVideo?.textContent).toBe("Replace video");
+    expect(replaceImage?.classList.contains("clickdeck-button--media-source")).toBe(true);
+    expect(replaceVideo?.classList.contains("clickdeck-button--media-source")).toBe(true);
+    expect(smaller?.textContent).toBe("-");
+    expect(larger?.textContent).toBe("+");
+    expect(smaller?.classList.contains("clickdeck-button--media-size")).toBe(true);
+    expect(larger?.classList.contains("clickdeck-button--media-size")).toBe(true);
+    expect(sourceGroup).not.toBeNull();
+    expect(sizeGroup).not.toBeNull();
+
+    panel.destroy();
+  });
 });
 
 describe("createPanel saved edits notice", () => {
