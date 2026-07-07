@@ -139,7 +139,7 @@ describe("applyStyleAction", () => {
     expect(element.style.padding).toBe("6px");
   });
 
-  it("applies safe image width/maxWidth/objectFit actions", () => {
+  it("applies proportional media scale actions for images", () => {
     const img = document.createElement("img");
     document.body.appendChild(img);
 
@@ -165,6 +165,26 @@ describe("applyStyleAction", () => {
     expect(img.style.objectFit).toBe("cover");
 
     img.remove();
+  });
+
+  it("applies proportional media scale actions for videos", () => {
+    const video = document.createElement("video");
+    document.body.appendChild(video);
+
+    video.style.width = "320px";
+    video.style.height = "180px";
+
+    const largerChanges = applyStyleAction(logger, video, "image-width-larger");
+    expect(video.style.width).toBe("340px");
+    expect(video.style.height).toBe("auto");
+    expect(largerChanges?.map(change => change.property)).toEqual(["width", "height"]);
+
+    const smallerChanges = applyStyleAction(logger, video, "image-width-smaller");
+    expect(video.style.width).toBe("320px");
+    expect(video.style.height).toBe("auto");
+    expect(smallerChanges?.map(change => change.property)).toEqual(["width", "height"]);
+
+    video.remove();
   });
 
   it("applies image radius presets including round", () => {

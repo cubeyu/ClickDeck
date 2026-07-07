@@ -267,13 +267,13 @@ export function applyStyleAction(
     case "image-width-smaller": {
       const current = element.style.width || computed.width;
       const next = stepSize(current, -1);
-      changes = buildImageScaleChanges(element, computed, next);
+      changes = buildMediaScaleChanges(element, computed, next);
       break;
     }
     case "image-width-larger": {
       const current = element.style.width || computed.width;
       const next = stepSize(current, +1);
-      changes = buildImageScaleChanges(element, computed, next);
+      changes = buildMediaScaleChanges(element, computed, next);
       break;
     }
     case "image-maxwidth-100":
@@ -338,7 +338,7 @@ export function applyStyleAction(
   return changes;
 }
 
-function buildImageScaleChanges(
+function buildMediaScaleChanges(
   element: HTMLElement,
   computed: CSSStyleDeclaration,
   nextWidth: string
