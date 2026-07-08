@@ -119,6 +119,51 @@ describe("buildAiEditPrompt", () => {
     }
   });
 
+  it("describes canvas edits as drawn output and formula edits as source-preserving", () => {
+    document.body.innerHTML = `
+      <main>
+        <canvas id="chart"></canvas>
+        <mjx-container id="formula"></mjx-container>
+      </main>
+    `;
+    const canvas = document.getElementById("chart") as HTMLCanvasElement;
+    const formula = document.getElementById("formula") as HTMLElement;
+
+    const canvasPatch: StylePatch = {
+      id: "canvas-1",
+      kind: "style",
+      targetElement: canvas,
+      targetDescriptor: "canvas#chart",
+      targetLocator: { descriptor: "canvas #chart", tagName: "canvas", cssPath: "#chart", nthOfTypePath: "canvas:nth-of-type(1)", siblingIndex: 0 },
+      property: "maxWidth",
+      before: "",
+      after: "100%",
+      createdAt: 1
+    };
+    const formulaPatch: StylePatch = {
+      id: "formula-1",
+      kind: "style",
+      targetElement: formula,
+      targetDescriptor: "mjx-container#formula",
+      targetLocator: { descriptor: "formula #formula", tagName: "mjx-container", cssPath: "#formula", nthOfTypePath: "mjx-container:nth-of-type(1)", siblingIndex: 0 },
+      property: "fontSize",
+      before: "16px",
+      after: "20px",
+      createdAt: 2
+    };
+
+    const result = buildAiEditPrompt([canvasPatch, formulaPatch], PAGE_EN);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Complex element: canvas.");
+      expect(result.prompt).toContain("drawn output");
+      expect(result.prompt).toContain("drawing code or generation logic");
+      expect(result.prompt).toContain("Complex element: formula / MathJax.");
+      expect(result.prompt).toContain("underlying formula source");
+      expect(result.prompt).toContain("LaTeX or MathML");
+    }
+  });
+
   it("returns empty when all patches have been undone (empty effective list)", () => {
     const result = buildAiEditPrompt([], PAGE_EN);
     expect(result.ok).toBe(false);

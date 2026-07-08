@@ -110,4 +110,28 @@ describe("exportHtmlSnapshot", () => {
     expect(html).toContain("letter-spacing: 0.08em;");
     expect(html).toContain("data:image/png;base64,ZmFrZS1pbWFnZQ==");
   });
+
+  it("preserves inline SVG text replacement and outer styles in the HTML snapshot", () => {
+    document.body.innerHTML = `
+      <svg id="badge" style="width: 160px; margin-top: 12px;" viewBox="0 0 160 40">
+        <text id="badge-text">Hello</text>
+      </svg>
+    `;
+    const svg = document.querySelector<SVGSVGElement>("#badge")!;
+    const text = document.querySelector<SVGTextElement>("#badge-text")!;
+
+    svg.style.width = "200px";
+    svg.style.marginTop = "24px";
+    text.textContent = "Lens";
+
+    exportHtmlSnapshot(logger);
+
+    expect(blobArgs).not.toBeNull();
+    const parts = (blobArgs?.[0] as unknown[]) ?? [];
+    const html = parts.join("");
+    expect(html).toContain("<svg");
+    expect(html).toContain("width: 200px;");
+    expect(html).toContain("margin-top: 24px;");
+    expect(html).toContain(">Lens</text>");
+  });
 });

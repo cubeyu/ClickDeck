@@ -104,11 +104,11 @@ export function getComplexElementPromptNotes(element: Element, isZh: boolean): s
           : "   说明：这是 inline SVG，当前只修改其外层样式，不进入内部 path/text/viewBox 结构。"
       );
     } else if (info.kind === "canvas") {
-      lines.push("   说明：这是 canvas，内容是绘制结果；当前只修改外层样式，不识别或修改内部绘图对象。");
+      lines.push("   说明：这是 canvas，内容是绘制结果；当前只修改外层样式，不识别或修改内部绘图对象，如需改内容需先修改对应绘制代码或生成逻辑。");
     } else if (info.kind === "formula") {
-      lines.push("   说明：这是渲染后的公式区域；当前只修改外层样式，不修改内部公式 DOM。");
+      lines.push("   说明：这是渲染后的公式区域；当前只修改外层样式，不修改内部公式结构。如需改内容应先修改对应的源公式（如 LaTeX 或 MathML）。");
     } else if (info.kind === "iframe") {
-      lines.push(`   说明：这是 iframe 嵌入内容${getIframeDetails(element, true)}；当前只修改外层 iframe，不进入内部页面。`);
+      lines.push(`   说明：这是 iframe 嵌入内容${getIframeDetails(element, true)}；当前只修改外层 iframe，不进入内部页面，如需改内容应先修改其加载页面的源代码或生成逻辑。`);
     }
     return lines;
   }
@@ -121,11 +121,11 @@ export function getComplexElementPromptNotes(element: Element, isZh: boolean): s
         : "   Note: This is inline SVG. Only outer styles are changed; internal path/text/viewBox structure is not edited."
     );
   } else if (info.kind === "canvas") {
-    lines.push("   Note: This is canvas. Its content is drawn output; only outer styles are changed.");
+    lines.push("   Note: This is canvas. Its content is drawn output; only outer styles are changed. To change its content, edit the underlying drawing code or generation logic.");
   } else if (info.kind === "formula") {
-    lines.push("   Note: This is a rendered formula region. Only outer styles are changed; internal formula DOM is not edited.");
+    lines.push("   Note: This is a rendered formula region. Only outer styles are changed; the underlying formula source (such as LaTeX or MathML) is not edited.");
   } else if (info.kind === "iframe") {
-    lines.push(`   Note: This is embedded iframe content${getIframeDetails(element, false)}. Only the outer iframe is changed; internal DOM is not edited.`);
+    lines.push(`   Note: This is embedded iframe content${getIframeDetails(element, false)}. Only the outer iframe is changed; to modify its content, edit the source page or generation logic loaded inside the iframe.`);
   }
   return lines;
 }
