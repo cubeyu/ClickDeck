@@ -264,8 +264,9 @@ function injectBaseStyles(rootId: string): void {
       white-space: nowrap;
     }
 
-    .clickdeck-panel__group--media-replace {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    .clickdeck-panel__group--media-actions {
+      grid-template-columns: minmax(0, 1fr) 44px 44px;
+      align-items: stretch;
     }
 
     .clickdeck-panel__group--media-size {

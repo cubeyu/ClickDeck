@@ -73,8 +73,7 @@ describe("createPanel selection context", () => {
     const smaller = panel.element.querySelector<HTMLButtonElement>("[data-action='image-width-smaller']");
     const larger = panel.element.querySelector<HTMLButtonElement>("[data-action='image-width-larger']");
     const max100 = panel.element.querySelector<HTMLButtonElement>("[data-action='image-maxwidth-100']");
-    const sourceGroup = panel.element.querySelector<HTMLElement>(".clickdeck-panel__group--media-replace");
-    const sizeGroup = panel.element.querySelector<HTMLElement>(".clickdeck-panel__group--media-size");
+    const actionsGroup = panel.element.querySelector<HTMLElement>(".clickdeck-panel__group--media-actions");
 
     expect(replaceImage?.textContent).toBe("Replace image");
     expect(replaceVideo?.textContent).toBe("Replace video");
@@ -85,8 +84,10 @@ describe("createPanel selection context", () => {
     expect(max100).toBeNull();
     expect(smaller?.classList.contains("clickdeck-button--media-size")).toBe(true);
     expect(larger?.classList.contains("clickdeck-button--media-size")).toBe(true);
-    expect(sourceGroup).not.toBeNull();
-    expect(sizeGroup).not.toBeNull();
+    expect(actionsGroup).not.toBeNull();
+    expect(actionsGroup?.contains(replaceImage as Node)).toBe(true);
+    expect(actionsGroup?.contains(smaller as Node)).toBe(true);
+    expect(actionsGroup?.contains(larger as Node)).toBe(true);
 
     panel.destroy();
   });

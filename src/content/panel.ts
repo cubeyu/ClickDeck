@@ -157,15 +157,9 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
     <div class="clickdeck-panel__section" data-section="image-basic" data-context="image,video">
       <div class="clickdeck-panel__section-title">${labels.image}</div>
       <div class="clickdeck-panel__sub-section">
-        <div class="clickdeck-panel__sub-title">${labels.imageSource}</div>
-        <div class="clickdeck-panel__group clickdeck-panel__group--media-replace">
+        <div class="clickdeck-panel__group clickdeck-panel__group--media-actions">
           ${buttonMarkup("replace-image", labels.replaceImage, true, undefined, "clickdeck-button--media-source")}
           ${buttonMarkup("replace-video", labels.replaceVideo, true, undefined, "clickdeck-button--media-source")}
-        </div>
-      </div>
-      <div class="clickdeck-panel__sub-section">
-        <div class="clickdeck-panel__sub-title">${labels.imageSize}</div>
-        <div class="clickdeck-panel__group clickdeck-panel__group--media-size">
           ${buttonMarkup("image-width-smaller", labels.smaller, false, undefined, "clickdeck-button--media-size")}
           ${buttonMarkup("image-width-larger", labels.larger, false, undefined, "clickdeck-button--media-size")}
         </div>
