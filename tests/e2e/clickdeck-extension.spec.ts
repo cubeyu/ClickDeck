@@ -645,6 +645,8 @@ test.describe("ClickDeck core editing workflows", () => {
     
     expect(promptText).toContain("type: move");
     expect(promptText).toContain("Target B source: dragged target box");
+    expect(promptText).toContain("Source A summary:");
+    expect(promptText).toContain("Target B summary:");
     expect(promptText).toContain("Final alignment guide:");
     expect(promptText).toContain("aligns with");
   });

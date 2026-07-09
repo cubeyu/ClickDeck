@@ -497,6 +497,74 @@ describe("Intent Prompt Builder", () => {
     }
   });
 
+  it("emits align relation types when edge guides drive both axes", () => {
+    const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
+    addTargetContext(input, "", true);
+    input.targetContext!.nearby = [];
+    input.targetContext!.activeAlignmentGuides = [
+      {
+        axis: "x",
+        position: 200,
+        targetEdge: "left",
+        sourceEdge: "left",
+        unitSummary: "Reference card",
+        deltaPx: 0,
+        confidence: "high"
+      },
+      {
+        axis: "y",
+        position: 260,
+        targetEdge: "top",
+        sourceEdge: "top",
+        unitSummary: "Reference card",
+        deltaPx: 0,
+        confidence: "high"
+      }
+    ];
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Relation types: align, inside");
+      expect(result.prompt).toContain('X axis: use recorded guide, Target B left edge aligns with "Reference card" left edge.');
+      expect(result.prompt).toContain('Y axis: use recorded guide, Target B top edge aligns with "Reference card" top edge.');
+    }
+  });
+
+  it("emits centered relation types when center guides or anchor-center hints drive placement", () => {
+    const input = mockRegionContext("move", "", false, [mockCandidate("image")]);
+    addTargetContext(input, "", true);
+    input.targetContext!.nearby = [];
+    input.targetContext!.activeAlignmentGuides = [
+      {
+        axis: "x",
+        position: 240,
+        targetEdge: "centerX",
+        sourceEdge: "centerX",
+        unitSummary: "Hero image",
+        deltaPx: 0,
+        confidence: "high"
+      },
+      {
+        axis: "y",
+        position: 260,
+        targetEdge: "centerY",
+        sourceEdge: "centerY",
+        unitSummary: "Hero image",
+        deltaPx: 0,
+        confidence: "high"
+      }
+    ];
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Relation types: inside, centered");
+      expect(result.prompt).toContain('X axis: use recorded guide, Target B center X aligns with "Hero image" center X.');
+      expect(result.prompt).toContain('Y axis: use recorded guide, Target B center Y aligns with "Hero image" center Y.');
+    }
+  });
+
   it("handles remove operation with note", () => {
     const input = mockRegionContext("remove", "just delete this", false, [mockCandidate("block")]);
     const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
