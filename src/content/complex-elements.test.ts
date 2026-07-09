@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { findComplexElementFromTarget, getComplexElementKind, getComplexElementPromptNotes, getSvgTextEditState } from "./complex-elements";
+import { findComplexElementFromTarget, getComplexElementKind, getComplexElementPromptNotes, getEditableSvgTextTarget, getSvgTextEditState } from "./complex-elements";
 
 describe("complex element detection", () => {
   it("resolves SVG children to the outer svg", () => {
@@ -92,5 +92,32 @@ describe("complex element detection", () => {
 
     expect(notes).toContain("inline SVG");
     expect(notes).toContain("Only detected simple SVG text content is changed");
+  });
+
+  it("allows direct targeting of simple editable svg text nodes", () => {
+    document.body.innerHTML = `
+      <svg id="chart">
+        <text id="plain-text">Hello</text>
+        <text><tspan id="leaf-tspan">World</tspan></text>
+      </svg>
+    `;
+
+    const text = document.getElementById("plain-text");
+    const tspan = document.getElementById("leaf-tspan");
+
+    expect(getEditableSvgTextTarget(text)).toBe(text);
+    expect(getEditableSvgTextTarget(tspan)).toBe(tspan);
+  });
+
+  it("does not directly target complex svg text nodes", () => {
+    document.body.innerHTML = `
+      <svg id="chart">
+        <defs><path id="curve" d="M10 50 Q 110 0 210 50"></path></defs>
+        <text id="complex-text"><textPath href="#curve">Curved</textPath></text>
+      </svg>
+    `;
+
+    const text = document.getElementById("complex-text");
+    expect(getEditableSvgTextTarget(text)).toBeNull();
   });
 });

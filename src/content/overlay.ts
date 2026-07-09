@@ -530,6 +530,21 @@ function injectBaseStyles(rootId: string): void {
       outline-offset: -1px;
     }
 
+    .clickdeck-svg-inline-editor {
+      box-sizing: border-box;
+      padding: 0 10px;
+      border: 2px solid #c8a47a;
+      border-radius: 8px;
+      background: rgba(255, 250, 244, 0.98);
+      box-shadow: 0 10px 28px rgba(49, 33, 18, 0.18);
+      outline: none;
+    }
+
+    .clickdeck-svg-inline-editor:focus {
+      border-color: #b9854a;
+      box-shadow: 0 12px 32px rgba(49, 33, 18, 0.22);
+    }
+
     .clickdeck-notice {
       background: #fff3df;
       border: 1px solid #e8d5b0;

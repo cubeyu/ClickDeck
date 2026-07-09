@@ -302,7 +302,7 @@ describe("createPanel prompt preview language roles", () => {
 });
 
 describe("createPanel SVG text editor", () => {
-  it("enables SVG text edit entry only for editable SVG state", () => {
+  it("shows SVG text status for editable SVG state without exposing a panel action button", () => {
     const panel = createPanel(() => undefined);
     document.body.appendChild(panel.element);
 
@@ -311,17 +311,16 @@ describe("createPanel SVG text editor", () => {
 
     const button = panel.element.querySelector<HTMLButtonElement>("[data-action='edit-svg-text']");
     const status = panel.element.querySelector<HTMLElement>(".clickdeck-panel__svg-text-status");
-    expect(button?.disabled).toBe(true);
+    expect(button).toBeNull();
     expect(status?.textContent).toContain("No editable SVG text");
 
-    panel.setSvgTextEditorState({ mode: "editable", message: "Editable SVG text detected." });
-    expect(button?.disabled).toBe(false);
-    expect(status?.textContent).toContain("Editable SVG text detected");
+    panel.setSvgTextEditorState({ mode: "editable", message: "Click the text itself to edit in place." });
+    expect(status?.textContent).toContain("edit in place");
 
     panel.destroy();
   });
 
-  it("keeps SVG text edit entry disabled for complex SVG text structures", () => {
+  it("keeps only the status hint for complex SVG text structures", () => {
     const panel = createPanel(() => undefined);
     document.body.appendChild(panel.element);
 
@@ -330,7 +329,7 @@ describe("createPanel SVG text editor", () => {
 
     const button = panel.element.querySelector<HTMLButtonElement>("[data-action='edit-svg-text']");
     const status = panel.element.querySelector<HTMLElement>(".clickdeck-panel__svg-text-status");
-    expect(button?.disabled).toBe(true);
+    expect(button).toBeNull();
     expect(status?.textContent).toContain("too complex");
 
     panel.destroy();

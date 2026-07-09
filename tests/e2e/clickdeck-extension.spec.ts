@@ -314,7 +314,7 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(page.locator("[data-action='replace-image']")).toBeHidden();
   });
 
-  test("edits simple inline SVG text with undo and redo", async ({ page, demoPageUrl }) => {
+  test("edits simple inline SVG text in place with undo and redo", async ({ page, demoPageUrl }) => {
     await page.goto(demoPageUrl);
     await page.evaluate(() => {
       const host = document.createElement("section");
@@ -331,29 +331,30 @@ test.describe("ClickDeck core editing workflows", () => {
 
     await page.locator("#editable-svg-text").click();
     await expect(page.locator(".clickdeck-panel__complex-notice")).toContainText("svg");
+    await expect(page.locator(".clickdeck-panel__svg-text-status")).toContainText("Click the text itself to edit in place");
 
-    const editButton = page.locator("[data-action='edit-svg-text']");
-    await expect(editButton).toBeVisible();
-    await expect(editButton).toBeEnabled();
-    await expect(page.locator(".clickdeck-panel__svg-text-status")).toContainText("Simple editable SVG text detected");
+    const inlineEditor = page.locator(".clickdeck-svg-inline-editor");
+    await expect(inlineEditor).toBeVisible();
+    await inlineEditor.fill("Lens");
+    await inlineEditor.press("Enter");
 
-    await editButton.click();
-    const modal = page.locator(".clickdeck-svg-text-modal");
-    await expect(modal).toBeVisible();
-    await expect(modal).toContainText("Longer text may overflow");
-
-    const inputs = modal.locator(".clickdeck-svg-text-modal__input");
-    await inputs.nth(0).fill("Lens");
-    await inputs.nth(1).fill("Deck");
-    await modal.locator("[data-svg-text-action='apply']").click();
+    await page.locator("#editable-svg-tspan").click();
+    await expect(inlineEditor).toBeVisible();
+    await inlineEditor.fill("Deck");
+    await inlineEditor.press("Enter");
 
     await expect(page.locator("#editable-svg-text")).toHaveText("Lens");
     await expect(page.locator("#editable-svg-tspan")).toHaveText("Deck");
 
     await page.locator("[data-action='undo']").click();
+    await expect(page.locator("#editable-svg-text")).toHaveText("Lens");
+    await expect(page.locator("#editable-svg-tspan")).toHaveText("World");
+
+    await page.locator("[data-action='undo']").click();
     await expect(page.locator("#editable-svg-text")).toHaveText("Hello");
     await expect(page.locator("#editable-svg-tspan")).toHaveText("World");
 
+    await page.locator("[data-action='redo']").click();
     await page.locator("[data-action='redo']").click();
     await expect(page.locator("#editable-svg-text")).toHaveText("Lens");
     await expect(page.locator("#editable-svg-tspan")).toHaveText("Deck");
@@ -379,10 +380,8 @@ test.describe("ClickDeck core editing workflows", () => {
     await page.locator("#complex-svg-text-node").click();
     await expect(page.locator(".clickdeck-panel__complex-notice")).toContainText("svg");
     await expect(page.locator(".clickdeck-panel__svg-text-status")).toContainText("structure is too complex");
-
-    const editButton = page.locator("[data-action='edit-svg-text']");
-    await expect(editButton).toBeVisible();
-    await expect(editButton).toBeDisabled();
+    await expect(page.locator("[data-action='edit-svg-text']")).toHaveCount(0);
+    await expect(page.locator(".clickdeck-svg-inline-editor")).toHaveCount(0);
   });
 
   test("6. Save/Restore persistence", async ({ page, demoPageUrl }) => {

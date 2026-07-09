@@ -135,6 +135,30 @@ function isSimpleSvgTextTarget(element: Element): boolean {
   return tagName === "text" || tagName === "tspan";
 }
 
+export function getEditableSvgTextTarget(target: EventTarget | null): SVGTextElement | SVGTSpanElement | null {
+  if (!(target instanceof SVGElement)) {
+    return null;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  if (tagName !== "text" && tagName !== "tspan") {
+    return null;
+  }
+
+  const ownerSvg = target.closest("svg");
+  if (!(ownerSvg instanceof SVGSVGElement)) {
+    return null;
+  }
+
+  const svgTextState = getSvgTextEditState(ownerSvg);
+  if (!svgTextState || svgTextState.mode !== "editable") {
+    return null;
+  }
+
+  const editableItem = svgTextState.items.find((item) => item.target === target);
+  return editableItem?.target ?? null;
+}
+
 export function getSvgTextEditState(element: Element | null | undefined): SvgTextEditState | null {
   if (!(element instanceof SVGSVGElement)) {
     return null;

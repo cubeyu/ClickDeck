@@ -36,7 +36,7 @@ import { buildIntentDraftVisualPlan, pickNextIntentColor } from "./intent-draft-
 import { collectVisualUnits, findVisualUnitsInBox, type RectLike } from "./visual-units";
 import { buildRegionContext, summarizeVisualUnit, type GuideCandidate, type RegionContext, type ActiveAlignmentGuide } from "./region-context";
 import { createMoveTargetBox, type MoveTargetBox } from "./intent-ghost";
-import { getComplexElementKind, getSvgTextEditState } from "./complex-elements";
+import { getComplexElementKind, getEditableSvgTextTarget, getSvgTextEditState } from "./complex-elements";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -69,6 +69,14 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let presentationController: PresentationController | null = null;
   let editingElement: HTMLElement | null = null;
   let originalText: string = "";
+  let svgInlineEditor:
+    | {
+        input: HTMLInputElement;
+        target: SVGTextElement | SVGTSpanElement;
+        ownerSvg: SVGSVGElement;
+        originalText: string;
+      }
+    | null = null;
   let visibilityCheckInterval: number | null = null;
   const pageHref = window.location.href;
   const storageKey = buildStorageKey(pageHref);
@@ -363,6 +371,37 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function stopEditing(): void {
+    if (svgInlineEditor) {
+      const { input, target, ownerSvg, originalText } = svgInlineEditor;
+      const newText = input.value;
+      input.remove();
+
+      if (newText !== originalText) {
+        target.textContent = newText;
+        const locator = createElementLocator(target);
+        const patch: ContentPatch = {
+          id: `${Date.now()}-${state.patches.length + 1}`,
+          kind: "content",
+          targetElement: target,
+          targetDescriptor: describeElement(target),
+          targetLocator: locator,
+          before: originalText,
+          after: newText,
+          createdAt: Date.now()
+        };
+        recordContentPatch(state, patch);
+        history.undoStack.push(patch);
+        history.redoStack.length = 0;
+        logger.info("Inline SVG text editing completed", { target: patch.targetDescriptor });
+        refreshHistoryButtons();
+        persistPatches();
+      }
+
+      svgInlineEditor = null;
+      refreshSvgTextEditorState(ownerSvg);
+      return;
+    }
+
     if (!editingElement) {
       return;
     }
@@ -558,6 +597,11 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
     const rawTarget = event.target as Element;
     const hadSelectionContext = Boolean(selectedElement || editingElement);
+    const editableSvgTextTarget = getEditableSvgTextTarget(rawTarget);
+
+    if (svgInlineEditor && svgInlineEditor.input.contains(rawTarget)) {
+      return;
+    }
 
     // If clicking inside the currently editing element, do not intercept
     // This allows the user to click to place the cursor.
@@ -609,6 +653,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     panel?.setReplaceMediaAvailability(mediaType !== "none", mediaType);
     panel?.setSelectionContext(getSelectionContext(target));
     refreshSvgTextEditorState(target);
+
+    if (editableSvgTextTarget) {
+      openInlineSvgTextEditor(editableSvgTextTarget);
+      updateOutline();
+      logger.info("Inline SVG text editing started", { target: describeElement(editableSvgTextTarget) });
+      return;
+    }
 
     // Only auto-start in-place text editing for text-like elements.
     // Non-text elements (img/button/input/...) must not be forced into contenteditable.
@@ -804,6 +855,78 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       patchIds: patches.map((patch) => patch.id),
       target: describeElement(targetSvg)
     });
+  }
+
+  function openInlineSvgTextEditor(target: SVGTextElement | SVGTSpanElement): void {
+    stopEditing();
+
+    const ownerSvg = target.closest("svg");
+    if (!(ownerSvg instanceof SVGSVGElement)) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const style = window.getComputedStyle(target);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = target.textContent ?? "";
+    input.className = "clickdeck-svg-inline-editor";
+    input.dataset.clickdeck = "true";
+    Object.assign(input.style, {
+      position: "fixed",
+      left: `${rect.left - 6}px`,
+      top: `${rect.top - 4}px`,
+      width: `${Math.max(rect.width + 20, 96)}px`,
+      height: `${Math.max(rect.height + 10, 32)}px`,
+      fontSize: style.fontSize,
+      fontFamily: style.fontFamily,
+      fontWeight: style.fontWeight,
+      letterSpacing: style.letterSpacing,
+      lineHeight: style.lineHeight,
+      color: style.fill && style.fill !== "none" ? style.fill : style.color,
+      zIndex: "2147483647"
+    });
+
+    const commitAndRemove = (): void => {
+      stopEditing();
+    };
+
+    const cancelAndRemove = (): void => {
+      if (!svgInlineEditor) {
+        return;
+      }
+      const { input, ownerSvg } = svgInlineEditor;
+      input.remove();
+      svgInlineEditor = null;
+      refreshSvgTextEditorState(ownerSvg);
+    };
+
+    input.addEventListener("keydown", (evt) => {
+      if (evt.key === "Enter") {
+        evt.preventDefault();
+        evt.stopPropagation();
+        commitAndRemove();
+        return;
+      }
+      if (evt.key === "Escape") {
+        evt.preventDefault();
+        evt.stopPropagation();
+        cancelAndRemove();
+      }
+    });
+    input.addEventListener("blur", () => {
+      commitAndRemove();
+    });
+
+    document.body.appendChild(input);
+    svgInlineEditor = {
+      input,
+      target,
+      ownerSvg,
+      originalText: target.textContent ?? ""
+    };
+    input.focus();
+    input.select();
   }
 
   function handlePanelAction(action: PanelAction): void {

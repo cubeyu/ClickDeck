@@ -182,9 +182,6 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
     </div>
     <div class="clickdeck-panel__section" data-section="svg-text" data-context="svg">
       <div class="clickdeck-panel__section-title">${labels.svgTextSection}</div>
-      <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
-        ${buttonMarkup("edit-svg-text", labels.editSvgText)}
-      </div>
       <div class="clickdeck-panel__sub-hint clickdeck-panel__svg-text-status"></div>
     </div>
     <div class="clickdeck-panel__section" data-section="history" data-context="text,container,image,video,svg,canvas,formula,iframe">
@@ -440,11 +437,9 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
     }
 
     const svgTextStatus = element.querySelector<HTMLElement>(".clickdeck-panel__svg-text-status");
-    const svgTextButton = element.querySelector<HTMLButtonElement>("[data-action='edit-svg-text']");
-    if (svgTextStatus && svgTextButton) {
+    if (svgTextStatus) {
       svgTextStatus.hidden = currentContext !== "svg" || !svgTextEditorState;
       svgTextStatus.textContent = svgTextEditorState?.message ?? "";
-      svgTextButton.disabled = currentContext !== "svg" || svgTextEditorState?.mode !== "editable";
     }
 
     const colorPickerEl = element.querySelector<HTMLInputElement>(".clickdeck-color-picker");
@@ -506,10 +501,6 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
         const isVideo = currentContext === "video";
         button.disabled = !isVideo || !canReplaceMedia || replaceMediaType !== "video";
         button.style.display = isVideo ? "" : "none";
-        return;
-      }
-      if (action === "edit-svg-text") {
-        button.disabled = currentContext !== "svg" || svgTextEditorState?.mode !== "editable";
         return;
       }
       button.disabled = currentContext === "none";
