@@ -867,6 +867,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
     const rect = target.getBoundingClientRect();
     const style = window.getComputedStyle(target);
+    const textAnchor = style.getPropertyValue("text-anchor").trim();
     const input = document.createElement("input");
     input.type = "text";
     input.value = target.textContent ?? "";
@@ -874,16 +875,17 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     input.dataset.clickdeck = "true";
     Object.assign(input.style, {
       position: "fixed",
-      left: `${rect.left - 6}px`,
-      top: `${rect.top - 4}px`,
-      width: `${Math.max(rect.width + 20, 96)}px`,
-      height: `${Math.max(rect.height + 10, 32)}px`,
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${Math.max(rect.width, 72)}px`,
+      height: `${Math.max(rect.height, 24)}px`,
       fontSize: style.fontSize,
       fontFamily: style.fontFamily,
       fontWeight: style.fontWeight,
       letterSpacing: style.letterSpacing,
-      lineHeight: style.lineHeight,
+      lineHeight: `${Math.max(rect.height, 24)}px`,
       color: style.fill && style.fill !== "none" ? style.fill : style.color,
+      textAlign: textAnchor === "middle" ? "center" : textAnchor === "end" ? "right" : "left",
       zIndex: "2147483647"
     });
 

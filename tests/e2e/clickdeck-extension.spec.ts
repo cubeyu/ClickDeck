@@ -333,8 +333,17 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(page.locator(".clickdeck-panel__complex-notice")).toContainText("svg");
     await expect(page.locator(".clickdeck-panel__svg-text-status")).toContainText("Click the text itself to edit in place");
 
+    const textBox = await page.locator("#editable-svg-text").boundingBox();
     const inlineEditor = page.locator(".clickdeck-svg-inline-editor");
     await expect(inlineEditor).toBeVisible();
+    const editorBox = await inlineEditor.boundingBox();
+    expect(textBox).not.toBeNull();
+    expect(editorBox).not.toBeNull();
+    if (textBox && editorBox) {
+      expect(Math.abs(editorBox.x - textBox.x)).toBeLessThanOrEqual(4);
+      expect(Math.abs(editorBox.y - textBox.y)).toBeLessThanOrEqual(4);
+      expect(editorBox.width + 0.5).toBeGreaterThanOrEqual(textBox.width);
+    }
     await inlineEditor.fill("Lens");
     await inlineEditor.press("Enter");
 
