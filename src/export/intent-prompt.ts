@@ -150,6 +150,59 @@ function appendSourceImplementationHint(lines: string[], context: RegionContext,
   lines.push("");
 }
 
+function describePrimaryObject(context: RegionContext, language: PromptLanguage): string {
+  const candidate = context.candidates[0];
+  if (!candidate) {
+    return t(language, "No strong primary object detected; treat Source A as the selected visual group only.", "未检测到强主对象；将 Source A 视为当前选中的整体视觉分组。");
+  }
+
+  const summary = summarizeVisualUnit(candidate.unit);
+  const kind = candidate.unit.kind;
+  if (kind === "image") {
+    return t(language, `Most likely primary object: image block ${summary}.`, `最可能的主对象：图片块 ${summary}。`);
+  }
+  if (kind === "video") {
+    return t(language, `Most likely primary object: video block ${summary}.`, `最可能的主对象：视频块 ${summary}。`);
+  }
+  if (kind === "interactive") {
+    return t(language, `Most likely primary object: interactive control ${summary}.`, `最可能的主对象：交互控件 ${summary}。`);
+  }
+  if (kind === "textLine" || kind === "textBlock") {
+    return t(language, `Most likely primary object: text content ${summary}.`, `最可能的主对象：文本内容 ${summary}。`);
+  }
+  return t(language, `Most likely primary object: visual block ${summary}.`, `最可能的主对象：视觉块 ${summary}。`);
+}
+
+function appendSourceSemanticSummary(lines: string[], context: RegionContext, language: PromptLanguage): void {
+  lines.push(t(language, "Source A summary:", "Source A 摘要:"));
+  lines.push(t(language, "- Source A is the selected visual content group inside the drawn Source A box.", "- Source A 是 Source A 视觉框内被选中的整体内容组。"));
+  lines.push(`- ${describePrimaryObject(context, language)}`);
+  if (hasMultipleSiblingCandidates(context)) {
+    lines.push(t(language, "- Group wrapper hint: if multiple sibling items are selected together, prefer moving their shared wrapper/container instead of splitting them into separate span-level edits.", "- 共同外层提示：如果同时选中了多个同级项，应优先移动它们共享的 wrapper / container，而不是拆成多个 span 级别的小改动。"));
+  } else {
+    lines.push(t(language, "- Group wrapper hint: no stronger shared wrapper signal was detected beyond the selected visual group.", "- 共同外层提示：除当前选中的视觉分组外，暂未检测到更强的共享 wrapper 信号。"));
+  }
+  lines.push(t(language, "- Surrounding context: nearby headings, labels, and parent-container text outside Source A's visual box are reference only unless they overlap Source A or the user explicitly says to move them together.", "- 周边上下文：Source A 视觉框外的邻近标题、标签和父容器文本默认只是参考，除非它们与 Source A 重叠，或用户明确要求一起移动。"));
+  lines.push("");
+}
+
+function appendTargetSemanticSummary(lines: string[], context: RegionContext, language: PromptLanguage): void {
+  lines.push(t(language, "Target B summary:", "Target B 摘要:"));
+  if (context.empty) {
+    lines.push(t(language, "- Target B is an empty placement area / destination guide, not an existing content target.", "- Target B 是空白放置区域 / 落点参考，不是已有内容目标。"));
+    lines.push(t(language, "- Existing content handling: none detected inside Target B; do not infer replacement from this empty area.", "- 现有内容处理：Target B 内未检测到现有内容，不要把这块空白区域理解为替换对象。"));
+    lines.push("");
+    return;
+  }
+
+  const primary = context.candidates[0];
+  const summary = primary ? summarizeVisualUnit(primary.unit) : t(language, "existing content", "现有内容");
+  lines.push(t(language, `- Target B is a destination guide that currently overlaps or sits near existing content such as ${summary}.`, `- Target B 是一个落点参考区域，目前与 ${summary} 等现有内容相邻或发生覆盖。`));
+  lines.push(t(language, `- Existing content handling: treat ${summary} as visual context first, not as a replacement target by default.`, `- 现有内容处理：应先将 ${summary} 视为视觉上下文，默认不要把它当成替换目标。`));
+  lines.push(t(language, `- Potential blocking content: if ${summary} would physically block the moved result, resolve that overlap locally; otherwise keep it as surrounding context.`, `- 可能的阻挡内容：如果 ${summary} 会物理阻挡移动结果，再局部处理重叠；否则应继续把它视为周边上下文。`));
+  lines.push("");
+}
+
 function formatOffsetAmount(value: number, unit: "%" | "px"): string {
   const rounded = Math.round(Math.abs(value));
   return `about ${rounded}${unit}`;
@@ -570,8 +623,8 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   appendContextBlock(lines, t(language, "Source A", "Source A"), sourceContext, "", language);
   appendRegionContents(lines, sourceContext, "", false, language);
   appendCssFacts(lines, sourceContext, "", language);
+  appendSourceSemanticSummary(lines, sourceContext, language);
   appendSourceImplementationHint(lines, sourceContext, language);
-  lines.push("");
 
   lines.push(t(language, "Placement summary:", "放置摘要:"));
   lines.push(t(language, "- Treat Source A as the selected visual content group inside Source A's visual box, not as individual child spans or text fragments.", "- 将 Source A 视为视觉框内被选中的整体内容组，而不是若干独立子 span 或零散文本片段。"));
@@ -616,6 +669,7 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   appendSecondaryReferences(lines, targetContext, primaryConstraints, language);
   appendConfidenceNotes(lines, sourceContext, targetContext, primaryConstraints, language);
   appendContextBlock(lines, t(language, "Target B", "Target B"), targetContext, "", language);
+  appendTargetSemanticSummary(lines, targetContext, language);
   lines.push(t(language, "Target B placement reference:", "Target B 放置参考:"));
   if (targetContext.region.isGhostPreview) {
     lines.push(t(language, "- Target B source: dragged target box.", "- Target B 来源：拖拽得到的目标框。"));

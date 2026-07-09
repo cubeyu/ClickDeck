@@ -256,6 +256,10 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Placement summary:");
       expect(prompt).toContain("Treat Source A as the selected visual content group inside Source A's visual box");
       expect(prompt).toContain("Do not include nearby labels, headings, or parent-container text unless they overlap Source A");
+      expect(prompt).toContain("Source A summary:");
+      expect(prompt).toContain("Most likely primary object: image block [Image].");
+      expect(prompt).toContain("Group wrapper hint: no stronger shared wrapper signal was detected beyond the selected visual group.");
+      expect(prompt).toContain("Surrounding context: nearby headings, labels, and parent-container text outside Source A's visual box are reference only");
       expect(prompt).toContain("Target B is below and shifted to the right of Source A.");
       expect(prompt).toContain("Placement offset:");
       expect(prompt).toContain("Target B left edge is about 48% to the right of Source A left edge.");
@@ -271,6 +275,8 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Secondary references:");
       expect(prompt).toContain("- None beyond the primary constraints.");
       expect(prompt).toContain("Confidence notes:");
+      expect(prompt).toContain("Target B summary:");
+      expect(prompt).toContain("Target B is an empty placement area / destination guide, not an existing content target.");
       expect(prompt).toContain("Final alignment guide:");
       expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Left edge aligns with [Title] left edge (delta: 2px, confidence: high).");
       expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Top edge is 24px below [Header] bottom edge (delta: 24px, confidence: high).");
@@ -301,6 +307,9 @@ describe("Intent Prompt Builder", () => {
     const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.prompt).toContain("Source A summary:");
+      expect(result.prompt).toContain("Most likely primary object: text content");
+      expect(result.prompt).toContain("Group wrapper hint: if multiple sibling items are selected together, prefer moving their shared wrapper/container");
       expect(result.prompt).toContain("Source implementation hint:");
       expect(result.prompt).toContain("Source A contains multiple sibling items; prefer moving their shared row/wrapper container");
       expect(result.prompt).toContain("Exclude nearby labels/headings outside Source A's visual box");
@@ -434,6 +443,9 @@ describe("Intent Prompt Builder", () => {
     const result = buildIntentPrompt([input], { language: "en", page: { url: "", title: "" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.prompt).toContain("Target B summary:");
+      expect(result.prompt).toContain("Existing content handling:");
+      expect(result.prompt).toContain("Potential blocking content:");
       expect(result.prompt).toContain("Target B placement reference:");
       expect(result.prompt).toContain("- Mostly empty/structural area; use nearby references and alignment hints as placement context.");
       // Ensure it doesn't output the typical formatCandidate details
