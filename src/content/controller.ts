@@ -71,7 +71,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let originalText: string = "";
   let svgInlineEditor:
     | {
+        container: HTMLDivElement;
         input: HTMLInputElement;
+        highlight: HTMLDivElement;
         target: SVGTextElement | SVGTSpanElement;
         ownerSvg: SVGSVGElement;
         originalText: string;
@@ -372,12 +374,12 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
   function stopEditing(): void {
     if (svgInlineEditor) {
-      const { input, target, ownerSvg, originalText } = svgInlineEditor;
-      const newText = input.value;
-      input.remove();
+      const { container, highlight, target, ownerSvg, originalText } = svgInlineEditor;
+      const newText = target.textContent ?? "";
+      container.remove();
+      highlight.remove();
 
       if (newText !== originalText) {
-        target.textContent = newText;
         const locator = createElementLocator(target);
         const patch: ContentPatch = {
           id: `${Date.now()}-${state.patches.length + 1}`,
@@ -599,7 +601,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const hadSelectionContext = Boolean(selectedElement || editingElement);
     const editableSvgTextTarget = getEditableSvgTextTarget(rawTarget);
 
-    if (svgInlineEditor && svgInlineEditor.input.contains(rawTarget)) {
+    if (svgInlineEditor && svgInlineEditor.container.contains(rawTarget)) {
       return;
     }
 
@@ -867,27 +869,62 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
     const rect = target.getBoundingClientRect();
     const style = window.getComputedStyle(target);
-    const textAnchor = style.getPropertyValue("text-anchor").trim();
+    const overlayRoot = overlay?.root ?? document.body;
+    const highlight = document.createElement("div");
+    highlight.className = "clickdeck-svg-inline-highlight";
+    highlight.dataset.clickdeck = "true";
+    Object.assign(highlight.style, {
+      position: "fixed",
+      left: `${rect.left - 4}px`,
+      top: `${rect.top - 4}px`,
+      width: `${rect.width + 8}px`,
+      height: `${rect.height + 8}px`,
+      zIndex: "2147483646"
+    });
+
+    const container = document.createElement("div");
+    container.className = "clickdeck-svg-inline-popover";
+    container.dataset.clickdeck = "true";
+    container.tabIndex = -1;
+
+    const title = document.createElement("div");
+    title.className = "clickdeck-svg-inline-popover__title";
+    title.textContent = labels.svgTextEditorTitle;
+
     const input = document.createElement("input");
     input.type = "text";
     input.value = target.textContent ?? "";
-    input.className = "clickdeck-svg-inline-editor";
+    input.className = "clickdeck-svg-inline-popover__input";
     input.dataset.clickdeck = "true";
     Object.assign(input.style, {
-      position: "fixed",
-      left: `${rect.left}px`,
-      top: `${rect.top}px`,
-      width: `${Math.max(rect.width, 72)}px`,
-      height: `${Math.max(rect.height, 24)}px`,
       fontSize: style.fontSize,
       fontFamily: style.fontFamily,
       fontWeight: style.fontWeight,
       letterSpacing: style.letterSpacing,
-      lineHeight: `${Math.max(rect.height, 24)}px`,
-      color: style.fill && style.fill !== "none" ? style.fill : style.color,
-      textAlign: textAnchor === "middle" ? "center" : textAnchor === "end" ? "right" : "left",
-      zIndex: "2147483647"
+      lineHeight: style.lineHeight,
+      color: style.fill && style.fill !== "none" ? style.fill : style.color
     });
+
+    const actions = document.createElement("div");
+    actions.className = "clickdeck-svg-inline-popover__actions";
+
+    const applyButton = document.createElement("button");
+    applyButton.type = "button";
+    applyButton.className = "clickdeck-svg-inline-popover__button clickdeck-svg-inline-popover__button--primary";
+    applyButton.dataset.clickdeck = "true";
+    applyButton.textContent = labels.svgTextApply;
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "clickdeck-svg-inline-popover__button";
+    cancelButton.dataset.clickdeck = "true";
+    cancelButton.textContent = labels.svgTextCancel;
+
+    actions.append(applyButton, cancelButton);
+    container.append(title, input, actions);
+    overlayRoot.append(highlight, container);
+
+    positionSvgInlinePopover(container, rect);
 
     const commitAndRemove = (): void => {
       stopEditing();
@@ -897,12 +934,17 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       if (!svgInlineEditor) {
         return;
       }
-      const { input, ownerSvg } = svgInlineEditor;
-      input.remove();
+      const { container, highlight, target, ownerSvg, originalText } = svgInlineEditor;
+      target.textContent = originalText;
+      container.remove();
+      highlight.remove();
       svgInlineEditor = null;
       refreshSvgTextEditorState(ownerSvg);
     };
 
+    input.addEventListener("input", () => {
+      target.textContent = input.value;
+    });
     input.addEventListener("keydown", (evt) => {
       if (evt.key === "Enter") {
         evt.preventDefault();
@@ -916,19 +958,50 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         cancelAndRemove();
       }
     });
-    input.addEventListener("blur", () => {
+
+    applyButton.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
       commitAndRemove();
     });
 
-    document.body.appendChild(input);
+    cancelButton.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      cancelAndRemove();
+    });
+
     svgInlineEditor = {
+      container,
       input,
+      highlight,
       target,
       ownerSvg,
       originalText: target.textContent ?? ""
     };
     input.focus();
     input.select();
+  }
+
+  function positionSvgInlinePopover(container: HTMLDivElement, rect: DOMRect): void {
+    const margin = 12;
+    const gap = 10;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const popoverRect = container.getBoundingClientRect();
+
+    let left = rect.left;
+    if (left + popoverRect.width > viewportWidth - margin) {
+      left = Math.max(margin, rect.right - popoverRect.width);
+    }
+
+    let top = rect.bottom + gap;
+    if (top + popoverRect.height > viewportHeight - margin) {
+      top = Math.max(margin, rect.top - popoverRect.height - gap);
+    }
+
+    container.style.left = `${left}px`;
+    container.style.top = `${top}px`;
   }
 
   function handlePanelAction(action: PanelAction): void {

@@ -334,23 +334,30 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(page.locator(".clickdeck-panel__svg-text-status")).toContainText("Click the text itself to edit in place");
 
     const textBox = await page.locator("#editable-svg-text").boundingBox();
-    const inlineEditor = page.locator(".clickdeck-svg-inline-editor");
+    const highlight = page.locator(".clickdeck-svg-inline-highlight");
+    const inlineEditor = page.locator(".clickdeck-svg-inline-popover");
+    const inlineInput = page.locator(".clickdeck-svg-inline-popover__input");
+    await expect(highlight).toBeVisible();
     await expect(inlineEditor).toBeVisible();
     const editorBox = await inlineEditor.boundingBox();
+    const highlightBox = await highlight.boundingBox();
     expect(textBox).not.toBeNull();
     expect(editorBox).not.toBeNull();
-    if (textBox && editorBox) {
-      expect(Math.abs(editorBox.x - textBox.x)).toBeLessThanOrEqual(4);
-      expect(Math.abs(editorBox.y - textBox.y)).toBeLessThanOrEqual(4);
-      expect(editorBox.width + 0.5).toBeGreaterThanOrEqual(textBox.width);
+    expect(highlightBox).not.toBeNull();
+    if (textBox && editorBox && highlightBox) {
+      expect(Math.abs(highlightBox.x - (textBox.x - 4))).toBeLessThanOrEqual(4);
+      expect(Math.abs(highlightBox.y - (textBox.y - 4))).toBeLessThanOrEqual(4);
+      expect(editorBox.y).toBeGreaterThanOrEqual(textBox.y + textBox.height + 4);
     }
-    await inlineEditor.fill("Lens");
-    await inlineEditor.press("Enter");
+    await inlineInput.fill("Lens");
+    await expect(page.locator("#editable-svg-text")).toHaveText("Lens");
+    await inlineInput.press("Enter");
 
     await page.locator("#editable-svg-tspan").click();
     await expect(inlineEditor).toBeVisible();
-    await inlineEditor.fill("Deck");
-    await inlineEditor.press("Enter");
+    await inlineInput.fill("Deck");
+    await expect(page.locator("#editable-svg-tspan")).toHaveText("Deck");
+    await inlineInput.press("Enter");
 
     await expect(page.locator("#editable-svg-text")).toHaveText("Lens");
     await expect(page.locator("#editable-svg-tspan")).toHaveText("Deck");
@@ -390,7 +397,7 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(page.locator(".clickdeck-panel__complex-notice")).toContainText("svg");
     await expect(page.locator(".clickdeck-panel__svg-text-status")).toContainText("structure is too complex");
     await expect(page.locator("[data-action='edit-svg-text']")).toHaveCount(0);
-    await expect(page.locator(".clickdeck-svg-inline-editor")).toHaveCount(0);
+    await expect(page.locator(".clickdeck-svg-inline-popover")).toHaveCount(0);
   });
 
   test("6. Save/Restore persistence", async ({ page, demoPageUrl }) => {

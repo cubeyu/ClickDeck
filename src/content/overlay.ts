@@ -530,22 +530,76 @@ function injectBaseStyles(rootId: string): void {
       outline-offset: -1px;
     }
 
-    .clickdeck-svg-inline-editor {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0 2px;
-      border: 0;
-      outline: 2px solid rgba(200, 164, 122, 0.9);
-      outline-offset: 0;
-      border-radius: 4px;
-      background: rgba(255, 250, 244, 0.94);
-      box-shadow: 0 6px 20px rgba(49, 33, 18, 0.14);
+    .clickdeck-svg-inline-highlight {
+      border: 2px solid rgba(249, 115, 22, 0.9);
+      border-radius: 6px;
+      box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+      background: rgba(255, 255, 255, 0.02);
+      pointer-events: none;
+    }
+
+    .clickdeck-svg-inline-popover {
+      position: fixed;
+      min-width: 180px;
+      max-width: min(280px, calc(100vw - 24px));
+      padding: 10px;
+      border: 1px solid rgba(120, 84, 53, 0.22);
+      border-radius: 10px;
+      background: rgba(255, 250, 244, 0.98);
+      box-shadow: 0 16px 36px rgba(49, 33, 18, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+      z-index: 2147483647;
+    }
+
+    .clickdeck-svg-inline-popover__title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #6b4e35;
+      line-height: 1.3;
+    }
+
+    .clickdeck-svg-inline-popover__input {
+      width: 100%;
+      min-height: 34px;
+      padding: 0 10px;
+      border: 1px solid rgba(120, 84, 53, 0.24);
+      border-radius: 8px;
+      background: #fff;
       caret-color: currentColor;
     }
 
-    .clickdeck-svg-inline-editor:focus {
-      outline: 2px solid rgba(185, 133, 74, 0.95);
-      box-shadow: 0 8px 24px rgba(49, 33, 18, 0.18);
+    .clickdeck-svg-inline-popover__input:focus {
+      outline: 2px solid rgba(185, 133, 74, 0.9);
+      outline-offset: 0;
+    }
+
+    .clickdeck-svg-inline-popover__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .clickdeck-svg-inline-popover__button {
+      min-width: 54px;
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(120, 84, 53, 0.22);
+      border-radius: 7px;
+      background: #fff;
+      color: #4b3525;
+      font-size: 12px;
+      font-weight: 600;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .clickdeck-svg-inline-popover__button--primary {
+      background: #f59e0b;
+      border-color: #f59e0b;
+      color: #fff;
     }
 
     .clickdeck-notice {
