@@ -176,12 +176,12 @@ describe("applyStyleAction", () => {
 
     const largerChanges = applyStyleAction(logger, video, "image-width-larger");
     expect(video.style.width).toBe("340px");
-    expect(video.style.height).toBe("auto");
+    expect(video.style.height).toBe("191.25px");
     expect(largerChanges?.map(change => change.property)).toEqual(["width", "height"]);
 
     const smallerChanges = applyStyleAction(logger, video, "image-width-smaller");
     expect(video.style.width).toBe("320px");
-    expect(video.style.height).toBe("auto");
+    expect(video.style.height).toBe("180px");
     expect(smallerChanges?.map(change => change.property)).toEqual(["width", "height"]);
 
     video.remove();

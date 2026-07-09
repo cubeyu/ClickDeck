@@ -270,6 +270,10 @@ export function applyStyleAction(
         changes = buildFormulaScaleChanges(element, computed, -1);
         break;
       }
+      if (element instanceof HTMLVideoElement) {
+        changes = buildVideoScaleChanges(element, computed, -1);
+        break;
+      }
       const current = element.style.width || computed.width;
       const next = stepSize(current, -1);
       changes = buildMediaScaleChanges(element, computed, next);
@@ -278,6 +282,10 @@ export function applyStyleAction(
     case "image-width-larger": {
       if (getComplexElementKind(element) === "formula") {
         changes = buildFormulaScaleChanges(element, computed, +1);
+        break;
+      }
+      if (element instanceof HTMLVideoElement) {
+        changes = buildVideoScaleChanges(element, computed, +1);
         break;
       }
       const current = element.style.width || computed.width;
@@ -384,6 +392,37 @@ function buildMediaScaleChanges(
   }
 
   return changes;
+}
+
+function buildVideoScaleChanges(
+  element: HTMLVideoElement,
+  computed: CSSStyleDeclaration,
+  direction: -1 | 1
+): AppliedStyleChange[] {
+  const currentWidth = readPixelValue(element.style.width || computed.width, 0);
+  const currentHeight = readPixelValue(element.style.height || computed.height, 0);
+
+  if (currentWidth <= 0 || currentHeight <= 0) {
+    const nextWidth = stepSize(computed.width, direction);
+    return buildMediaScaleChanges(element, computed, nextWidth);
+  }
+
+  const nextWidth = clamp(currentWidth + 20 * direction, 20, 2000);
+  const ratio = currentHeight / currentWidth;
+  const nextHeight = clamp(roundTo(nextWidth * ratio, 2), 20, 2000);
+
+  return [
+    {
+      property: "width",
+      before: element.style.width,
+      after: `${nextWidth}px`
+    },
+    {
+      property: "height",
+      before: element.style.height,
+      after: `${nextHeight}px`
+    }
+  ];
 }
 
 function stepSize(value: string, direction: -1 | 1): string {
