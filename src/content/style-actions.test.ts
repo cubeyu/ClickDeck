@@ -173,6 +173,8 @@ describe("applyStyleAction", () => {
 
     video.style.width = "320px";
     video.style.height = "180px";
+    Object.defineProperty(video, "videoWidth", { value: 1920, configurable: true });
+    Object.defineProperty(video, "videoHeight", { value: 1080, configurable: true });
 
     const largerChanges = applyStyleAction(logger, video, "image-width-larger");
     expect(video.style.width).toBe("340px");
@@ -183,6 +185,22 @@ describe("applyStyleAction", () => {
     expect(video.style.width).toBe("320px");
     expect(video.style.height).toBe("180px");
     expect(smallerChanges?.map(change => change.property)).toEqual(["width", "height"]);
+
+    video.remove();
+  });
+
+  it("prefers intrinsic video ratio over a distorted displayed box", () => {
+    const video = document.createElement("video");
+    document.body.appendChild(video);
+
+    video.style.width = "320px";
+    video.style.height = "480px";
+    Object.defineProperty(video, "videoWidth", { value: 1920, configurable: true });
+    Object.defineProperty(video, "videoHeight", { value: 1080, configurable: true });
+
+    applyStyleAction(logger, video, "image-width-smaller");
+    expect(video.style.width).toBe("300px");
+    expect(video.style.height).toBe("168.75px");
 
     video.remove();
   });

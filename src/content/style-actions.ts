@@ -401,14 +401,27 @@ function buildVideoScaleChanges(
 ): AppliedStyleChange[] {
   const currentWidth = readPixelValue(element.style.width || computed.width, 0);
   const currentHeight = readPixelValue(element.style.height || computed.height, 0);
+  const intrinsicWidth = typeof element.videoWidth === "number" ? element.videoWidth : 0;
+  const intrinsicHeight = typeof element.videoHeight === "number" ? element.videoHeight : 0;
 
-  if (currentWidth <= 0 || currentHeight <= 0) {
+  if (currentWidth <= 0) {
     const nextWidth = stepSize(computed.width, direction);
     return buildMediaScaleChanges(element, computed, nextWidth);
   }
 
   const nextWidth = clamp(currentWidth + 20 * direction, 20, 2000);
-  const ratio = currentHeight / currentWidth;
+  const ratio =
+    intrinsicWidth > 0 && intrinsicHeight > 0
+      ? intrinsicHeight / intrinsicWidth
+      : currentHeight > 0
+        ? currentHeight / currentWidth
+        : 0;
+
+  if (ratio <= 0) {
+    const nextWidthFallback = stepSize(computed.width, direction);
+    return buildMediaScaleChanges(element, computed, nextWidthFallback);
+  }
+
   const nextHeight = clamp(roundTo(nextWidth * ratio, 2), 20, 2000);
 
   return [
