@@ -1,4 +1,4 @@
-import type { EditorPatch } from "../state/editor-state";
+import type { EditorPatch, ElementLocator } from "../state/editor-state";
 import { getSlideContext } from "../content/dom-utils";
 import { getComplexElementPromptNotes } from "../content/complex-elements";
 
@@ -25,6 +25,7 @@ export type PromptChangeGroup = {
   key: string;
   target: string;
   targetElement?: Element;
+  targetLocator: ElementLocator;
   locator: string;
   slideContext?: string;
   styleChanges: Map<string, { before: string; after: string }>;
@@ -49,6 +50,7 @@ export function groupPromptChanges(patches: EditorPatch[]): PromptChangeGroup[] 
         key,
         target: locator.descriptor || patch.targetDescriptor,
         targetElement: patch.targetElement,
+        targetLocator: locator,
         locator: locator.cssPath || locator.nthOfTypePath,
         slideContext: getSlideContext(patch.targetElement),
         styleChanges: new Map(),

@@ -206,6 +206,10 @@ test.describe("ClickDeck core editing workflows", () => {
     
     expect(promptText).toContain("Quarterly Product Review"); // locator context
     expect(promptText).toContain("fontSize");
+    expect(promptText).toContain("Machine location evidence:");
+    expect(promptText).toContain("Original HTML source location:");
+    expect(promptText).toMatch(/demo-page\.html:\d+:\d+/);
+    expect(promptText).toContain("confidence: high");
   });
 
   test("4. Prompt does not include undone changes", async ({ page, demoPageUrl }) => {

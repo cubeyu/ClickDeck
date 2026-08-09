@@ -1,4 +1,5 @@
-import type { EditorPatch } from "../state/editor-state";
+import type { EditorPatch, ElementLocator } from "../state/editor-state";
+import type { ResolveSourceLocationsResponse } from "../shared/messages";
 import {
   type IntentPromptInput,
   type IntentPromptOptions,
@@ -16,6 +17,10 @@ import {
 import { isClickDeckUiElement } from "../content/dom-utils";
 import { getComplexElementPromptNotes } from "../content/complex-elements";
 
+export type UnifiedPromptOptions = IntentPromptOptions & {
+  sourceLocations?: ResolveSourceLocationsResponse;
+};
+
 const PROMPT_COPY = {
   en: {
     pageContext: "Page context:",
@@ -29,7 +34,8 @@ const PROMPT_COPY = {
       "1. Use the original HTML structure as the source of truth, then use anchors, region contents, nearby references, and CSS facts to locate the edit.",
       "2. Visual boxes are placement hints, not absolute CSS instructions. Do not blindly convert viewport boxes into hard-coded top/left coordinates.",
       "3. Use Target B relativeBox and alignment hints as spatial intent. Prefer stable local layout edits over coordinate-only CSS.",
-      "4. CSS facts are a short factual snapshot of the selected element, not a full computed-style dump and not a classification rule system."
+      "4. CSS facts are a short factual snapshot of the selected element, not a full computed-style dump and not a classification rule system.",
+      "5. Treat an original HTML line as a high-confidence starting hint only. Cross-check it against the selector, text/media hint, parent context, and local HTML before editing."
     ],
     globalRules: "Global editing rules:",
     globalRuleLines: [
@@ -71,6 +77,9 @@ const PROMPT_COPY = {
     locatorField: "Locator",
     slideContextField: "Slide/Page Context",
     codeSnippetField: "Context code snippet",
+    machineLocationField: "Machine location evidence",
+    originalSourceField: "Original HTML source location",
+    sourceUnavailable: "unavailable; use DOM and context evidence",
     finalChecklist: "Final alignment checklist:",
     finalChecklistLines: [
       "1. Complete every task in the Execution TodoList exactly once.",
@@ -100,7 +109,8 @@ const PROMPT_COPY = {
       "1. 以原始 HTML 结构为准，再结合锚点、区域内容、近邻参考和 CSS 事实定位需要修改的对象。",
       "2. 视觉框只是放置提示，不是绝对 CSS 指令。不要把视口框盲目转换成硬编码的 top/left 坐标。",
       "3. 将 Target B 的 relativeBox 和对齐提示视为空间意图。应优先使用稳定的局部布局修改，而不是仅靠坐标写 CSS。",
-      "4. CSS 事实只是所选元素的简短事实快照，不是完整的 computed-style 导出，也不是一套分类规则系统。"
+      "4. CSS 事实只是所选元素的简短事实快照，不是完整的 computed-style 导出，也不是一套分类规则系统。",
+      "5. 原始 HTML 行号只是高置信度的起点提示。修改前必须再与 selector、文字/媒体提示、父级上下文和局部 HTML 交叉确认。"
     ],
     globalRules: "全局编辑规则:",
     globalRuleLines: [
@@ -142,6 +152,9 @@ const PROMPT_COPY = {
     locatorField: "定位路径",
     slideContextField: "所属页面/Slide",
     codeSnippetField: "上下文代码片段",
+    machineLocationField: "机器定位证据",
+    originalSourceField: "原始 HTML 源码位置",
+    sourceUnavailable: "不可用；请改用 DOM 与上下文证据",
     finalChecklist: "最终核对清单:",
     finalChecklistLines: [
       "1. 严格逐项完成执行待办清单中的每个任务，且只完成一次。",
@@ -160,6 +173,31 @@ const PROMPT_COPY = {
     }
   }
 } as const;
+
+function compactLocatorEvidence(locator: ElementLocator): string[] {
+  const lines = [
+    `tag: ${locator.tagName}`,
+    `css-path: ${locator.cssPath}`,
+    `structural-path: ${locator.nthOfTypePath}`
+  ];
+  if (locator.idHint) lines.push(`id: ${locator.idHint}`);
+  if (locator.classHint) lines.push(`class: ${locator.classHint}`);
+  if (locator.textSnippet) lines.push(`text: ${quoteSnippet(locator.textSnippet)}`);
+  if (locator.imageHint) lines.push(`image: ${quoteSnippet(locator.imageHint)}`);
+  if (locator.parentDescriptor) lines.push(`parent: ${quoteSnippet(compactContextDescriptor(locator.parentDescriptor))}`);
+  if (locator.semanticAncestor) lines.push(`semantic-ancestor: ${quoteSnippet(compactContextDescriptor(locator.semanticAncestor))}`);
+  if (locator.previousSiblingDescriptor) lines.push(`previous-sibling: ${locator.previousSiblingDescriptor}`);
+  if (locator.nextSiblingDescriptor) lines.push(`next-sibling: ${locator.nextSiblingDescriptor}`);
+  if (locator.selectorStability) {
+    const reason = locator.selectorStabilityReason ? ` (${locator.selectorStabilityReason})` : "";
+    lines.push(`selector-stability: ${locator.selectorStability}${reason}`);
+  }
+  return lines;
+}
+
+function compactContextDescriptor(value: string): string {
+  return value.replace(/\s+"[^"]{33,}"/g, "").trim();
+}
 
 function getLocalHtmlSnippet(el: Element | undefined): string | null {
   if (!el) return null;
@@ -195,7 +233,7 @@ function getLocalHtmlSnippet(el: Element | undefined): string | null {
 export function buildUnifiedPrompt(
   patches: EditorPatch[],
   intents: IntentPromptInput[],
-  options: IntentPromptOptions
+  options: UnifiedPromptOptions
 ): PromptBuildResult {
   const isZh = options.language === "zh";
   const copy = PROMPT_COPY[isZh ? "zh" : "en"];
@@ -326,6 +364,15 @@ export function buildUnifiedPrompt(
     lines.push(`${changeId} | ${copy.typeLabel}: ${copy.patchType}`);
     lines.push(`   ${copy.targetField}: ${group.target}`);
     lines.push(`   ${copy.locatorField}: ${group.locator}`);
+    lines.push(`   ${copy.machineLocationField}:`);
+    compactLocatorEvidence(group.targetLocator).forEach((evidence) => lines.push(`   - ${evidence}`));
+    const sourceLocation = options.sourceLocations?.locations[group.key];
+    if (sourceLocation) {
+      lines.push(`   - ${copy.originalSourceField}: ${sourceLocation.sourceUrl}:${sourceLocation.line}:${sourceLocation.column}`);
+      lines.push(`   - source-match: ${sourceLocation.matchMethod}; confidence: ${sourceLocation.confidence}`);
+    } else {
+      lines.push(`   - ${copy.originalSourceField}: ${copy.sourceUnavailable}`);
+    }
     if (group.slideContext) {
       lines.push(`   ${copy.slideContextField}: ${group.slideContext}`);
     }

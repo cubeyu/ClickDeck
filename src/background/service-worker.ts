@@ -1,6 +1,12 @@
+import type { SourceLocationTarget } from "../shared/messages";
+import { fetchAndResolveSourceLocations } from "../export/source-location";
+
 const DEFAULT_ACTION_TITLE = "Toggle ClickDeck";
+// Keep these constants local so Vite does not create a shared ESM chunk for the
+// classic content script. Their string values are the cross-context contract.
 const CLICKDECK_TOGGLE_MESSAGE = "CLICKDECK_TOGGLE";
 const CLICKDECK_CAPTURE_VISIBLE_TAB = "CLICKDECK_CAPTURE_VISIBLE_TAB";
+const CLICKDECK_RESOLVE_SOURCE_LOCATIONS = "CLICKDECK_RESOLVE_SOURCE_LOCATIONS";
 const FILE_ACCESS_HELP = "ClickDeck needs file access for local HTML. Open chrome://extensions, find ClickDeck, click Details, then enable \"Allow access to file URLs\" / \"允许访问文件网址\" and reload the file.";
 const RESTRICTED_PAGE_HELP = "ClickDeck cannot run on this browser page. Open a normal website page, localhost page, or local HTML file with file access enabled.";
 
@@ -104,20 +110,42 @@ chrome.action.onClicked.addListener((tab) => {
   });
 });
 
+export async function resolveSourceLocationRequest(
+  tabUrl: string | undefined,
+  targets: SourceLocationTarget[],
+  fetcher: typeof fetch = fetch
+) {
+  if (!tabUrl) {
+    return { locations: {}, unavailableReason: "missing-tab-url" };
+  }
+  const safeTargets = Array.isArray(targets) ? targets.slice(0, 50) : [];
+  return fetchAndResolveSourceLocations(tabUrl, safeTargets, fetcher);
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.type !== CLICKDECK_CAPTURE_VISIBLE_TAB) {
-    return false;
+  if (msg.type === CLICKDECK_RESOLVE_SOURCE_LOCATIONS) {
+    resolveSourceLocationRequest(sender.tab?.url, msg.targets)
+      .then(sendResponse)
+      .catch((error) => {
+        console.warn("[ClickDeck] source location lookup failed", error);
+        sendResponse({ locations: {}, unavailableReason: "source-location-error" });
+      });
+    return true;
   }
 
-  chrome.tabs.captureVisibleTab(
-    sender.tab?.windowId || chrome.windows.WINDOW_ID_CURRENT,
-    { format: "png" }
-  ).then((dataUrl) => {
-    sendResponse({ dataUrl });
-  }).catch((error) => {
-    console.warn("[ClickDeck] captureVisibleTab failed", error);
-    sendResponse({ error: error instanceof Error ? error.message : String(error) });
-  });
+  if (msg.type === CLICKDECK_CAPTURE_VISIBLE_TAB) {
+    chrome.tabs.captureVisibleTab(
+      sender.tab?.windowId || chrome.windows.WINDOW_ID_CURRENT,
+      { format: "png" }
+    ).then((dataUrl) => {
+      sendResponse({ dataUrl });
+    }).catch((error) => {
+      console.warn("[ClickDeck] captureVisibleTab failed", error);
+      sendResponse({ error: error instanceof Error ? error.message : String(error) });
+    });
 
-  return true;
+    return true;
+  }
+
+  return false;
 });

@@ -24,7 +24,13 @@ import { getEditableTarget, getTabSwitchTarget, isLargeContainer, resolveEditabl
 import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
 import { buildUnifiedPrompt } from "../export/unified-prompt";
+import { groupPromptChanges } from "../export/change-summary";
 import type { IntentPromptInput } from "../export/intent-prompt";
+import {
+  CLICKDECK_RESOLVE_SOURCE_LOCATIONS,
+  type ResolveSourceLocationsResponse,
+  type SourceLocationTarget
+} from "../shared/messages";
 import { detectPresentationSlides, createPresentationController, type PresentationController } from "./presentation-mode";
 import { collectPresentationDiagnostics } from "./presentation-diagnostics";
 import { exportLongImageSnapshot } from "../export/long-image";
@@ -1004,6 +1010,83 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     container.style.top = `${top}px`;
   }
 
+  async function resolvePatchSourceLocations(patches: EditorPatch[]): Promise<ResolveSourceLocationsResponse> {
+    const targets: SourceLocationTarget[] = groupPromptChanges(patches).map((group) => ({
+      key: group.key,
+      tagName: group.targetLocator.tagName,
+      idHint: group.targetLocator.idHint,
+      classHint: group.targetLocator.classHint,
+      textSnippet: group.targetLocator.textSnippet,
+      imageHint: group.targetLocator.imageHint,
+      selectorStability: group.targetLocator.selectorStability
+    }));
+
+    if (targets.length === 0) {
+      return { locations: {}, unavailableReason: "no-patch-targets" };
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: CLICKDECK_RESOLVE_SOURCE_LOCATIONS,
+        targets
+      }) as ResolveSourceLocationsResponse | undefined;
+      return response?.locations ? response : { locations: {}, unavailableReason: "invalid-source-location-response" };
+    } catch (error) {
+      logger.warn("Original HTML source location unavailable; using DOM evidence", { error });
+      return { locations: {}, unavailableReason: "source-location-request-failed" };
+    }
+  }
+
+  async function showAiEditPrompt(): Promise<void> {
+    const effective = getEffectivePatches();
+    const page = { url: pageHref, title: document.title };
+    const sourceLocations = await resolvePatchSourceLocations(effective);
+
+    const intentInputs: IntentPromptInput[] = intentDrafts.map(d => ({
+      operation: d.operation,
+      sourceContext: d.context,
+      targetContext: d.targetContext
+    }));
+
+    const unifiedResultEn = buildUnifiedPrompt(effective, intentInputs, { language: "en", page, sourceLocations });
+
+    if (!unifiedResultEn.ok) {
+      logger.info("No effective edits or intents to summarize for AI prompt", {
+        intentMessage: unifiedResultEn.message
+      });
+      alert(unifiedResultEn.message);
+      return;
+    }
+
+    const finalEn = unifiedResultEn.prompt;
+    const hasMediaReplacement = unifiedResultEn.hasMediaReplacement;
+
+    const unifiedResultZh = buildUnifiedPrompt(effective, intentInputs, { language: "zh", page, sourceLocations });
+    const finalZh = unifiedResultZh.ok
+      ? [
+          "中文参考说明：以下内容只用于人工核对任务是否完整、目标是否准确、是否存在歧义。实际复制给 coding AI 执行时，优先使用 English 版本。",
+          "",
+          unifiedResultZh.prompt
+        ].join("\n")
+      : "";
+
+    panel?.showPromptPreview({
+      promptEn: finalEn,
+      promptZh: finalZh || finalEn,
+      hasMediaReplacement,
+      onCopy: (value, lang) => {
+        if (!value.trim()) {
+          logger.info("Copy cancelled: empty prompt");
+          return;
+        }
+        navigator.clipboard
+          .writeText(value)
+          .then(() => logger.info("AI edit prompt copied to clipboard", { lang }))
+          .catch((error) => logger.error("Failed to copy AI edit prompt", { error }));
+      }
+    });
+  }
+
   function handlePanelAction(action: PanelAction): void {
     // Commit any active text editing before handling other actions
     stopEditing();
@@ -1020,52 +1103,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     }
 
     if (action === "copy-ai-prompt") {
-      const effective = getEffectivePatches();
-      const page = { url: pageHref, title: document.title };
-
-      const intentInputs: IntentPromptInput[] = intentDrafts.map(d => ({
-        operation: d.operation,
-        sourceContext: d.context,
-        targetContext: d.targetContext
-      }));
-
-      const unifiedResultEn = buildUnifiedPrompt(effective, intentInputs, { language: "en", page });
-
-      if (!unifiedResultEn.ok) {
-        logger.info("No effective edits or intents to summarize for AI prompt", {
-          intentMessage: unifiedResultEn.message
-        });
-        alert(unifiedResultEn.message);
-        return;
-      }
-
-      let finalEn = unifiedResultEn.prompt;
-      let hasMediaReplacement = unifiedResultEn.hasMediaReplacement;
-
-      const unifiedResultZh = buildUnifiedPrompt(effective, intentInputs, { language: "zh", page });
-      let finalZh = unifiedResultZh.ok
-        ? [
-            "中文参考说明：以下内容只用于人工核对任务是否完整、目标是否准确、是否存在歧义。实际复制给 coding AI 执行时，优先使用 English 版本。",
-            "",
-            unifiedResultZh.prompt
-          ].join("\n")
-        : "";
-
-      panel?.showPromptPreview({
-        promptEn: finalEn,
-        promptZh: finalZh || finalEn,
-        hasMediaReplacement,
-        onCopy: (value, lang) => {
-          if (!value.trim()) {
-            logger.info("Copy cancelled: empty prompt");
-            return;
-          }
-          navigator.clipboard
-            .writeText(value)
-            .then(() => logger.info("AI edit prompt copied to clipboard", { lang }))
-            .catch((error) => logger.error("Failed to copy AI edit prompt", { error }));
-        }
-      });
+      void showAiEditPrompt();
       return;
     }
 

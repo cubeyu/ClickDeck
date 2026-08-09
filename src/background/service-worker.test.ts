@@ -129,4 +129,23 @@ describe("service-worker action activation", () => {
       title: expect.stringContaining("cannot run")
     }));
   });
+
+  it("resolves source locations from the sender tab url instead of a caller supplied url", async () => {
+    installChromeMock();
+    const { resolveSourceLocationRequest } = await loadServiceWorker();
+    const fetcher = vi.fn().mockResolvedValue(new Response(`<!doctype html>
+      <html><body><h1 id="title">Hello</h1></body></html>`, { status: 200 }));
+
+    const result = await resolveSourceLocationRequest("https://example.com/page.html", [{
+      key: "#title",
+      tagName: "h1",
+      idHint: "#title"
+    }], fetcher);
+
+    expect(fetcher).toHaveBeenCalledWith("https://example.com/page.html", expect.any(Object));
+    expect(result.locations["#title"]).toMatchObject({
+      sourceUrl: "https://example.com/page.html",
+      matchMethod: "unique-id"
+    });
+  });
 });

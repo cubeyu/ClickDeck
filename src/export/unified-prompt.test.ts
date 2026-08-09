@@ -113,6 +113,89 @@ describe("buildUnifiedPrompt", () => {
     }
   });
 
+  it("adds machine-readable DOM evidence and only supplied high-confidence source locations", () => {
+    const targetElement = document.createElement("h1");
+    targetElement.id = "hero-title";
+    targetElement.textContent = "Quarterly Product Review";
+    const patch: EditorPatch = {
+      id: "p-source-location",
+      createdAt: Date.now(),
+      targetElement,
+      targetDescriptor: "h1 #hero-title",
+      targetLocator: {
+        descriptor: "h1 #hero-title",
+        tagName: "h1",
+        idHint: "#hero-title",
+        textSnippet: "Quarterly Product Review",
+        cssPath: "#hero-title",
+        nthOfTypePath: "html:nth-of-type(1) body:nth-of-type(1) h1:nth-of-type(1)",
+        siblingIndex: 0,
+        parentDescriptor: "body",
+        selectorStability: "high",
+        selectorStabilityReason: "unique id"
+      },
+      kind: "style",
+      property: "font-size",
+      before: "48px",
+      after: "52px"
+    } as unknown as EditorPatch;
+
+    const result = buildUnifiedPrompt([patch], [], {
+      language: "en",
+      page: dummyPage,
+      sourceLocations: {
+        sourceUrl: "http://test/index.html",
+        locations: {
+          "#hero-title": {
+            key: "#hero-title",
+            sourceUrl: "http://test/index.html",
+            line: 42,
+            column: 7,
+            confidence: "high",
+            matchMethod: "unique-id"
+          }
+        }
+      }
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Machine location evidence:");
+      expect(result.prompt).toContain("css-path: #hero-title");
+      expect(result.prompt).toContain("parent: \"body\"");
+      expect(result.prompt).toContain("Original HTML source location: http://test/index.html:42:7");
+      expect(result.prompt).toContain("source-match: unique-id; confidence: high");
+    }
+  });
+
+  it("states that source location is unavailable instead of inventing a line", () => {
+    const targetElement = document.createElement("p");
+    const patch: EditorPatch = {
+      id: "p-no-source-location",
+      createdAt: Date.now(),
+      targetElement,
+      targetDescriptor: "p",
+      targetLocator: {
+        descriptor: "p",
+        tagName: "p",
+        cssPath: "p:nth-of-type(1)",
+        nthOfTypePath: "html:nth-of-type(1) body:nth-of-type(1) p:nth-of-type(1)",
+        siblingIndex: 0,
+        selectorStability: "low"
+      },
+      kind: "content",
+      before: "Before",
+      after: "After"
+    } as EditorPatch;
+
+    const result = buildUnifiedPrompt([patch], [], { language: "en", page: dummyPage });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Original HTML source location: unavailable; use DOM and context evidence");
+      expect(result.prompt).not.toMatch(/Original HTML source location: .*:\d+:\d+/);
+    }
+  });
+
   it("describes complex element patch targets and hides iframe srcdoc in snippets", () => {
     document.body.innerHTML = `<iframe id="frame" srcdoc="<main>Nested source should stay hidden</main>"></iframe>`;
     const targetElement = document.getElementById("frame") as HTMLIFrameElement;
