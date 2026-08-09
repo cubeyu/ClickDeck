@@ -127,6 +127,47 @@ describe("Region Context", () => {
     expect(refs.some(ref => ref.unit === duplicateNearby)).toBe(true);
   });
 
+  it("buildRegionContext excludes the full Source A subtree but keeps unrelated target content", () => {
+    const region = mockRegion({ left: 100, top: 100, width: 100, height: 100 });
+    region.action = "move";
+    const sourceRoot = document.createElement("div");
+    const sourceChild = document.createElement("span");
+    const sourceGrandchild = document.createElement("strong");
+    sourceChild.appendChild(sourceGrandchild);
+    sourceRoot.appendChild(sourceChild);
+    const unrelatedTarget = document.createElement("span");
+    const unrelatedNearby = document.createElement("span");
+    document.body.append(sourceRoot, unrelatedTarget, unrelatedNearby);
+
+    const sourceCandidate = mockUnit("textLine", { left: 110, top: 110, width: 80, height: 30 }, {
+      element: sourceGrandchild,
+      textSnippet: "Source title"
+    });
+    const realCandidate = mockUnit("textLine", { left: 120, top: 150, width: 60, height: 20 }, {
+      element: unrelatedTarget,
+      textSnippet: "Real target content"
+    });
+    const sourceNearby = mockUnit("textLine", { left: 100, top: 230, width: 100, height: 20 }, {
+      element: sourceChild,
+      textSnippet: "Source subtitle"
+    });
+    const realNearby = mockUnit("textLine", { left: 100, top: 270, width: 100, height: 20 }, {
+      element: unrelatedNearby,
+      textSnippet: "Real nearby content"
+    });
+
+    const context = buildRegionContext(
+      region,
+      [sourceCandidate, realCandidate, sourceNearby, realNearby],
+      { excludeElements: [sourceRoot] }
+    );
+
+    expect(context.candidates.map(candidate => candidate.unit)).toEqual([realCandidate]);
+    expect(context.nearby.some(reference => reference.unit === sourceNearby)).toBe(false);
+    expect(context.nearby.some(reference => reference.unit === realNearby)).toBe(true);
+    expect(context.alignmentHints?.some(hint => hint.summary.includes("Source"))).toBe(false);
+  });
+
   it("findNearbyReferences excludes every source visual unit by id, even when it was not a top candidate", () => {
     const region = mockRegion({ left: 100, top: 100, width: 100, height: 100 });
     const sourceChip = mockUnit("textLine", { left: 100, top: 250, width: 100, height: 20 }, { id: "source-chip", textSnippet: "UI 设计 / 排版" });

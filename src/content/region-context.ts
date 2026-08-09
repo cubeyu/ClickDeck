@@ -65,9 +65,11 @@ export function summarizeVisualUnit(unit: VisualUnit): string {
 
 export function rankRegionCandidates(
   region: IntentRegion,
-  units: VisualUnit[]
+  units: VisualUnit[],
+  options?: RegionContextOptions
 ): RegionCandidate[] {
-  const matches = findVisualUnitsInBox(units, region.viewportBox);
+  const matches = findVisualUnitsInBox(units, region.viewportBox)
+    .filter((match) => !shouldExcludeUnit(match.unit, options));
   
   const candidates = matches.map(match => {
     let priorityScore = match.score;
@@ -215,9 +217,10 @@ type InternalAlignmentHint = AlignmentHint & {
   referencePriority: number;
 };
 
-export type AlignmentHintOptions = {
-  excludeTextSnippets?: string[];
-};
+export type AlignmentHintOptions = Pick<
+  RegionContextOptions,
+  "excludeTextSnippets" | "excludeElements" | "excludeUnitIds"
+>;
 
 export function calculateAlignmentHints(
   box: RectLike,
@@ -258,12 +261,8 @@ export function calculateAlignmentHints(
 
   for (const unit of units) {
     if (unit.element.closest('[data-clickdeck="true"]')) continue;
+    if (shouldExcludeUnit(unit, options)) continue;
     if (unit.kind === "background" || unit.kind === "block") continue;
-
-    const textSnippet = unit.textSnippet?.trim();
-    if (options?.excludeTextSnippets && textSnippet && options.excludeTextSnippets.includes(textSnippet)) {
-      continue;
-    }
 
     const u = unit.rect;
     if (u.width === 0 || u.height === 0) continue;
@@ -357,6 +356,9 @@ function shouldExcludeUnit(unit: VisualUnit, options?: RegionContextOptions): bo
   if (options?.excludeElements?.some(element => element === unit.element)) {
     return true;
   }
+  if (options?.excludeElements?.some(element => element.contains(unit.element))) {
+    return true;
+  }
   const textSnippet = unit.textSnippet?.trim();
   return Boolean(textSnippet && options?.excludeTextSnippets?.includes(textSnippet));
 }
@@ -366,7 +368,7 @@ export function buildRegionContext(
   units: VisualUnit[],
   options?: RegionContextOptions
 ): RegionContext {
-  const candidates = rankRegionCandidates(region, units);
+  const candidates = rankRegionCandidates(region, units, options);
   const empty = candidates.length === 0;
   
   const nearby = findNearbyReferences(region, units, options);
