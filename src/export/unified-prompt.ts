@@ -35,7 +35,8 @@ const PROMPT_COPY = {
       "2. Visual boxes are placement hints, not absolute CSS instructions. Do not blindly convert viewport boxes into hard-coded top/left coordinates.",
       "3. Use Target B relativeBox and alignment hints as spatial intent. Prefer stable local layout edits over coordinate-only CSS.",
       "4. CSS facts are a short factual snapshot of the selected element, not a full computed-style dump and not a classification rule system.",
-      "5. Treat an original HTML line as a high-confidence starting hint only. Cross-check it against the selector, text/media hint, parent context, and local HTML before editing."
+      "5. Treat an original HTML line as a high-confidence starting hint only. Cross-check it against the selector, text/media hint, parent context, and local HTML before editing.",
+      "6. Treat the complete TodoList as one desired final-state specification. Its listed order is not a required replay order; choose the safest implementation order and verify the combined final result."
     ],
     globalRules: "Global editing rules:",
     globalRuleLines: [
@@ -54,9 +55,11 @@ const PROMPT_COPY = {
       "3. Target B is a placement reference, not replacement content.",
       "4. Interpret the move as the desired final visual placement of Source A content, not as an instruction to recreate ClickDeck selection boxes or markers.",
       "5. Implement the move through the page's existing layout flow first: parent alignment, flex/grid placement, margin, max-width, gap, order, or a local wrapper.",
-      "6. Preserve source size/proportion/style and only make local spacing adjustments needed to fit.",
+      "6. Preserve source size/proportion/style unless another task explicitly changes them. If another task changes Source A size or content flow, use that final size when validating the move.",
       "7. Preserve obvious alignment relationships such as edge alignment, centering, relative offset, and spacing rhythm.",
-      "8. Avoid brittle coordinate-only fixes unless the original layout is already absolute-positioned and no safer local layout edit exists."
+      "8. Resolve placement evidence in this order: active snap guides; stable anchor-relative Target B; containment, non-overlap, and nearby spacing; viewport/document pixels only as fallback.",
+      "9. After all related content and style tasks are applied, re-check Source A against the final Target B alignment and local spacing before finishing.",
+      "10. Avoid brittle coordinate-only fixes unless the original layout is already absolute-positioned and no safer local layout edit exists."
     ],
     removeRules: "Remove operation rules:",
     removeRuleLines: [
@@ -308,6 +311,9 @@ export function buildUnifiedPrompt(
   // 2. Global Rules
   lines.push(copy.howToUse);
   copy.howToUseRules.forEach((line) => lines.push(line));
+  if (isZh) {
+    lines.push("6. 将完整 TodoList 视为同一个最终状态规格。列表顺序不是必须重放的操作顺序；应选择最安全的实施顺序，并核对组合后的最终结果。");
+  }
   lines.push("");
 
   lines.push(copy.globalRules);
@@ -318,6 +324,10 @@ export function buildUnifiedPrompt(
   if (hasMove) {
     lines.push(copy.moveRules);
     copy.moveRuleLines.forEach((line) => lines.push(line));
+    if (isZh) {
+      lines.push("9. 放置证据优先级：主动吸附线 > 稳定锚点下的 Target B 相对位置 > 容器包含、避让和邻近间距 > viewport/document 像素坐标回退。");
+      lines.push("10. 如果其他任务改变 Source A 的字号、尺寸或内容流，应使用改变后的最终尺寸，并在全部相关任务完成后重新核对 Target B 对齐与局部间距。");
+    }
     lines.push("");
   }
 

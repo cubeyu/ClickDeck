@@ -662,6 +662,12 @@ test.describe("ClickDeck core editing workflows", () => {
 
     await expect(page.locator(".clickdeck-ghost-guide-line")).toHaveCount(0);
 
+    // Simulate a later size edit before copying. Prompt generation must read the
+    // current rendered source instead of replaying the geometry captured earlier.
+    await heading.evaluate((element: HTMLElement) => {
+      element.style.fontSize = "64px";
+    });
+
     // Copy AI prompt
     await page.locator("[data-action='copy-ai-prompt']").click();
     const modal = page.locator(".clickdeck-prompt-modal");
@@ -669,6 +675,9 @@ test.describe("ClickDeck core editing workflows", () => {
     const promptText = await modal.locator("textarea").inputValue();
     
     expect(promptText).toContain("type: move");
+    expect(promptText).toContain("Measurement state: Source A, Target B, anchors, and nearby references were refreshed from the rendered page");
+    expect(promptText).toContain("Treat the complete TodoList as one desired final-state specification");
+    expect(promptText).toContain("active snap guides; stable anchor-relative Target B; containment, non-overlap, and nearby spacing; viewport/document pixels only as fallback");
     expect(promptText).toContain("Target B source: dragged target box");
     expect(promptText).toContain("Source A summary:");
     expect(promptText).toContain("Source A implementation evidence:");
@@ -677,13 +686,16 @@ test.describe("ClickDeck core editing workflows", () => {
     expect(promptText).toContain("Local HTML for Source A:");
     expect(promptText).toContain("Original HTML source location:");
     expect(promptText).toMatch(/demo-page\.html:\d+:\d+/);
-    expect(promptText).toContain("<h1>Quarterly Product Review</h1>");
+    expect(promptText).toContain('<h1 style="font-size: 64px;">Quarterly Product Review</h1>');
     expect(promptText).not.toContain("next-sibling: div.clickdeck");
     expect(promptText).toContain("Group wrapper hint: no stronger shared wrapper signal was detected");
     expect(promptText).not.toContain("Source A contains multiple sibling items");
     expect(promptText).toContain("Target B summary:");
     expect(promptText).toContain("Final alignment guide:");
     expect(promptText).toContain("aligns with");
+    const anchorLines = promptText.split("\n").filter((line) => line.startsWith("- Anchor:"));
+    expect(anchorLines.length).toBeGreaterThanOrEqual(2);
+    expect(anchorLines.join("\n")).not.toMatch(/ClickDeck|1A|1B|X: centerX/);
   });
 
   test("12. Remove intent marker", async ({ page, demoPageUrl }) => {

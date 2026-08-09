@@ -294,6 +294,23 @@ describe("Intent Prompt Builder", () => {
       mockCandidateFromElement(title, "what about us?", 3)
     ]);
     addTargetContext(input, "", true);
+    input.measurementState = "copy-time-rendered-page";
+    input.sourceContext.region.anchor.locator = {
+      descriptor: 'section .slide "Spain wins 1A"',
+      tagName: "section",
+      classHint: ".slide",
+      cssPath: ".slide",
+      nthOfTypePath: "body > section:nth-of-type(1)",
+      siblingIndex: 0
+    };
+    input.targetContext!.region.anchor.locator = {
+      descriptor: 'section .slide "Spain wins 1A 1B X: centerX"',
+      tagName: "section",
+      classHint: ".slide",
+      cssPath: ".slide",
+      nthOfTypePath: "body > section:nth-of-type(1)",
+      siblingIndex: 0
+    };
     input.sourceImplementation = createMoveSourceImplementationEvidence(input.sourceContext, input.operation.id);
     expect(input.sourceImplementation).toBeDefined();
     if (input.sourceImplementation) {
@@ -310,6 +327,7 @@ describe("Intent Prompt Builder", () => {
     const result = buildIntentPrompt([input], { language: "en", page: { url: "file:///deck.html", title: "Deck" } });
     expect(result.ok).toBe(true);
     if (result.ok) {
+      expect(result.prompt).toContain("Measurement state: Source A, Target B, anchors, and nearby references were refreshed from the rendered page when this prompt was generated.");
       expect(result.prompt).toContain("Source A implementation evidence:");
       expect(result.prompt).toContain("selection-method: primary-candidate");
       expect(result.prompt).toContain("class: .title");
@@ -320,6 +338,8 @@ describe("Intent Prompt Builder", () => {
       expect(result.prompt).toContain("Target B is an empty placement area / destination guide");
       expect(result.prompt).toContain("Group wrapper hint: no stronger shared wrapper signal was detected");
       expect(result.prompt).not.toContain("Source A contains multiple sibling items");
+      expect(result.prompt).toContain("Anchor: slide (section .slide); confidence:");
+      expect(result.prompt).not.toContain("1B X: centerX");
     }
   });
 

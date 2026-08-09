@@ -37,7 +37,7 @@ import { exportLongImageSnapshot } from "../export/long-image";
 import { exportImagePdfLongSnapshot, exportImagePdfA4Snapshot, exportImagePdfSlidesSnapshot } from "../export/image-pdf";
 import { createIntentOverlay, type IntentOverlay } from "./intent-overlay";
 import { createIntentDraftPanel, type IntentDraftPanel } from "./intent-draft-panel";
-import { createIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
+import { createIntentRegion, refreshIntentRegion, type IntentOperation, type IntentRegion } from "./intent-region";
 import { buildIntentDraftVisualPlan, pickNextIntentColor } from "./intent-draft-state";
 import { collectVisualUnits, findVisualUnitsInBox, type RectLike } from "./visual-units";
 import { buildRegionContext, summarizeVisualUnit, type GuideCandidate, type RegionContext, type ActiveAlignmentGuide } from "./region-context";
@@ -56,6 +56,7 @@ type IntentDraftState = {
   color: string;
   sourceMarker: HTMLDivElement;
   targetMarker?: HTMLDivElement;
+  targetPreview?: HTMLDivElement;
 };
 
 export function createController(logger: ClickDeckLogger, rootId: string): ClickDeckController {
@@ -1058,14 +1059,74 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     const effective = getEffectivePatches();
     const page = { url: pageHref, title: document.title };
 
-    const intentInputs: IntentPromptInput[] = intentDrafts.map(d => ({
-      operation: d.operation,
-      sourceContext: d.context,
-      targetContext: d.targetContext,
-      sourceImplementation: d.operation.action === "move"
-        ? createMoveSourceImplementationEvidence(d.context, d.operation.id)
-        : undefined
-    }));
+    const currentUnits = collectVisualUnits();
+    const intentInputs: IntentPromptInput[] = intentDrafts.map((draft) => {
+      if (draft.operation.action !== "move" || !draft.targetContext) {
+        return {
+          operation: draft.operation,
+          sourceContext: draft.context,
+          targetContext: draft.targetContext
+        };
+      }
+
+      const existingSource = createMoveSourceImplementationEvidence(draft.context, draft.operation.id);
+      const sourceElement = existingSource?.element;
+      const sourceDomRect = sourceElement?.isConnected ? sourceElement.getBoundingClientRect() : undefined;
+      const sourceViewportBox = sourceDomRect && sourceDomRect.width > 0 && sourceDomRect.height > 0
+        ? {
+            left: sourceDomRect.left,
+            top: sourceDomRect.top,
+            width: sourceDomRect.width,
+            height: sourceDomRect.height,
+            right: sourceDomRect.right,
+            bottom: sourceDomRect.bottom
+          }
+        : draft.context.region.viewportBox;
+
+      const renderedTarget = draft.targetMarker?.isConnected
+        ? draft.targetMarker
+        : draft.targetPreview?.isConnected
+          ? draft.targetPreview
+          : undefined;
+      const targetMarkerRect = renderedTarget
+        ? renderedTarget.getBoundingClientRect()
+        : undefined;
+      const markerWidth = renderedTarget?.clientWidth ?? 0;
+      const markerHeight = renderedTarget?.clientHeight ?? 0;
+      const targetViewportBox = targetMarkerRect && targetMarkerRect.width > 0 && targetMarkerRect.height > 0
+        ? {
+            left: targetMarkerRect.left,
+            top: targetMarkerRect.top,
+            width: markerWidth || targetMarkerRect.width,
+            height: markerHeight || targetMarkerRect.height,
+            right: targetMarkerRect.left + (markerWidth || targetMarkerRect.width),
+            bottom: targetMarkerRect.top + (markerHeight || targetMarkerRect.height)
+          }
+        : draft.targetContext.region.viewportBox;
+
+      const sourceRegion = refreshIntentRegion(draft.context.region, sourceViewportBox);
+      const targetRegion = refreshIntentRegion(draft.targetContext.region, targetViewportBox);
+      const sourceContext = buildRegionContext(sourceRegion, currentUnits);
+      const targetContext = buildRegionContext(targetRegion, currentUnits, {
+        excludeElements: sourceElement ? [sourceElement] : undefined,
+        activeAlignmentGuides: draft.targetContext.activeAlignmentGuides
+      });
+      const sourceImplementation = existingSource
+        ? { ...existingSource, locator: createElementLocator(existingSource.element) }
+        : createMoveSourceImplementationEvidence(sourceContext, draft.operation.id);
+
+      return {
+        operation: {
+          ...draft.operation,
+          source: sourceRegion,
+          target: targetRegion
+        },
+        sourceContext,
+        targetContext,
+        sourceImplementation,
+        measurementState: "copy-time-rendered-page" as const
+      };
+    });
     const sourceLocations = await resolvePromptSourceLocations(effective, intentInputs);
     intentInputs.forEach((input) => {
       if (input.sourceImplementation) {
@@ -1659,6 +1720,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     }
                   }
                 });
+                draft.targetPreview = moveTargetBox.element;
               },
               (opId, action) => {
                 // onActionChange

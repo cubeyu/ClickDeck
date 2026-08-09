@@ -18,6 +18,7 @@ export type IntentPromptInput = {
   sourceContext: RegionContext;
   targetContext?: RegionContext;
   sourceImplementation?: MoveSourceImplementationEvidence;
+  measurementState?: "copy-time-rendered-page";
 };
 
 export type MoveSourceImplementationEvidence = {
@@ -57,7 +58,11 @@ function formatRect(rect: { left: number; top: number; width: number; height: nu
 
 function formatAnchor(context: RegionContext): string {
   const { anchor } = context.region;
-  const descriptor = anchor.locator?.descriptor ? ` (${anchor.locator.descriptor})` : "";
+  const locator = anchor.locator;
+  const stableParts = locator
+    ? [locator.tagName, locator.idHint, locator.classHint].filter(Boolean).join(" ")
+    : "";
+  const descriptor = stableParts ? ` (${stableParts})` : "";
   return `${anchor.kind}${descriptor}; confidence: ${anchor.confidence}`;
 }
 
@@ -772,6 +777,13 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
 
   lines.push(`${opId} | ${t(language, "type", "类型")}: ${t(language, "move", "移动")}`);
   lines.push(`${t(language, "Move note", "移动说明")}: ${moveNote ? `"${moveNote}"` : "[not provided]"}`);
+  if (input.measurementState === "copy-time-rendered-page") {
+    lines.push(t(
+      language,
+      "Measurement state: Source A, Target B, anchors, and nearby references were refreshed from the rendered page when this prompt was generated.",
+      "测量状态：Source A、Target B、锚点与邻近参考均在生成本 Prompt 时按当前渲染页面重新读取。"
+    ));
+  }
   appendContextBlock(lines, t(language, "Source A", "Source A"), sourceContext, "", language);
   appendRegionContents(lines, sourceContext, "", false, language);
   appendMoveSourceImplementationEvidence(lines, input, language);

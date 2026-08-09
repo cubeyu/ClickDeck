@@ -267,6 +267,7 @@ describe("buildUnifiedPrompt", () => {
     sourceElement.innerHTML = "Quarterly<br>Review";
     const intent: IntentPromptInput = {
       operation: { action: "move", id: "op1" } as any,
+      measurementState: "copy-time-rendered-page",
       sourceImplementation: {
         key: "move:op1:source-a",
         element: sourceElement,
@@ -326,6 +327,11 @@ describe("buildUnifiedPrompt", () => {
     if (result.ok) {
       const prompt = result.prompt;
       
+      expect(prompt).toContain("Treat the complete TodoList as one desired final-state specification.");
+      expect(prompt).toContain("Its listed order is not a required replay order");
+      expect(prompt).toContain("Measurement state: Source A, Target B, anchors, and nearby references were refreshed from the rendered page");
+      expect(prompt).toContain("Resolve placement evidence in this order: active snap guides; stable anchor-relative Target B; containment, non-overlap, and nearby spacing; viewport/document pixels only as fallback.");
+      expect(prompt).toContain("After all related content and style tasks are applied, re-check Source A against the final Target B alignment");
       expect(prompt).toContain("Placement summary:");
       expect(prompt).toContain("Source A implementation evidence:");
       expect(prompt).toContain("css-path: body > div.move-title");

@@ -7,7 +7,8 @@ import {
   toRelativeRect,
   detectPageMode,
   findRegionAnchor,
-  createIntentRegion
+  createIntentRegion,
+  refreshIntentRegion
 } from "./intent-region";
 
 describe("Intent Region Core Functions", () => {
@@ -217,6 +218,32 @@ describe("Intent Region Core Functions", () => {
     expect(region.relativeBox?.top).toBe(50);  // (300 / 600) * 100
   });
 
+  it("refreshIntentRegion recalculates current geometry while preserving intent identity", () => {
+    document.body.innerHTML = `<section class="slide" id="slide1"></section>`;
+    const slide = document.querySelector("#slide1") as HTMLElement;
+    (slide as any).getBoundingClientRect = () => ({ left: 100, top: 50, width: 800, height: 600, right: 900, bottom: 650 });
+
+    const original = createIntentRegion({
+      action: "move",
+      userIntent: "keep this aligned",
+      viewportBox: normalizeRect({ left: 200, top: 150, width: 100, height: 50 }),
+      root: document.body,
+      isGhostPreview: true
+    });
+    const refreshed = refreshIntentRegion(
+      original,
+      normalizeRect({ left: 300, top: 250, width: 240, height: 80 }),
+      document.body
+    );
+
+    expect(refreshed.id).toBe(original.id);
+    expect(refreshed.createdAt).toBe(original.createdAt);
+    expect(refreshed.userIntent).toBe("keep this aligned");
+    expect(refreshed.isGhostPreview).toBe(true);
+    expect(refreshed.viewportBox).toMatchObject({ left: 300, top: 250, width: 240, height: 80 });
+    expect(refreshed.relativeBox).toMatchObject({ left: 25, top: 33.33333333333333, width: 30, height: 13.333333333333334 });
+  });
+
   it("compareRegionAnchors detects shared anchors by locator identity", () => {
     const source = createIntentRegion({
       action: "move",
@@ -246,6 +273,49 @@ describe("Intent Region Core Functions", () => {
       shared: true,
       differentSection: false,
       confidence: "high"
+    });
+  });
+
+  it("compareRegionAnchors ignores changing marker text when structural anchor paths match", () => {
+    const source = createIntentRegion({
+      action: "move",
+      userIntent: "",
+      viewportBox: normalizeRect({ left: 10, top: 10, width: 50, height: 30 }),
+      root: document.body
+    });
+    source.anchor = {
+      kind: "container",
+      confidence: "medium",
+      locator: {
+        descriptor: 'div .cover-container "Title 1A"',
+        tagName: "div",
+        cssPath: ".cover-container",
+        nthOfTypePath: "body > div:nth-of-type(1)",
+        siblingIndex: 0
+      }
+    };
+    const target = createIntentRegion({
+      action: "move",
+      userIntent: "",
+      viewportBox: normalizeRect({ left: 100, top: 100, width: 50, height: 30 }),
+      root: document.body
+    });
+    target.anchor = {
+      kind: "container",
+      confidence: "medium",
+      locator: {
+        descriptor: 'div .cover-container "Title 1A 1B X: centerX"',
+        tagName: "div",
+        cssPath: ".cover-container",
+        nthOfTypePath: "body > div:nth-of-type(1)",
+        siblingIndex: 0
+      }
+    };
+
+    expect(compareRegionAnchors(source, target)).toEqual({
+      shared: true,
+      differentSection: false,
+      confidence: "medium"
     });
   });
 

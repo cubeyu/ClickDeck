@@ -263,9 +263,35 @@ export function createIntentOperation(source: IntentRegion, target?: IntentRegio
   };
 }
 
+export function refreshIntentRegion(
+  region: IntentRegion,
+  viewportBox: RectLike,
+  root: ParentNode = document.body
+): IntentRegion {
+  const refreshed = createIntentRegion({
+    action: region.action,
+    userIntent: region.userIntent,
+    viewportBox: normalizeRect(viewportBox),
+    root,
+    isGhostPreview: region.isGhostPreview
+  });
+
+  return {
+    ...refreshed,
+    id: region.id,
+    createdAt: region.createdAt
+  };
+}
+
 function getAnchorIdentity(anchor: RegionAnchor): string | null {
+  if (anchor.locator?.cssPath) {
+    return `${anchor.kind}:css:${anchor.locator.cssPath}`;
+  }
+  if (anchor.locator?.nthOfTypePath) {
+    return `${anchor.kind}:structure:${anchor.locator.nthOfTypePath}`;
+  }
   if (anchor.locator?.descriptor) {
-    return `${anchor.kind}:${anchor.locator.descriptor}`;
+    return `${anchor.kind}:descriptor:${anchor.locator.descriptor}`;
   }
   if (anchor.kind === "document") {
     return "document";
