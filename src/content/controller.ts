@@ -25,7 +25,7 @@ import { applyStyleAction, type StyleAction } from "./style-actions";
 import { exportHtmlSnapshot } from "../export/html";
 import { buildUnifiedPrompt } from "../export/unified-prompt";
 import { groupPromptChanges } from "../export/change-summary";
-import type { IntentPromptInput } from "../export/intent-prompt";
+import { createMoveSourceImplementationEvidence, type IntentPromptInput } from "../export/intent-prompt";
 import {
   CLICKDECK_RESOLVE_SOURCE_LOCATIONS,
   type ResolveSourceLocationsResponse,
@@ -1010,8 +1010,11 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     container.style.top = `${top}px`;
   }
 
-  async function resolvePatchSourceLocations(patches: EditorPatch[]): Promise<ResolveSourceLocationsResponse> {
-    const targets: SourceLocationTarget[] = groupPromptChanges(patches).map((group) => ({
+  async function resolvePromptSourceLocations(
+    patches: EditorPatch[],
+    intents: IntentPromptInput[]
+  ): Promise<ResolveSourceLocationsResponse> {
+    const patchTargets: SourceLocationTarget[] = groupPromptChanges(patches).map((group) => ({
       key: group.key,
       tagName: group.targetLocator.tagName,
       idHint: group.targetLocator.idHint,
@@ -1020,9 +1023,23 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       imageHint: group.targetLocator.imageHint,
       selectorStability: group.targetLocator.selectorStability
     }));
+    const moveTargets: SourceLocationTarget[] = intents.flatMap((input) => {
+      const evidence = input.sourceImplementation;
+      if (!evidence) return [];
+      return [{
+        key: evidence.key,
+        tagName: evidence.locator.tagName,
+        idHint: evidence.locator.idHint,
+        classHint: evidence.locator.classHint,
+        textSnippet: evidence.locator.textSnippet,
+        imageHint: evidence.locator.imageHint,
+        selectorStability: evidence.locator.selectorStability
+      }];
+    });
+    const targets = [...patchTargets, ...moveTargets];
 
     if (targets.length === 0) {
-      return { locations: {}, unavailableReason: "no-patch-targets" };
+      return { locations: {}, unavailableReason: "no-source-targets" };
     }
 
     try {
@@ -1040,13 +1057,21 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   async function showAiEditPrompt(): Promise<void> {
     const effective = getEffectivePatches();
     const page = { url: pageHref, title: document.title };
-    const sourceLocations = await resolvePatchSourceLocations(effective);
 
     const intentInputs: IntentPromptInput[] = intentDrafts.map(d => ({
       operation: d.operation,
       sourceContext: d.context,
-      targetContext: d.targetContext
+      targetContext: d.targetContext,
+      sourceImplementation: d.operation.action === "move"
+        ? createMoveSourceImplementationEvidence(d.context, d.operation.id)
+        : undefined
     }));
+    const sourceLocations = await resolvePromptSourceLocations(effective, intentInputs);
+    intentInputs.forEach((input) => {
+      if (input.sourceImplementation) {
+        input.sourceImplementation.sourceLocation = sourceLocations.locations[input.sourceImplementation.key];
+      }
+    });
 
     const unifiedResultEn = buildUnifiedPrompt(effective, intentInputs, { language: "en", page, sourceLocations });
 

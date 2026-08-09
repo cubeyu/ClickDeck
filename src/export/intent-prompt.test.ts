@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { IntentRegion } from "../content/intent-region";
 import { RegionCandidate } from "../content/region-context";
 import { VisualUnit, VisualUnitKind } from "../content/visual-units";
-import { buildIntentPrompt, IntentPromptInput } from "./intent-prompt";
+import { buildIntentPrompt, createMoveSourceImplementationEvidence, IntentPromptInput } from "./intent-prompt";
 
 const viewportBox = { left: 0, top: 0, width: 100, height: 100, right: 100, bottom: 100 };
 
@@ -282,6 +282,65 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Top edge is 24px below [Header] bottom edge (delta: 24px, confidence: high).");
       expect(result.hasMediaReplacement).toBe(true);
     }
+  });
+
+  it("adds Source A implementation evidence with local HTML and optional source line", () => {
+    const title = createElement("div");
+    title.className = "title";
+    title.innerHTML = "Spain wins,<br>what about us?";
+    const input = mockRegionContext("move", "", false, [
+      mockCandidate("textBlock", { text: "Spain wins, what about us?", element: title })
+    ]);
+    addTargetContext(input, "", true);
+    input.sourceImplementation = createMoveSourceImplementationEvidence(input.sourceContext, input.operation.id);
+    expect(input.sourceImplementation).toBeDefined();
+    if (input.sourceImplementation) {
+      input.sourceImplementation.sourceLocation = {
+        key: input.sourceImplementation.key,
+        sourceUrl: "file:///deck.html",
+        line: 18,
+        column: 5,
+        confidence: "high",
+        matchMethod: "unique-class"
+      };
+    }
+
+    const result = buildIntentPrompt([input], { language: "en", page: { url: "file:///deck.html", title: "Deck" } });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.prompt).toContain("Source A implementation evidence:");
+      expect(result.prompt).toContain("selection-method: primary-candidate");
+      expect(result.prompt).toContain("class: .title");
+      expect(result.prompt).toContain("Original HTML source location: file:///deck.html:18:5");
+      expect(result.prompt).toContain("Local HTML for Source A:");
+      expect(result.prompt).toContain("Spain wins,<br>what about us?");
+      expect(result.prompt).toContain("Preserve this element's existing child structure (including <br> and inline wrappers)");
+      expect(result.prompt).toContain("Target B is an empty placement area / destination guide");
+    }
+  });
+
+  it("selects a shared wrapper only when the source box substantially covers it", () => {
+    const row = document.createElement("div");
+    row.className = "selected-row";
+    Object.defineProperty(row, "getBoundingClientRect", {
+      value: () => ({ left: 10, top: 20, width: 80, height: 40, right: 90, bottom: 60 }),
+      configurable: true
+    });
+    const first = document.createElement("span");
+    first.textContent = "A";
+    const second = document.createElement("span");
+    second.textContent = "B";
+    row.append(first, second);
+    document.body.appendChild(row);
+    const input = mockRegionContext("move", "", false, [
+      mockCandidateFromElement(first, "A", 1),
+      mockCandidateFromElement(second, "B", 2)
+    ]);
+
+    const evidence = createMoveSourceImplementationEvidence(input.sourceContext, input.operation.id);
+    expect(evidence?.selectionMethod).toBe("shared-wrapper");
+    expect(evidence?.element).toBe(row);
+    expect(evidence?.locator.classHint).toBe(".selected-row");
   });
 
   it("scopes grouped source semantics to the visual box and adds implementation hint for sibling items", () => {

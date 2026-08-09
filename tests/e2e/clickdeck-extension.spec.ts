@@ -613,11 +613,17 @@ test.describe("ClickDeck core editing workflows", () => {
     await heading.click();
     await page.locator("[data-action='add-intent']").click();
     
-    // Draw an intent region
+    // Draw Source A around the heading text rather than a generic page corner.
+    const sourceTextBox = await heading.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const rect = range.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    });
     const mouse = page.mouse;
-    await mouse.move(50, 50);
+    await mouse.move(sourceTextBox.x - 4, sourceTextBox.y - 4);
     await mouse.down();
-    await mouse.move(150, 150);
+    await mouse.move(sourceTextBox.x + sourceTextBox.width + 4, sourceTextBox.y + sourceTextBox.height + 4);
     await mouse.up();
 
     // Click Move to... triggers ghost preview immediately
@@ -665,6 +671,14 @@ test.describe("ClickDeck core editing workflows", () => {
     expect(promptText).toContain("type: move");
     expect(promptText).toContain("Target B source: dragged target box");
     expect(promptText).toContain("Source A summary:");
+    expect(promptText).toContain("Source A implementation evidence:");
+    expect(promptText).toContain("css-path:");
+    expect(promptText).toContain("structural-path:");
+    expect(promptText).toContain("Local HTML for Source A:");
+    expect(promptText).toContain("Original HTML source location:");
+    expect(promptText).toMatch(/demo-page\.html:\d+:\d+/);
+    expect(promptText).toContain("<h1>Quarterly Product Review</h1>");
+    expect(promptText).not.toContain("next-sibling: div.clickdeck");
     expect(promptText).toContain("Target B summary:");
     expect(promptText).toContain("Final alignment guide:");
     expect(promptText).toContain("aligns with");

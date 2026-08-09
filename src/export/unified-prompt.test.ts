@@ -262,8 +262,34 @@ describe("buildUnifiedPrompt", () => {
   });
 
   it("integrates Move intent prompt structure with Placement summary and Final alignment guide", () => {
+    const sourceElement = document.createElement("div");
+    sourceElement.className = "move-title";
+    sourceElement.innerHTML = "Quarterly<br>Review";
     const intent: IntentPromptInput = {
       operation: { action: "move", id: "op1" } as any,
+      sourceImplementation: {
+        key: "move:op1:source-a",
+        element: sourceElement,
+        locator: {
+          descriptor: "div .move-title",
+          tagName: "div",
+          classHint: ".move-title",
+          textSnippet: "Quarterly Review",
+          cssPath: "body > div.move-title",
+          nthOfTypePath: "body:nth-of-type(1) > div:nth-of-type(1)",
+          siblingIndex: 0,
+          selectorStability: "medium"
+        },
+        selectionMethod: "primary-candidate",
+        sourceLocation: {
+          key: "move:op1:source-a",
+          sourceUrl: "http://test/deck.html",
+          line: 30,
+          column: 3,
+          confidence: "high",
+          matchMethod: "unique-class"
+        }
+      },
       sourceContext: {
         region: { 
           id: "r1", 
@@ -301,6 +327,10 @@ describe("buildUnifiedPrompt", () => {
       const prompt = result.prompt;
       
       expect(prompt).toContain("Placement summary:");
+      expect(prompt).toContain("Source A implementation evidence:");
+      expect(prompt).toContain("css-path: body > div.move-title");
+      expect(prompt).toContain("Original HTML source location: http://test/deck.html:30:3");
+      expect(prompt).toContain("Quarterly<br>Review");
       expect(prompt).toContain("Treat Source A as the selected visual content group inside Source A's visual box");
       expect(prompt).toContain("Target B is below and shifted to the right of Source A");
       expect(prompt).toContain("Placement offset:");

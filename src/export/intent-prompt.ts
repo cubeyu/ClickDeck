@@ -1,6 +1,9 @@
 import { compareRegionAnchors, IntentOperation } from "../content/intent-region";
 import { collectCssFacts, CssFacts } from "../content/css-facts";
 import { ActiveAlignmentGuide, AlignmentEdge, NearbyReference, RegionCandidate, RegionContext, summarizeVisualUnit } from "../content/region-context";
+import { createElementLocator, isClickDeckUiElement } from "../content/dom-utils";
+import type { ElementLocator } from "../state/editor-state";
+import type { SourceLocationEvidence } from "../shared/messages";
 
 export type IntentPromptOptions = {
   language: "en" | "zh";
@@ -14,6 +17,15 @@ export type IntentPromptInput = {
   operation: IntentOperation;
   sourceContext: RegionContext;
   targetContext?: RegionContext;
+  sourceImplementation?: MoveSourceImplementationEvidence;
+};
+
+export type MoveSourceImplementationEvidence = {
+  key: string;
+  element: HTMLElement;
+  locator: ElementLocator;
+  selectionMethod: "primary-candidate" | "shared-wrapper";
+  sourceLocation?: SourceLocationEvidence;
 };
 
 export type PromptBuildResult =
@@ -140,6 +152,143 @@ function hasMultipleSiblingCandidates(context: RegionContext): boolean {
     parents.set(parent, (parents.get(parent) ?? 0) + 1);
   });
   return Array.from(parents.values()).some(count => count >= 2);
+}
+
+export function createMoveSourceImplementationEvidence(
+  context: RegionContext,
+  operationId: string
+): MoveSourceImplementationEvidence | undefined {
+  const candidates = context.candidates
+    .filter((candidate) => !isClickDeckUiElement(candidate.unit.element))
+    .sort((a, b) => a.rank - b.rank);
+  if (candidates.length === 0) return undefined;
+
+  const uniqueElements = Array.from(new Set(candidates.map((candidate) => candidate.unit.element)));
+  const primary = candidates[0].unit.element;
+  let element = primary;
+  let selectionMethod: MoveSourceImplementationEvidence["selectionMethod"] = "primary-candidate";
+
+  if (uniqueElements.length >= 2) {
+    const sharedParent = uniqueElements[0].parentElement;
+    const allDirectSiblings = sharedParent
+      && uniqueElements.every((candidate) => candidate.parentElement === sharedParent);
+    if (allDirectSiblings && sharedParent && !isClickDeckUiElement(sharedParent)) {
+      const parentRect = sharedParent.getBoundingClientRect();
+      const sourceBox = context.region.viewportBox;
+      const overlapWidth = Math.max(0, Math.min(parentRect.right, sourceBox.right) - Math.max(parentRect.left, sourceBox.left));
+      const overlapHeight = Math.max(0, Math.min(parentRect.bottom, sourceBox.bottom) - Math.max(parentRect.top, sourceBox.top));
+      const parentArea = Math.max(1, parentRect.width * parentRect.height);
+      const coveredRatio = (overlapWidth * overlapHeight) / parentArea;
+      if (coveredRatio >= 0.8) {
+        element = sharedParent;
+        selectionMethod = "shared-wrapper";
+      }
+    }
+  }
+
+  const locator = createElementLocator(element);
+  return {
+    key: `move:${operationId}:source-a`,
+    element,
+    locator,
+    selectionMethod
+  };
+}
+
+function compactMoveContextDescriptor(value: string): string {
+  return value.replace(/\s+"[^"]{33,}"/g, "").trim();
+}
+
+function isClickDeckDescriptor(value: string): boolean {
+  return value.toLowerCase().includes("clickdeck");
+}
+
+function formatMoveLocatorEvidence(locator: ElementLocator): string[] {
+  const lines = [
+    `tag: ${locator.tagName}`,
+    `css-path: ${locator.cssPath}`,
+    `structural-path: ${locator.nthOfTypePath}`
+  ];
+  if (locator.idHint) lines.push(`id: ${locator.idHint}`);
+  if (locator.classHint) lines.push(`class: ${locator.classHint}`);
+  if (locator.textSnippet) lines.push(`text: ${JSON.stringify(locator.textSnippet)}`);
+  if (locator.imageHint) lines.push(`image: ${JSON.stringify(locator.imageHint)}`);
+  if (locator.parentDescriptor && !isClickDeckDescriptor(locator.parentDescriptor)) {
+    lines.push(`parent: ${JSON.stringify(compactMoveContextDescriptor(locator.parentDescriptor))}`);
+  }
+  if (locator.previousSiblingDescriptor && !isClickDeckDescriptor(locator.previousSiblingDescriptor)) {
+    lines.push(`previous-sibling: ${locator.previousSiblingDescriptor}`);
+  }
+  if (locator.nextSiblingDescriptor && !isClickDeckDescriptor(locator.nextSiblingDescriptor)) {
+    lines.push(`next-sibling: ${locator.nextSiblingDescriptor}`);
+  }
+  if (locator.selectorStability) {
+    const reason = locator.selectorStabilityReason ? ` (${locator.selectorStabilityReason})` : "";
+    lines.push(`selector-stability: ${locator.selectorStability}${reason}`);
+  }
+  return lines;
+}
+
+function getMoveLocalHtmlSnippet(element: HTMLElement): string | undefined {
+  try {
+    const clone = element.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll("[data-clickdeck='true'], [id^='clickdeck-'], [class*='clickdeck-']")
+      .forEach((node) => node.remove());
+    let html = clone.outerHTML
+      .replace(/src=("|')data:[\s\S]*?\1/gi, 'src="[data URL hidden]"')
+      .replace(/srcdoc=("|')[\s\S]*?\1/gi, 'srcdoc="[srcdoc hidden]"');
+    const lines = html.split("\n");
+    html = lines.slice(0, 8).join("\n");
+    if (html.length > 500) html = `${html.slice(0, 500)}\n... (truncated)`;
+    else if (lines.length > 8) html += "\n... (truncated)";
+    return html;
+  } catch {
+    return undefined;
+  }
+}
+
+function appendMoveSourceImplementationEvidence(
+  lines: string[],
+  input: IntentPromptInput,
+  language: PromptLanguage
+): void {
+  lines.push(t(language, "Source A implementation evidence:", "Source A 实现定位证据:"));
+  const evidence = input.sourceImplementation;
+  if (!evidence) {
+    lines.push(t(
+      language,
+      "- unavailable: no reliable Source A DOM candidate; use Region contents, visual box, and nearby context without guessing a source element.",
+      "- 不可用：没有可靠的 Source A DOM 候选；请使用区域内容、视觉框和近邻上下文定位，不要猜测源码元素。"
+    ));
+    lines.push("");
+    return;
+  }
+
+  lines.push(`- selection-method: ${evidence.selectionMethod}`);
+  lines.push(`- target: ${evidence.locator.descriptor}`);
+  formatMoveLocatorEvidence(evidence.locator).forEach((item) => lines.push(`- ${item}`));
+  if (evidence.sourceLocation) {
+    lines.push(`- ${t(language, "Original HTML source location", "原始 HTML 源码位置")}: ${evidence.sourceLocation.sourceUrl}:${evidence.sourceLocation.line}:${evidence.sourceLocation.column}`);
+    lines.push(`- source-match: ${evidence.sourceLocation.matchMethod}; confidence: ${evidence.sourceLocation.confidence}`);
+  } else {
+    lines.push(t(
+      language,
+      "- Original HTML source location: unavailable; use DOM and context evidence.",
+      "- 原始 HTML 源码位置：不可用；请改用 DOM 与上下文证据。"
+    ));
+  }
+
+  const snippet = getMoveLocalHtmlSnippet(evidence.element);
+  if (snippet) {
+    lines.push(t(language, "Local HTML for Source A:", "Source A 局部 HTML:"));
+    lines.push(`\`\`\`html\n${snippet}\n\`\`\``);
+    lines.push(t(
+      language,
+      "- Preserve this element's existing child structure (including <br> and inline wrappers) unless the move explicitly requires a structural change.",
+      "- 除非移动明确要求改变结构，否则保留该元素现有的子节点结构，包括 <br> 和行内容器。"
+    ));
+  }
+  lines.push("");
 }
 
 function appendSourceImplementationHint(lines: string[], context: RegionContext, language: PromptLanguage): void {
@@ -622,6 +771,7 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   lines.push(`${t(language, "Move note", "移动说明")}: ${moveNote ? `"${moveNote}"` : "[not provided]"}`);
   appendContextBlock(lines, t(language, "Source A", "Source A"), sourceContext, "", language);
   appendRegionContents(lines, sourceContext, "", false, language);
+  appendMoveSourceImplementationEvidence(lines, input, language);
   appendCssFacts(lines, sourceContext, "", language);
   appendSourceSemanticSummary(lines, sourceContext, language);
   appendSourceImplementationHint(lines, sourceContext, language);
