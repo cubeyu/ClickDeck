@@ -2,6 +2,7 @@ import { compareRegionAnchors, IntentOperation } from "../content/intent-region"
 import { collectCssFacts, CssFacts } from "../content/css-facts";
 import { ActiveAlignmentGuide, AlignmentEdge, NearbyReference, RegionCandidate, RegionContext, summarizeVisualUnit } from "../content/region-context";
 import { createElementLocator, isClickDeckUiElement } from "../content/dom-utils";
+import type { RectLike } from "../content/visual-units";
 import type { ElementLocator } from "../state/editor-state";
 import type { SourceLocationEvidence } from "../shared/messages";
 
@@ -19,6 +20,17 @@ export type IntentPromptInput = {
   targetContext?: RegionContext;
   sourceImplementation?: MoveSourceImplementationEvidence;
   measurementState?: "copy-time-rendered-page";
+  dragFrameCalibration?: DragFrameCalibration;
+};
+
+export type DragFrameCalibration = {
+  sourceContentBox: RectLike;
+  sourceFrame: RectLike;
+  targetFrame: RectLike;
+  deltaX: number;
+  deltaY: number;
+  sourceInset: { left: number; top: number; right: number; bottom: number };
+  activeGuides: ActiveAlignmentGuide[];
 };
 
 export type MoveSourceImplementationEvidence = {
@@ -41,7 +53,7 @@ type ResolvedAxisConstraint = {
   text: string;
   confidence: ConstraintConfidence;
   relationType: RelationType;
-  source: "active-guide" | "nearby" | "anchor-center" | "placement-offset";
+  source: "active-guide" | "drag-frame-translation" | "nearby" | "anchor-center" | "placement-offset";
 };
 
 function isZh(language: PromptLanguage): boolean {
@@ -479,6 +491,38 @@ function formatGuideConstraintLocalized(axis: "X" | "Y", guide: ActiveAlignmentG
   return `- ${axis} 轴：使用已记录参考线，Target B 的${formatAlignmentEdge(guide.targetEdge)}与 ${quoteReference(guide.unitSummary)} 的${formatAlignmentEdge(guide.sourceEdge)}对齐。`;
 }
 
+function getDragFrameConstraint(
+  calibration: DragFrameCalibration,
+  axis: "x" | "y",
+  language: PromptLanguage
+): ResolvedAxisConstraint {
+  const delta = axis === "x" ? calibration.deltaX : calibration.deltaY;
+  const guide = calibration.activeGuides.find((candidate) => candidate.axis === axis);
+  const direction = axis === "x"
+    ? delta >= 0 ? t(language, "right", "向右") : t(language, "left", "向左")
+    : delta >= 0 ? t(language, "down", "向下") : t(language, "up", "向上");
+  const guideText = guide
+    ? t(
+        language,
+        ` The dragged frame ${formatAlignmentEdge(guide.targetEdge)} aligns with ${quoteReference(guide.unitSummary)} ${formatAlignmentEdge(guide.sourceEdge)}.`,
+        ` 拖拽目标框的 ${formatAlignmentEdge(guide.targetEdge)} 与 ${quoteReference(guide.unitSummary)} 的 ${formatAlignmentEdge(guide.sourceEdge)} 对齐。`
+      )
+    : "";
+  const isCenter = guide?.targetEdge === "centerX" || guide?.targetEdge === "centerY";
+
+  return {
+    axis,
+    confidence: guide ? "high" : "medium",
+    relationType: guide ? (isCenter ? "centered" : "align") : "gap",
+    source: "drag-frame-translation",
+    text: t(
+      language,
+      `- ${axis.toUpperCase()} axis: translate Source A about ${Math.round(Math.abs(delta))}px ${direction}, preserving its inset inside the dragged frame.${guideText}`,
+      `- ${axis.toUpperCase()} 轴：将 Source A ${direction}平移约 ${Math.round(Math.abs(delta))}px，并保留它在拖拽框内的 inset。${guideText}`
+    )
+  };
+}
+
 function getAnchorCenterHint(targetContext: RegionContext, axis: "x" | "y"): { confidence: ConstraintConfidence } | null {
   const hints = targetContext.alignmentHints ?? [];
   const needle = axis === "x" ? "Center X is close to anchor center X" : "Center Y is close to anchor center Y";
@@ -529,8 +573,13 @@ function resolveAxisConstraint(
   sourceContext: RegionContext,
   targetContext: RegionContext,
   axis: "x" | "y",
-  language: PromptLanguage
+  language: PromptLanguage,
+  dragFrameCalibration?: DragFrameCalibration
 ): ResolvedAxisConstraint {
+  if (dragFrameCalibration) {
+    return getDragFrameConstraint(dragFrameCalibration, axis, language);
+  }
+
   const guides = targetContext.activeAlignmentGuides ?? [];
   const guide = guides.find((candidate) => candidate.axis === axis);
   if (guide) {
@@ -588,9 +637,15 @@ function resolveAxisConstraint(
   return getPlacementOffsetConstraint(sourceContext, targetContext, axis, language);
 }
 
-function appendPrimaryAxisConstraints(lines: string[], sourceContext: RegionContext, targetContext: RegionContext, language: PromptLanguage): ResolvedAxisConstraint[] {
-  const xConstraint = resolveAxisConstraint(sourceContext, targetContext, "x", language);
-  const yConstraint = resolveAxisConstraint(sourceContext, targetContext, "y", language);
+function appendPrimaryAxisConstraints(
+  lines: string[],
+  sourceContext: RegionContext,
+  targetContext: RegionContext,
+  language: PromptLanguage,
+  dragFrameCalibration?: DragFrameCalibration
+): ResolvedAxisConstraint[] {
+  const xConstraint = resolveAxisConstraint(sourceContext, targetContext, "x", language, dragFrameCalibration);
+  const yConstraint = resolveAxisConstraint(sourceContext, targetContext, "y", language, dragFrameCalibration);
 
   lines.push(t(language, "Primary axis constraints:", "主轴约束:"));
   lines.push(xConstraint.text);
@@ -668,6 +723,52 @@ function appendAnchorAndCoordinateModel(lines: string[], sourceContext: RegionCo
   if (targetContext.region.documentBox) {
     lines.push(t(language, `- Document box fallback: ${formatRect(targetContext.region.documentBox)}.`, `- 文档坐标回退：${formatRect(targetContext.region.documentBox)}。`));
   }
+  lines.push("");
+}
+
+function appendDragFrameCalibration(
+  lines: string[],
+  calibration: DragFrameCalibration,
+  targetContext: RegionContext,
+  language: PromptLanguage
+): void {
+  const inset = calibration.sourceInset;
+  lines.push(t(language, "Dragged-frame calibration:", "拖拽框校准："));
+  lines.push(t(
+    language,
+    `- Current Source A content box: ${formatRect(calibration.sourceContentBox)}.`,
+    `- 当前 Source A 内容框：${formatRect(calibration.sourceContentBox)}。`
+  ));
+  lines.push(t(
+    language,
+    `- Source selection frame: ${formatRect(calibration.sourceFrame)}.`,
+    `- Source 框选框：${formatRect(calibration.sourceFrame)}。`
+  ));
+  lines.push(t(
+    language,
+    `- Dragged target frame: ${formatRect(calibration.targetFrame)}.`,
+    `- 拖拽目标框：${formatRect(calibration.targetFrame)}。`
+  ));
+  lines.push(t(
+    language,
+    `- Frame translation: dx ${Math.round(calibration.deltaX)}px; dy ${Math.round(calibration.deltaY)}px.`,
+    `- 框位移：dx ${Math.round(calibration.deltaX)}px；dy ${Math.round(calibration.deltaY)}px。`
+  ));
+  lines.push(t(
+    language,
+    `- Source A inset inside the source frame: left ${Math.round(inset.left)}px; top ${Math.round(inset.top)}px; right ${Math.round(inset.right)}px; bottom ${Math.round(inset.bottom)}px.`,
+    `- Source A 在源框内的 inset：left ${Math.round(inset.left)}px；top ${Math.round(inset.top)}px；right ${Math.round(inset.right)}px；bottom ${Math.round(inset.bottom)}px。`
+  ));
+  lines.push(t(
+    language,
+    `- Normalized content destination: ${formatRect(targetContext.region.viewportBox)}; it keeps the current Source A width and height.`,
+    `- 统一口径后的内容落点：${formatRect(targetContext.region.viewportBox)}；保持当前 Source A 的宽高。`
+  ));
+  lines.push(t(
+    language,
+    "- Recorded snap guides constrain the dragged frame. Preserve Source A's inset when mapping those frame guides to the real content; do not treat a frame edge as the element edge unless its inset is zero.",
+    "- 已记录的吸附线约束拖拽框。映射到真实内容时必须保留 Source A 的 inset；除非 inset 为 0，否则不要把框边直接当作元素边。"
+  ));
   lines.push("");
 }
 
@@ -827,16 +928,39 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   }
   lines.push("");
   appendPlacementOffset(lines, sourceContext, targetContext, language);
+  if (input.dragFrameCalibration) {
+    appendDragFrameCalibration(lines, input.dragFrameCalibration, targetContext, language);
+  }
   appendAnchorAndCoordinateModel(lines, sourceContext, targetContext, language);
-  const primaryConstraints = appendPrimaryAxisConstraints(lines, sourceContext, targetContext, language);
+  const primaryConstraints = appendPrimaryAxisConstraints(
+    lines,
+    sourceContext,
+    targetContext,
+    language,
+    input.dragFrameCalibration
+  );
   lines.push(`${t(language, "Relation types", "关系类型")}: ${detectRelationTypes(sourceContext, targetContext, primaryConstraints, language)}`);
   lines.push("");
   appendSecondaryReferences(lines, targetContext, primaryConstraints, language);
   appendConfidenceNotes(lines, sourceContext, targetContext, primaryConstraints, language);
-  appendContextBlock(lines, t(language, "Target B", "Target B"), targetContext, "", language);
+  appendContextBlock(
+    lines,
+    input.dragFrameCalibration
+      ? t(language, "Target B normalized content destination", "Target B 统一口径内容落点")
+      : t(language, "Target B", "Target B"),
+    targetContext,
+    "",
+    language
+  );
   appendTargetSemanticSummary(lines, targetContext, language);
   lines.push(t(language, "Target B placement reference:", "Target B 放置参考:"));
-  if (targetContext.region.isGhostPreview) {
+  if (input.dragFrameCalibration) {
+    lines.push(t(
+      language,
+      "- Target B source: normalized from the dragged target frame using the current Source A size.",
+      "- Target B 来源：使用当前 Source A 尺寸对拖拽目标框进行统一口径校准。"
+    ));
+  } else if (targetContext.region.isGhostPreview) {
     lines.push(t(language, "- Target B source: dragged target box.", "- Target B 来源：拖拽得到的目标框。"));
   }
   lines.push(t(language, "- Target B is the destination guide for placement and alignment, not replacement content.", "- Target B 是放置和对齐参考，不代表要替换这里原有内容。"));
@@ -847,9 +971,18 @@ export function appendMoveOperation(lines: string[], input: IntentPromptInput, o
   lines.push("");
 
   lines.push(t(language, "Final alignment guide:", "最终对齐参考:"));
-  if (targetContext.activeAlignmentGuides && targetContext.activeAlignmentGuides.length > 0) {
-    targetContext.activeAlignmentGuides.forEach((guide) => {
-      lines.push(formatActiveGuide(guide, language));
+  const finalActiveGuides = input.dragFrameCalibration?.activeGuides ?? targetContext.activeAlignmentGuides;
+  if (finalActiveGuides && finalActiveGuides.length > 0) {
+    finalActiveGuides.forEach((guide) => {
+      if (input.dragFrameCalibration) {
+        lines.push(t(
+          language,
+          `- Dragged target frame ${formatAlignmentEdge(guide.targetEdge)} aligns with "${guide.unitSummary}" ${formatAlignmentEdge(guide.sourceEdge)} (delta: ${Math.round(guide.deltaPx)}px); preserve Source A inset when mapping this to content.`,
+          `- 拖拽目标框的 ${formatAlignmentEdge(guide.targetEdge)} 与“${guide.unitSummary}”的 ${formatAlignmentEdge(guide.sourceEdge)} 对齐（delta: ${Math.round(guide.deltaPx)}px）；映射到内容时保留 Source A inset。`
+        ));
+      } else {
+        lines.push(formatActiveGuide(guide, language));
+      }
     });
   } else if (targetContext.alignmentHints && targetContext.alignmentHints.length > 0) {
     const highHints = targetContext.alignmentHints.filter(h => h.confidence === "high");

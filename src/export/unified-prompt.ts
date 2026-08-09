@@ -59,7 +59,8 @@ const PROMPT_COPY = {
       "7. Preserve obvious alignment relationships such as edge alignment, centering, relative offset, and spacing rhythm.",
       "8. Resolve placement evidence in this order: active snap guides; stable anchor-relative Target B; containment, non-overlap, and nearby spacing; viewport/document pixels only as fallback.",
       "9. After all related content and style tasks are applied, re-check Source A against the final Target B alignment and local spacing before finishing.",
-      "10. Avoid brittle coordinate-only fixes unless the original layout is already absolute-positioned and no safer local layout edit exists."
+      "10. For a dragged target frame, use its translation to place the current Source A content. Keep Source A's current size and preserve its inset inside the frame; frame snap guides do not automatically mean the real element edge has zero inset.",
+      "11. Avoid brittle coordinate-only fixes unless the original layout is already absolute-positioned and no safer local layout edit exists."
     ],
     removeRules: "Remove operation rules:",
     removeRuleLines: [
@@ -327,6 +328,7 @@ export function buildUnifiedPrompt(
     if (isZh) {
       lines.push("9. 放置证据优先级：主动吸附线 > 稳定锚点下的 Target B 相对位置 > 容器包含、避让和邻近间距 > viewport/document 像素坐标回退。");
       lines.push("10. 如果其他任务改变 Source A 的字号、尺寸或内容流，应使用改变后的最终尺寸，并在全部相关任务完成后重新核对 Target B 对齐与局部间距。");
+      lines.push("11. 对拖拽目标框，应使用框位移放置当前 Source A，并保留它在框内的 inset；框吸附线不等于真实元素边缘的 inset 必然为 0。");
     }
     lines.push("");
   }

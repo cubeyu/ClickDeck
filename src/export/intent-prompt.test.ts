@@ -244,6 +244,8 @@ describe("Intent Prompt Builder", () => {
       expect(prompt).toContain("Move note: [not provided]");
       expect(prompt).toContain("Source A:");
       expect(prompt).toContain("Target B:");
+      expect(prompt).not.toContain("Dragged-frame calibration:");
+      expect(prompt).not.toContain("Target B normalized content destination:");
       expect(prompt).toContain("Target B is the destination guide for placement and alignment, not replacement content.");
       expect(prompt).toContain("Without a move note, infer conservatively from Source A, Target B, visual boxes, region contents, nearby references, and CSS facts.");
       expect(prompt).toContain("Interpret the move as the desired final visual placement of Source A content");

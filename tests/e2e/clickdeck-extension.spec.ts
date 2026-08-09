@@ -678,7 +678,16 @@ test.describe("ClickDeck core editing workflows", () => {
     expect(promptText).toContain("Measurement state: Source A, Target B, anchors, and nearby references were refreshed from the rendered page");
     expect(promptText).toContain("Treat the complete TodoList as one desired final-state specification");
     expect(promptText).toContain("active snap guides; stable anchor-relative Target B; containment, non-overlap, and nearby spacing; viewport/document pixels only as fallback");
-    expect(promptText).toContain("Target B source: dragged target box");
+    expect(promptText).toContain("Dragged-frame calibration:");
+    expect(promptText).toContain("Target B source: normalized from the dragged target frame using the current Source A size.");
+    expect(promptText).toContain("Target B normalized content destination:");
+    const currentContentBox = promptText.match(/Current Source A content box: \[x:-?\d+, y:-?\d+, w:(\d+), h:(\d+)\]/);
+    const normalizedDestination = promptText.match(/Normalized content destination: \[x:-?\d+, y:-?\d+, w:(\d+), h:(\d+)\]/);
+    expect(currentContentBox).toBeTruthy();
+    expect(normalizedDestination).toBeTruthy();
+    expect(normalizedDestination?.slice(1)).toEqual(currentContentBox?.slice(1));
+    expect(promptText).toContain("Target B top edge is about");
+    expect(promptText).toContain("below Source A top edge");
     expect(promptText).toContain("Source A summary:");
     expect(promptText).toContain("Source A implementation evidence:");
     expect(promptText).toContain("css-path:");

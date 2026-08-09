@@ -1093,7 +1093,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         : undefined;
       const markerWidth = renderedTarget?.clientWidth ?? 0;
       const markerHeight = renderedTarget?.clientHeight ?? 0;
-      const targetViewportBox = targetMarkerRect && targetMarkerRect.width > 0 && targetMarkerRect.height > 0
+      const renderedTargetFrame = targetMarkerRect && targetMarkerRect.width > 0 && targetMarkerRect.height > 0
         ? {
             left: targetMarkerRect.left,
             top: targetMarkerRect.top,
@@ -1104,12 +1104,52 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
           }
         : draft.targetContext.region.viewportBox;
 
+      const sourceMarkerRect = draft.sourceMarker.isConnected
+        ? draft.sourceMarker.getBoundingClientRect()
+        : undefined;
+      const sourceMarkerWidth = draft.sourceMarker.clientWidth;
+      const sourceMarkerHeight = draft.sourceMarker.clientHeight;
+      const renderedSourceFrame = sourceMarkerRect && sourceMarkerRect.width > 0 && sourceMarkerRect.height > 0
+        ? {
+            left: sourceMarkerRect.left,
+            top: sourceMarkerRect.top,
+            width: sourceMarkerWidth || sourceMarkerRect.width,
+            height: sourceMarkerHeight || sourceMarkerRect.height,
+            right: sourceMarkerRect.left + (sourceMarkerWidth || sourceMarkerRect.width),
+            bottom: sourceMarkerRect.top + (sourceMarkerHeight || sourceMarkerRect.height)
+          }
+        : undefined;
+
+      const useDragFrameCalibration = Boolean(
+        draft.targetContext.region.isGhostPreview
+        && renderedSourceFrame
+        && renderedTarget
+      );
+      const deltaX = useDragFrameCalibration && renderedSourceFrame
+        ? renderedTargetFrame.left - renderedSourceFrame.left
+        : 0;
+      const deltaY = useDragFrameCalibration && renderedSourceFrame
+        ? renderedTargetFrame.top - renderedSourceFrame.top
+        : 0;
+      const targetViewportBox = useDragFrameCalibration
+        ? {
+            left: sourceViewportBox.left + deltaX,
+            top: sourceViewportBox.top + deltaY,
+            width: sourceViewportBox.width,
+            height: sourceViewportBox.height,
+            right: sourceViewportBox.right + deltaX,
+            bottom: sourceViewportBox.bottom + deltaY
+          }
+        : renderedTargetFrame;
+
       const sourceRegion = refreshIntentRegion(draft.context.region, sourceViewportBox);
       const targetRegion = refreshIntentRegion(draft.targetContext.region, targetViewportBox);
       const sourceContext = buildRegionContext(sourceRegion, currentUnits);
       const targetContext = buildRegionContext(targetRegion, currentUnits, {
         excludeElements: sourceElement ? [sourceElement] : undefined,
-        activeAlignmentGuides: draft.targetContext.activeAlignmentGuides
+        activeAlignmentGuides: useDragFrameCalibration
+          ? undefined
+          : draft.targetContext.activeAlignmentGuides
       });
       const sourceImplementation = existingSource
         ? { ...existingSource, locator: createElementLocator(existingSource.element) }
@@ -1124,7 +1164,23 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
         sourceContext,
         targetContext,
         sourceImplementation,
-        measurementState: "copy-time-rendered-page" as const
+        measurementState: "copy-time-rendered-page" as const,
+        dragFrameCalibration: useDragFrameCalibration && renderedSourceFrame
+          ? {
+              sourceContentBox: sourceViewportBox,
+              sourceFrame: renderedSourceFrame,
+              targetFrame: renderedTargetFrame,
+              deltaX,
+              deltaY,
+              sourceInset: {
+                left: sourceViewportBox.left - renderedSourceFrame.left,
+                top: sourceViewportBox.top - renderedSourceFrame.top,
+                right: renderedSourceFrame.right - sourceViewportBox.right,
+                bottom: renderedSourceFrame.bottom - sourceViewportBox.bottom
+              },
+              activeGuides: draft.targetContext.activeAlignmentGuides ?? []
+            }
+          : undefined
       };
     });
     const sourceLocations = await resolvePromptSourceLocations(effective, intentInputs);

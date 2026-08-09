@@ -268,6 +268,23 @@ describe("buildUnifiedPrompt", () => {
     const intent: IntentPromptInput = {
       operation: { action: "move", id: "op1" } as any,
       measurementState: "copy-time-rendered-page",
+      dragFrameCalibration: {
+        sourceContentBox: { left: 10, top: 20, width: 30, height: 40, right: 40, bottom: 60 },
+        sourceFrame: { left: 0, top: 10, width: 50, height: 60, right: 50, bottom: 70 },
+        targetFrame: { left: 90, top: 90, width: 50, height: 60, right: 140, bottom: 150 },
+        deltaX: 90,
+        deltaY: 80,
+        sourceInset: { left: 10, top: 10, right: 10, bottom: 10 },
+        activeGuides: [{
+          axis: "x",
+          position: 115,
+          targetEdge: "centerX",
+          sourceEdge: "centerX",
+          unitSummary: "[Title]",
+          deltaPx: 0,
+          confidence: "high"
+        }]
+      },
       sourceImplementation: {
         key: "move:op1:source-a",
         element: sourceElement,
@@ -332,6 +349,15 @@ describe("buildUnifiedPrompt", () => {
       expect(prompt).toContain("Measurement state: Source A, Target B, anchors, and nearby references were refreshed from the rendered page");
       expect(prompt).toContain("Resolve placement evidence in this order: active snap guides; stable anchor-relative Target B; containment, non-overlap, and nearby spacing; viewport/document pixels only as fallback.");
       expect(prompt).toContain("After all related content and style tasks are applied, re-check Source A against the final Target B alignment");
+      expect(prompt).toContain("Dragged-frame calibration:");
+      expect(prompt).toContain("Current Source A content box: [x:10, y:20, w:30, h:40]");
+      expect(prompt).toContain("Source selection frame: [x:0, y:10, w:50, h:60]");
+      expect(prompt).toContain("Dragged target frame: [x:90, y:90, w:50, h:60]");
+      expect(prompt).toContain("Normalized content destination: [x:100, y:100, w:30, h:40]; it keeps the current Source A width and height.");
+      expect(prompt).toContain("X axis: translate Source A about 90px right, preserving its inset inside the dragged frame.");
+      expect(prompt).toContain("Y axis: translate Source A about 80px down, preserving its inset inside the dragged frame.");
+      expect(prompt).toContain("Target B normalized content destination:");
+      expect(prompt).toContain("Dragged target frame center X aligns with \"[Title]\" center X");
       expect(prompt).toContain("Placement summary:");
       expect(prompt).toContain("Source A implementation evidence:");
       expect(prompt).toContain("css-path: body > div.move-title");
@@ -343,16 +369,14 @@ describe("buildUnifiedPrompt", () => {
       expect(prompt).toContain("Anchor and coordinate model:");
       expect(prompt).toContain("Viewport box fallback:");
       expect(prompt).toContain("Primary axis constraints:");
-      expect(prompt).toContain("X axis: place Source A immediately to the left of [Title], with about 10px horizontal gap.");
-      expect(prompt).toContain("Y axis: use placement offset; Target B top edge is about 80px below Source A top edge.");
-      expect(prompt).toContain("Relation types: gap, adjacent");
+      expect(prompt).toContain("Relation types: gap, centered");
       expect(prompt).toContain("Secondary references:");
-      expect(prompt).toContain("- None beyond the primary constraints.");
+      expect(prompt).toContain("- right: [Title], 10px away (confidence: medium).");
       expect(prompt).toContain("Confidence notes:");
       expect(prompt).toContain("Placement references:");
       expect(prompt).toContain("- right: [Title], 10px away; avoid overlap / preserve offset.");
       expect(prompt).toContain("Final alignment guide:");
-      expect(prompt).toContain("- No recorded active guide at drop; calculated high-confidence fallback: Left edge aligns with [Title] left edge (delta: 0px, confidence: high).");
+      expect(prompt).toContain("Dragged target frame center X aligns with \"[Title]\" center X (delta: 0px); preserve Source A inset when mapping this to content.");
     }
   });
 
