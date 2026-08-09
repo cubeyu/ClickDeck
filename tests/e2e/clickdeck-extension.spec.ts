@@ -679,6 +679,8 @@ test.describe("ClickDeck core editing workflows", () => {
     expect(promptText).toMatch(/demo-page\.html:\d+:\d+/);
     expect(promptText).toContain("<h1>Quarterly Product Review</h1>");
     expect(promptText).not.toContain("next-sibling: div.clickdeck");
+    expect(promptText).toContain("Group wrapper hint: no stronger shared wrapper signal was detected");
+    expect(promptText).not.toContain("Source A contains multiple sibling items");
     expect(promptText).toContain("Target B summary:");
     expect(promptText).toContain("Final alignment guide:");
     expect(promptText).toContain("aligns with");

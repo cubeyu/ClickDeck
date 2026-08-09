@@ -289,7 +289,9 @@ describe("Intent Prompt Builder", () => {
     title.className = "title";
     title.innerHTML = "Spain wins,<br>what about us?";
     const input = mockRegionContext("move", "", false, [
-      mockCandidate("textBlock", { text: "Spain wins, what about us?", element: title })
+      mockCandidate("textBlock", { text: "Spain wins, what about us?", element: title }),
+      mockCandidateFromElement(title, "Spain wins,", 2),
+      mockCandidateFromElement(title, "what about us?", 3)
     ]);
     addTargetContext(input, "", true);
     input.sourceImplementation = createMoveSourceImplementationEvidence(input.sourceContext, input.operation.id);
@@ -316,6 +318,8 @@ describe("Intent Prompt Builder", () => {
       expect(result.prompt).toContain("Spain wins,<br>what about us?");
       expect(result.prompt).toContain("Preserve this element's existing child structure (including <br> and inline wrappers)");
       expect(result.prompt).toContain("Target B is an empty placement area / destination guide");
+      expect(result.prompt).toContain("Group wrapper hint: no stronger shared wrapper signal was detected");
+      expect(result.prompt).not.toContain("Source A contains multiple sibling items");
     }
   });
 

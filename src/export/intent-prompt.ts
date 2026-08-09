@@ -145,13 +145,16 @@ export function appendNearbyReferences(lines: string[], context: RegionContext, 
 
 function hasMultipleSiblingCandidates(context: RegionContext): boolean {
   if (context.candidates.length < 2) return false;
-  const parents = new Map<HTMLElement, number>();
+  const parents = new Map<HTMLElement, Set<HTMLElement>>();
   context.candidates.forEach((candidate) => {
+    const element = candidate.unit.element;
     const parent = candidate.unit.element.parentElement;
     if (!parent) return;
-    parents.set(parent, (parents.get(parent) ?? 0) + 1);
+    const siblings = parents.get(parent) ?? new Set<HTMLElement>();
+    siblings.add(element);
+    parents.set(parent, siblings);
   });
-  return Array.from(parents.values()).some(count => count >= 2);
+  return Array.from(parents.values()).some((siblings) => siblings.size >= 2);
 }
 
 export function createMoveSourceImplementationEvidence(
