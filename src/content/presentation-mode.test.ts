@@ -112,6 +112,69 @@ describe("createPresentationController", () => {
     delete window.impress;
   });
 
+  it.each(['zero-size', 'display', 'visibility', 'opacity', 'hidden', 'aria-hidden', 'hidden-parent'])(
+    'does not start from an inactive %s slide at zero coordinates', async (reason) => {
+      const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+      const first = slides[0];
+      if (reason === 'display') first.style.display = 'none';
+      if (reason === 'visibility') first.style.visibility = 'hidden';
+      if (reason === 'opacity') first.style.opacity = '0';
+      if (reason === 'hidden') first.hidden = true;
+      if (reason === 'aria-hidden') first.setAttribute('aria-hidden', 'true');
+      if (reason === 'hidden-parent') {
+        const parent = document.createElement('div'); parent.style.display = 'none';
+        first.before(parent); parent.append(first);
+      }
+      first.getBoundingClientRect = () => ({ width: reason === 'zero-size' ? 0 : 800, height: reason === 'zero-size' ? 0 : 600, left: 0, top: 0 } as DOMRect);
+      slides[1].getBoundingClientRect = () => ({ width: 800, height: 600, left: 200, top: 100 } as DOMRect);
+      // No active class: the visibility filter must work without a naming convention.
+      const controller = createPresentationController({ slides, logger: mockLogger });
+      try { await controller.enter(); expect(slides[1].classList.contains('active')).toBe(true); }
+      finally { controller.destroy(); }
+    }
+  );
+
+  it('prefers the visible active slide in an overlapping deck and re-reads it on re-entry', async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+    slides[0].getBoundingClientRect = () => ({ width: 800, height: 600, left: 0, top: 0 } as DOMRect);
+    slides[1].getBoundingClientRect = () => ({ width: 800, height: 600, left: 100, top: 100 } as DOMRect);
+    slides[1].classList.add('active');
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    try {
+      await controller.enter(); expect(slides[1].classList.contains('clickdeck-presenting-slide')).toBe(true);
+      controller.exit();
+      slides[1].classList.remove('active'); slides[0].classList.add('active');
+      await controller.enter(); expect(slides[0].classList.contains('clickdeck-presenting-slide')).toBe(true);
+    } finally { controller.destroy(); }
+  });
+
+  it('uses visible geometry for scroll documents instead of an offscreen stale active page', async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+    slides[0].classList.add('active');
+    slides[0].getBoundingClientRect = () => ({ width: 800, height: 600, left: 0, top: -1000 } as DOMRect);
+    slides[1].getBoundingClientRect = () => ({ width: 800, height: 600, left: 0, top: 50 } as DOMRect);
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    try { await controller.enter(); expect(slides[1].classList.contains('clickdeck-presenting-slide')).toBe(true); }
+    finally { controller.destroy(); }
+  });
+
+  it('releases the hidden plugin trigger focus even when fullscreen is refused', async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+    const ui = document.createElement('div'); ui.dataset.clickdeck = 'true';
+    const trigger = document.createElement('button'); ui.append(trigger); document.body.append(ui);
+    trigger.focus();
+    const original = document.documentElement.requestFullscreen;
+    document.documentElement.requestFullscreen = vi.fn().mockRejectedValue(new Error('Fullscreen unavailable'));
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    try {
+      await controller.enter();
+      expect(document.activeElement).not.toBe(trigger);
+      expect(document.documentElement.classList.contains('clickdeck-presenting')).toBe(true);
+      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.documentElement.classList.contains('clickdeck-presenting')).toBe(false);
+    } finally { controller.destroy(); document.documentElement.requestFullscreen = original; }
+  });
+
   it("adds staging classes and CSS variables on enter, updates on navigation, and cleans up on exit", async () => {
     const slides = Array.from(document.querySelectorAll<HTMLElement>(".slide"));
     document.body.style.background = "rgb(247, 242, 232)";
@@ -164,6 +227,32 @@ describe("createPresentationController", () => {
     // Calling next on last slide should exit
     controller.next();
     expect(document.documentElement.classList.contains("clickdeck-presenting")).toBe(false);
+  });
+
+  it.each(['transform', 'perspective', 'filter', 'opacity, transform'])('temporarily neutralizes will-change %s and restores inline styles exactly', async hint => {
+    const deck = document.createElement('main');
+    deck.setAttribute('style', `will-change: ${hint} !important; transition: transform 1s !important; color: red;`);
+    const before = deck.getAttribute('style');
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+    document.body.append(deck); deck.append(...slides);
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    try {
+      await controller.enter();
+      expect(deck.style.willChange).toBe('auto');
+      expect(deck.style.transition).toBe('none');
+      expect(deck.style.getPropertyPriority('will-change')).toBe('important');
+      controller.exit(); expect(deck.getAttribute('style')).toBe(before);
+    } finally { controller.destroy(); }
+  });
+
+  it('does not neutralize unrelated will-change hints', async () => {
+    const deck = document.createElement('main'); deck.style.willChange = 'opacity';
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+    document.body.append(deck); deck.append(...slides);
+    const before = deck.getAttribute('style');
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    try { await controller.enter(); expect(deck.getAttribute('style')).toBe(before); }
+    finally { controller.destroy(); }
   });
 
   it("temporarily neutralizes transformed deck ancestors during presentation", async () => {
@@ -476,6 +565,27 @@ describe("createPresentationController", () => {
 
     expect(wheelEvent.preventDefault).toHaveBeenCalled();
     expect(slides[1].classList.contains("clickdeck-presenting-slide")).toBe(true);
+  });
+
+  it("ignores plugin wheel, keyboard and touch without consuming page navigation", async () => {
+    const slides = Array.from(document.querySelectorAll<HTMLElement>('.slide'));
+    const ui = document.createElement('div');
+    ui.dataset.clickdeck = 'true';
+    const control = document.createElement('button'); ui.append(control); document.body.append(ui);
+    const controller = createPresentationController({ slides, logger: mockLogger });
+    await controller.enter();
+    try {
+      const wheel = new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true });
+      control.dispatchEvent(wheel);
+      expect(wheel.defaultPrevented).toBe(false);
+      control.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      control.dispatchEvent(new TouchEvent('touchstart', { touches: [{ clientX: 0, clientY: 100 } as Touch], bubbles: true }));
+      // Ending on the page must not reuse a gesture started in plugin UI.
+      document.dispatchEvent(new TouchEvent('touchend', { changedTouches: [{ clientX: 0, clientY: 0 } as Touch], bubbles: true }));
+      expect(slides[0].classList.contains('active')).toBe(true);
+      document.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true }));
+      expect(slides[1].classList.contains('active')).toBe(true);
+    } finally { controller.destroy(); }
   });
 
   it("intercepts touch events to navigate", async () => {

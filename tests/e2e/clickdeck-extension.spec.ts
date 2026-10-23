@@ -551,6 +551,90 @@ test.describe("ClickDeck core editing workflows", () => {
     await expect(page.locator("#clickdeck-root")).toBeVisible();
   });
 
+  test("presentation starts from the visible host page, not zero-sized hidden slides", async ({ page, presentationActivePrevUrl }) => {
+    await page.goto(presentationActivePrevUrl);
+    await page.addStyleTag({ content: '.slide:not(.active) { display: none; }' });
+    await page.evaluate(() => {
+      document.querySelector('#ap-slide-1')!.classList.remove('active');
+      document.querySelector('#ap-slide-2')!.classList.add('active');
+    });
+    await activateExtension(page);
+    await page.locator('[data-action="present"]').click();
+    await expect(page.locator('#ap-slide-2')).toHaveClass(/clickdeck-presenting-slide/);
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#ap-slide-3')).toHaveClass(/clickdeck-presenting-slide/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#ap-slide-3')).toHaveClass(/active/);
+    await page.locator('[data-action="present"]').click();
+    await expect(page.locator('#ap-slide-3')).toHaveClass(/clickdeck-presenting-slide/);
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.locator('#ap-slide-2')).toHaveClass(/clickdeck-presenting-slide/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).not.toHaveClass(/clickdeck-presenting/);
+  });
+
+  test("presentation centers slides inside a generic will-change ancestor and restores it", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await page.evaluate(() => {
+      document.body.innerHTML = '<main id="generic-wide" style="position:relative;width:700vw;display:flex;will-change:transform!important;transition:transform 2s!important"><section class="slide" style="width:100vw;height:100vh;flex:0 0 100vw">Generic first</section><section class="slide" style="width:100vw;height:100vh;flex:0 0 100vw">Generic second</section></main>';
+    });
+    const before = await page.locator('#generic-wide').getAttribute('style');
+    await activateExtension(page);
+    await page.locator('[data-action="present"]').click();
+    for (let i=0; i<2; i++) {
+      if (i) await page.keyboard.press('ArrowRight');
+      const box = await page.locator('.clickdeck-presenting-slide').boundingBox();
+      const width = await page.evaluate(() => innerWidth);
+      expect(Math.abs(box!.x + box!.width/2 - width/2)).toBeLessThan(2);
+      expect(box!.width).toBeGreaterThan(width*0.8);
+    }
+    await page.keyboard.press('Escape');
+    await expect(page.locator('html')).not.toHaveClass(/clickdeck-presenting/);
+    expect(await page.locator('#generic-wide').getAttribute('style')).toBe(before);
+  });
+
+  test("browse mode restores host navigation and review controls keep keys local", async ({ page, presentationActivePrevUrl }) => {
+    await page.goto(presentationActivePrevUrl);
+    await page.evaluate(() => {
+      // This presentation fixture originally has no clickable host navigation behavior.
+      // Keep its nav above its slides while installing a native navigation fixture.
+      (document.querySelector('.nav-dots') as HTMLElement).style.zIndex = '10';
+      const slides = Array.from(document.querySelectorAll('.slide'));
+      const go = (index: number) => slides.forEach((slide, i) => slide.classList.toggle('active', i === index));
+      document.querySelectorAll('.nav-dot').forEach((button, i) => button.addEventListener('click', () => go(i)));
+      window.addEventListener('keydown', event => {
+        if (event.key === 'ArrowRight') go((slides.findIndex(slide => slide.classList.contains('active')) + 1) % slides.length);
+      });
+    });
+    await activateExtension(page);
+    const heading = page.locator('#ap-slide-1 h1');
+    await heading.click();
+    await page.locator('[data-action="font-larger"]').click();
+    const font = await heading.evaluate(el => el.style.fontSize);
+    await page.locator('[data-internal-action="collapse"]').click();
+    await expect(heading).not.toHaveAttribute('contenteditable', 'true');
+    await expect(page.locator('[data-internal-action="restore"]')).toContainText(/Browsing|浏览中/);
+    await page.locator('.nav-dot').nth(1).click();
+    await expect(page.locator('#ap-slide-2')).toHaveClass(/active/);
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#ap-slide-3')).toHaveClass(/active/);
+    await page.locator('[data-internal-action="restore"]').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.clickdeck-panel')).not.toHaveClass(/--collapsed/);
+    await expect(page.locator('[data-action="undo"]')).toBeEnabled();
+    await expect(heading).toHaveCSS('font-size', font);
+    await page.locator('[data-action="team-collaboration"]').click();
+    await page.locator('[data-collab="current-page"]').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#ap-slide-3')).toHaveClass(/active/);
+    await page.locator('.nav-dot').nth(0).click();
+    await expect(page.locator('#ap-slide-1')).toHaveClass(/active/);
+    await page.locator('[data-collab="close"]').click();
+    await expect(page.locator('.clickdeck-panel')).not.toHaveClass(/--collapsed|--reviewing/);
+    await page.locator('.nav-dot').nth(1).click();
+    await expect(page.locator('#ap-slide-1')).toHaveClass(/active/);
+  });
+
   test("10. Move intent target box label and dashed styles", async ({ page, demoPageUrl }) => {
     await page.goto(demoPageUrl);
     await activateExtension(page);
@@ -882,7 +966,7 @@ test.describe("ClickDeck core editing workflows", () => {
 
     await page.locator("#selection-poster-blank").click({ force: true });
 
-    await expect(page.locator(".clickdeck-panel__hint")).toHaveText("Select an element on the page.");
+    await expect(page.locator(".clickdeck-panel__hint")).toHaveText("Click to edit. Collapse the editor to browse and use page navigation.");
     await expect(page.locator("#clickdeck-root .clickdeck-outline")).toBeHidden();
 
     const finalFontSize = await title.evaluate((element) => getComputedStyle(element).fontSize);
@@ -964,6 +1048,9 @@ test.describe("ClickDeck core editing workflows", () => {
   });
 
   test("18. Interaction dictionary filters 20 patterns and keeps demos usable on narrow screens", async ({ page, demoPageUrl }) => {
+    // This case tests looping animation. Do not inherit an OS preference that
+    // deliberately disables playback; reduced-motion behavior is tested separately.
+    await page.emulateMedia({ reducedMotion: "no-preference" });
     await page.goto(demoPageUrl);
     await activateExtension(page);
 
@@ -1003,10 +1090,35 @@ test.describe("ClickDeck core editing workflows", () => {
     const slider = library.locator("[data-demo-action='compare-slider']");
     await expect(slider).toBeVisible();
     expect(await library.locator("[data-demo-compare]").evaluate((element: HTMLElement) => element.style.width)).toBe("50%");
+    await page.evaluate(() => {
+      const state = window as unknown as { cdDemoEvents: unknown[] };
+      state.cdDemoEvents = [];
+      for (const type of ["mouseover", "mouseout", "click", "input"]) {
+        document.addEventListener(type, event => {
+          const target = event.target as HTMLElement;
+          if (!target.closest?.("[data-library-demo-stage]")) return;
+          const related = (event as MouseEvent).relatedTarget as HTMLElement | null;
+          if (state.cdDemoEvents.length < 32) state.cdDemoEvents.push({ type, trusted: event.isTrusted, target: target.tagName,
+            related: related?.tagName, relatedInside: Boolean(related?.closest?.("[data-library-demo-stage]")) });
+        }, true);
+      }
+    });
     await library.locator("[data-library-demo-stage]").hover();
-    await expect.poll(
-      () => library.locator("[data-demo-renderer='compare-slider']").getAttribute("data-preview-cycle")
-    ).toBe("1");
+    try {
+      await expect(library.locator("[data-library-demo-stage]")).toHaveAttribute("data-preview-playing", "true");
+      await expect.poll(
+        () => library.locator("[data-demo-renderer='compare-slider']").getAttribute("data-preview-cycle")
+      ).toBe("1");
+    } catch (error) {
+      const diagnostic = await page.evaluate(() => ({
+        reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        playing: document.querySelector("[data-library-demo-stage]")?.getAttribute("data-preview-playing"),
+        cycle: document.querySelector("[data-demo-renderer='compare-slider']")?.getAttribute("data-preview-cycle"),
+        events: (window as unknown as { cdDemoEvents: unknown[] }).cdDemoEvents
+      }));
+      await test.info().attach("demo-playback-state", { body: JSON.stringify(diagnostic), contentType: "application/json" });
+      throw error;
+    }
     await library.locator("[data-library-demo-stage]").click({ position: { x: 8, y: 8 } });
     await expect.poll(
       () => library.locator("[data-demo-compare]").evaluate((element: HTMLElement) => element.style.width)
@@ -1070,6 +1182,187 @@ test.describe("ClickDeck core editing workflows", () => {
 
     await draft.locator("button[data-action='save']").click();
     await expect(draft.locator(".clickdeck-intent-draft__saved-text")).toContainText("Filter Chips");
+  });
+
+  test("20. Private collaboration entry is secondary, explicit, and offline when unconfigured", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    const aiActions = page.locator("[data-section='ai-prompt'] [data-action]");
+    await expect(aiActions).toHaveCount(2);
+    await expect(aiActions.nth(0)).toHaveAttribute("data-action", "copy-ai-prompt");
+    await expect(aiActions.nth(1)).toHaveAttribute("data-action", "team-collaboration");
+
+    await aiActions.nth(1).click();
+    const modal = page.locator(".clickdeck-collab-modal");
+    await expect(modal).toBeVisible();
+    await expect(modal).toContainText("not configured for private collaboration");
+    await expect(modal).toContainText("48 hours");
+    await expect(modal.locator("[data-collab='manage']")).toBeDisabled();
+    await expect(modal.locator("form")).toHaveCount(0);
+    await expect(modal.locator("input")).toHaveCount(0);
+  });
+
+  test("automatically recovers source checking and reuses it only within the loaded page", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    const worker = page.context().serviceWorkers()[0] || await page.context().waitForEvent('serviceworker');
+    await worker.evaluate(url => {
+      const probe = { calls: 0, fail: true };
+      (globalThis as typeof globalThis & { clickdeckSourceProbe: typeof probe }).clickdeckSourceProbe = probe;
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (input, init) => {
+        if (String(input) === url) {
+          probe.calls++;
+          if (probe.fail) throw new TypeError('Simulated source fetch failure');
+        }
+        return originalFetch(input, init);
+      };
+    }, demoPageUrl);
+    const readCount = () => worker.evaluate(() => (globalThis as typeof globalThis & { clickdeckSourceProbe: { calls: number } }).clickdeckSourceProbe.calls);
+    await activateExtension(page);
+    await page.locator('[data-action="team-collaboration"]').click();
+    await expect(page.locator('.clickdeck-collab-modal')).toContainText('could not fetch the source');
+    expect(await readCount()).toBe(1);
+    await worker.evaluate(() => { (globalThis as typeof globalThis & { clickdeckSourceProbe: { fail: boolean } }).clickdeckSourceProbe.fail = false; });
+    await page.locator('[data-collab="refresh"]').click();
+    await expect(page.locator('.clickdeck-collab-modal__busy')).toHaveCount(0);
+    await expect(page.locator('[data-collab="verify-source"]')).toHaveCount(0);
+    await expect(page.locator('.clickdeck-collab-modal')).not.toContainText('could not fetch the source');
+    expect(await readCount()).toBe(2);
+    await page.locator('[data-collab="close"]').click();
+    await page.locator('[data-action="team-collaboration"]').click();
+    await expect(page.locator('.clickdeck-collab-modal__busy')).toHaveCount(0);
+    expect(await readCount()).toBe(2);
+    await page.keyboard.press('Alt+Shift+C');
+    await expect(page.locator('#clickdeck-root')).toBeHidden();
+    await activateExtension(page);
+    await page.locator('[data-action="team-collaboration"]').click();
+    await expect(page.locator('.clickdeck-collab-modal__busy')).toHaveCount(0);
+    expect(await readCount()).toBe(2);
+    await page.reload();
+    await activateExtension(page);
+    await page.locator('[data-action="team-collaboration"]').click();
+    await expect(page.locator('.clickdeck-collab-modal__busy')).toHaveCount(0);
+    await expect.poll(readCount).toBe(3);
+  });
+
+  test("28. Page scripts cannot approve collaboration; trusted windows expire with their source", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+    await page.locator("[data-action='team-collaboration']").click();
+    // Initial verification finishes asynchronously and re-renders the panel.
+    // Wait for its final state BEFORE the deliberate test-only enable below;
+    // otherwise that re-render restores disabled and the real click races it.
+    await expect(page.locator("[data-collab-source]")).toContainText("Original version verified");
+    await expect(page.getByText("This build is not configured for private collaboration.", { exact: true })).toBeVisible();
+    const manage = page.locator("[data-collab='manage']");
+    // Deliberately bypass only the unconfigured UI disable to exercise the actual
+    // browser isolation and click guards. No remote service is configured.
+    await manage.evaluate(el => { (el as HTMLButtonElement).disabled = false; (el as HTMLButtonElement).click(); });
+    await page.waitForTimeout(250);
+    expect(page.context().pages().filter(p => p.url().includes("collaboration.html"))).toHaveLength(0);
+    const popupPromise = page.context().waitForEvent("page");
+    await manage.click();
+    const popup = await popupPromise;
+    await popup.waitForLoadState();
+    await expect(popup.locator("form")).toBeVisible();
+    await expect(popup.locator("input[name='consent']")).not.toBeChecked();
+    await popup.locator("[name='title']").fill("test draft");
+    await popup.locator("[name='name']").fill("A");
+    await popup.locator("input[name='consent']").check();
+    await expect(popup.locator("button[value='create']")).toBeDisabled();
+    // Creation now requires login. Exercise the same trusted-window boundary
+    // through the enabled login action, without bypassing the creation gate.
+    const login = popup.getByRole('button', { name: '使用 Google 登录以继续', exact: true });
+    await expect(popup.locator("button[value='create']")).toBeHidden();
+    await login.click();
+    await expect(popup.locator("#status")).not.toBeEmpty();
+    await expect(popup.locator("[name='title']")).toHaveValue("test draft");
+    await expect(popup.locator("[name='name']")).toHaveValue("A");
+    const secureUrl = popup.url();
+    // The host cannot embed/read the privileged UI (not web-accessible).
+    expect(await page.evaluate(async url => { try { await fetch(url); return true; } catch { return false; } }, secureUrl)).toBe(false);
+    await page.reload();
+    await login.click();
+    await expect(popup.locator("#status")).toContainText("窗口已失效");
+    await popup.close();
+  });
+
+  test("21. Visible image intent remains visible when Move target is dragged", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl);
+    await activateExtension(page);
+
+    const imageBox = await page.locator("#test-image").boundingBox();
+    expect(imageBox).toBeTruthy();
+
+    await page.locator("[data-action='add-intent']").click();
+    await page.mouse.move(imageBox!.x + 4, imageBox!.y + 4);
+    await page.mouse.down();
+    await page.mouse.move(imageBox!.x + imageBox!.width - 4, imageBox!.y + imageBox!.height - 4);
+    await page.mouse.up();
+
+    const source = page.locator(".clickdeck-intent-region-marker").first();
+    await expect(source).toBeVisible();
+    await page.locator(".clickdeck-intent-draft__target-btn").click();
+    await expect(source).toBeVisible();
+    await expect(source.locator(".clickdeck-intent-region-badge")).toHaveText("1A");
+
+    const target = page.locator(".clickdeck-ghost-preview");
+    await expect(target).toBeVisible();
+    const before = await target.boundingBox();
+    expect(before).toBeTruthy();
+    await page.mouse.move(before!.x + 12, before!.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(before!.x + 92, before!.y + 72);
+    await page.mouse.up();
+    const after = await target.boundingBox();
+    expect(after).toBeTruthy();
+    expect(after!.x).toBeGreaterThan(before!.x + 30);
+    await expect(source).toBeVisible();
+  });
+
+  test("22. Hidden generic container cannot swallow an intent marker", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl.replace("/demo-page.html", "/intent-hidden-container.html"));
+    await activateExtension(page);
+
+    await page.locator("[data-action='add-intent']").click();
+    await page.mouse.move(90, 100);
+    await page.mouse.down();
+    await page.mouse.move(360, 245);
+    await page.mouse.up();
+
+    const marker = page.locator(".clickdeck-intent-region-marker").first();
+    await expect(marker).toBeVisible();
+    expect(await marker.evaluate(element => element.parentElement?.classList.contains("ghost-container"))).toBe(false);
+  });
+
+  test("23. Intent marker follows a nonstandard transform page", async ({ page, demoPageUrl }) => {
+    await page.goto(demoPageUrl.replace("/demo-page.html", "/intent-transform-pages.html"));
+    await activateExtension(page);
+
+    await page.locator("[data-action='add-intent']").click();
+    await page.mouse.move(85, 85);
+    await page.mouse.down();
+    await page.mouse.move(330, 210);
+    await page.mouse.up();
+
+    const marker = page.locator(".clickdeck-intent-region-marker").first();
+    await expect(marker).toBeVisible();
+    expect(await marker.evaluate(element => element.parentElement?.id || element.parentElement?.className || "body")).toBe("page-one-target");
+    const panel = page.locator(".clickdeck-panel");
+    await panel.locator("[data-internal-action='collapse']").click();
+    await page.locator("#next").click();
+    await page.waitForTimeout(180);
+    await expect(page.getByRole("heading", { name: "Page 2" })).toBeVisible();
+    const movedMarkerBox = await marker.boundingBox();
+    expect(movedMarkerBox).toBeTruthy();
+    expect(movedMarkerBox!.x + movedMarkerBox!.width).toBeLessThanOrEqual(0);
+
+    await page.locator("#previous").click();
+    await page.waitForTimeout(180);
+    const restoredMarkerBox = await marker.boundingBox();
+    expect(restoredMarkerBox).toBeTruthy();
+    expect(restoredMarkerBox!.x).toBeGreaterThanOrEqual(0);
   });
 
 });

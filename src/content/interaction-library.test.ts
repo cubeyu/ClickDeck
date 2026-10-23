@@ -210,11 +210,38 @@ describe("createInteractionLibrary", () => {
     }
   });
 
+  it("respects reduced motion without disabling manual comparison controls", () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
+    const library = createInteractionLibrary("en");
+    try {
+      document.body.appendChild(library.element);
+      library.element.querySelector<HTMLButtonElement>("[data-library-pattern='compare-slider']")?.click();
+      const stage = library.element.querySelector<HTMLElement>("[data-library-demo-stage]");
+      stage?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+      stage?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      vi.advanceTimersByTime(5000);
+      expect(library.element.querySelector("[data-demo-renderer='compare-slider']")?.getAttribute("data-preview-cycle")).toBeNull();
+      expect(stage?.getAttribute("data-preview-playing")).toBe("false");
+      const slider = library.element.querySelector<HTMLInputElement>("[data-demo-action='compare-slider']")!;
+      slider.value = "72";
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      expect(library.element.querySelector<HTMLElement>("[data-demo-compare]")?.style.width).toBe("72%");
+    } finally {
+      library.destroy();
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
+  });
+
   it("supports click and keyboard playback fallbacks on the right stage", () => {
     vi.useFakeTimers();
     try {
       const library = createInteractionLibrary("en");
-      document.body.appendChild(library.element);
+      const isolatedRoot = document.createElement('div');
+      isolatedRoot.addEventListener('keydown', event => event.stopPropagation());
+      document.body.appendChild(isolatedRoot);
+      isolatedRoot.append(library.element);
       library.element.querySelector<HTMLButtonElement>("[data-library-pattern='drawer']")?.click();
 
       const clickStage = library.element.querySelector<HTMLElement>("[data-library-demo-stage]");
@@ -241,6 +268,9 @@ describe("createInteractionLibrary", () => {
       vi.advanceTimersByTime(2000);
       expect(library.element.querySelector("[data-demo-drawer]")?.classList.contains("is-open")).toBe(false);
 
+      keyboardStage?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(library.element.isConnected).toBe(false);
+      isolatedRoot.remove();
       library.destroy();
     } finally {
       vi.useRealTimers();

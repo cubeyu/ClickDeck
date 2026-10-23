@@ -78,7 +78,11 @@ Load the built `dist/` directory in Chrome or Edge via the extensions page with 
 
 ClickDeck runs locally in the browser. It does not upload page content or diagnostics by default. The diagnostics button copies recent local logs to your clipboard so you can choose what to share in an issue.
 
+Optional configured cloud collaboration contacts Supabase when you create, join or refresh a project. Confirming a submission shares selected structured proposals, which may contain text excerpts and before/after values, with authorized project members. It does not automatically upload the complete HTML document or screenshots. See [Privacy Policy](privacy-policy.html) and [Public release boundary](PUBLIC_RELEASE.md). Public client connection settings are not administrator credentials; access must be enforced by the server.
+
 ## Known Limitations
+
+- Invited collaborators do not need Google sign-in. If the first registration commits but its credentials are completely lost, automatic recovery is not guaranteed and a member slot may remain occupied. ClickDeck pauses repeated registration. Keep extension data and contact the maintainer through [GitHub Issues](https://github.com/ningsiii/ClickDeck/issues), sharing only the extension/browser versions, time and error code. Never post invitations, tokens or private HTML. Manual assistance does not guarantee identity recovery or immediate slot release; local editing and export remain available.
 
 - Legacy browser-print PDF export is no longer the primary route. Use long image or image-based PDF export for higher visual fidelity; complex pages may still need manual review.
 - Complex websites may have CSS or script behavior that affects editing/export quality.
@@ -177,7 +181,11 @@ npm run e2e
 
 ClickDeck 在浏览器本地运行。默认不会上传页面内容或诊断信息。诊断按钮只会把最近本地日志复制到剪贴板，由你决定是否粘贴到 issue。
 
+可选的云端协作在创建、加入或刷新项目时联系 Supabase；核对并确认提交后，选中的结构化提案会分享给授权成员，可能包含原文片段和修改前后值。不自动上传完整 HTML 或页面截图。详见[隐私政策](privacy-policy.html)与[公开发布边界](PUBLIC_RELEASE.md)。客户端公开连接配置不是管理员权限，数据访问必须由服务端验证。
+
 ## 已知限制
+
+- 受邀协作者无需 Google 登录。若首次注册已成功但凭据彻底丢失，不能保证自动恢复，成员名额也可能仍被占用。ClickDeck 会暂停重复注册；请保留扩展数据，通过 [GitHub Issues](https://github.com/ningsiii/ClickDeck/issues) 联系维护者，仅提供扩展/浏览器版本、发生时间和错误码，不要公开邀请码、令牌或私人 HTML。人工协助不保证恢复原身份或立即释放名额，本地编辑和导出仍可使用。
 
 - 旧版浏览器打印 PDF 不再是主要路线。建议优先使用长图或图片型 PDF 导出；复杂页面仍建议人工检查导出效果。
 - 复杂网站的 CSS 或脚本可能影响编辑和导出质量。

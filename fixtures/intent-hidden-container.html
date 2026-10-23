@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Intent hidden container fixture</title>
+    <style>
+      html, body { margin: 0; height: 100%; }
+      main { height: 100%; padding: 50px; box-sizing: border-box; background: #eee; }
+      .visible-card { position: absolute; left: 70px; top: 80px; width: 320px; height: 190px; background: #fff; border: 2px solid #333; }
+      .ghost-container { visibility: hidden; position: absolute; left: 60px; top: 70px; width: 360px; height: 230px; }
+    </style>
+  </head>
+  <body>
+    <main id="visible-main">
+      <div class="visible-card">Visible content</div>
+      <div class="ghost-container">Hidden structural container</div>
+    </main>
+  </body>
+</html>

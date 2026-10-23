@@ -1,73 +1,9 @@
-# Dependencies
 node_modules/
-
-# Build outputs
 dist/
-build/
-coverage/
-.vite/
-playwright-report/
-test-results/
-test-diagnostic/
-fixtures/
-
-# Logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Environment
+release/
+*.zip
 .env
 .env.*
 !.env.example
-
-# OS / editor
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-
-# Temporary files
-tmp/
-temp/
-scratch/
-nul
-*.zip
-*.tar
-release/
-RELEASE_1.2.1.md
-RELEASE_1.3.1.md
-RELEASE_1.3.2.md
-test-extension.cjs
-
-# Local/internal planning docs
-AGENTS.md
-docs/Chrome插件*
-docs/chrome插件*
-docs/PRD*
-docs/RELEASE_CHECKLIST.md
-docs/OUTREACH_PLAYBOOK.md
-docs/豆包.md
-docs/工程*
-docs/执行*
-docs/assets/logo*-original.png
-/scripts
-!/scripts/
-/scripts/*
-!/scripts/capture-demo.mjs
-!/scripts/package-release.mjs
-/chrome-store-assets
-/chrome-store-screenshots
-tools/
-/.claude
-feedback
-docs
-!docs/
-docs/*
-!docs/assets/
-docs/assets/*
-!docs/assets/alipay.png
-!docs/assets/wechat.png
-fixtures
+test-results/
+playwright-report/

@@ -9,7 +9,7 @@ describe("getPanelLabels", () => {
       }
     });
 
-    expect(getPanelLabels().selectHint).toBe("选择页面中的元素。");
+    expect(getPanelLabels().selectHint).toBe("点击页面可编辑；收起编辑器后可正常浏览、翻页。");
 
     vi.unstubAllGlobals();
   });
@@ -21,7 +21,7 @@ describe("getPanelLabels", () => {
       }
     });
 
-    expect(getPanelLabels().selectHint).toBe("Select an element on the page.");
+    expect(getPanelLabels().selectHint).toBe("Click to edit. Collapse the editor to browse and use page navigation.");
 
     vi.unstubAllGlobals();
   });

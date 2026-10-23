@@ -43,6 +43,9 @@ import { collectVisualUnits, findVisualUnitsInBox, type RectLike } from "./visua
 import { buildRegionContext, summarizeVisualUnit, type GuideCandidate, type RegionContext, type ActiveAlignmentGuide } from "./region-context";
 import { createMoveTargetBox, type MoveTargetBox } from "./intent-ghost";
 import { getComplexElementKind, getEditableSvgTextTarget, getSvgTextEditState } from "./complex-elements";
+import { createSharedSubmission } from "../shared/collaboration-contract";
+import { buildTeamPrompt } from "../export/team-prompt";
+import { createCollaborationPanel } from "./collaboration-panel";
 
 export type ClickDeckController = {
   toggle: () => void;
@@ -50,6 +53,7 @@ export type ClickDeckController = {
 };
 
 type IntentDraftState = {
+  collaborationInput?: IntentPromptInput;
   operation: IntentOperation;
   context: RegionContext;
   targetContext?: RegionContext;
@@ -72,6 +76,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   let intentOverlay: IntentOverlay | null = null;
   let intentDraftPanel: IntentDraftPanel | null = null;
   let intentDrafts: IntentDraftState[] = [];
+  let collaborationPanel: ReturnType<typeof createCollaborationPanel> | null = null;
+  let collaborationAnnotations = false;
+  let intentEditorOpen = false;
+  let initialPageFingerprint = "";
   let moveTargetBox: MoveTargetBox | null = null;
   let presentationController: PresentationController | null = null;
   let editingElement: HTMLElement | null = null;
@@ -155,11 +163,13 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
     marker.dataset.clickdeck = "true";
     marker.dataset.intentColor = color;
     marker.className = "clickdeck-intent-region-marker";
+    marker.hidden = collaborationAnnotations;
 
     const anchorElement = findIntentAnchorElement(region);
     const relativeBox = anchorElement ? region.relativeBox : undefined;
     const box = relativeBox ?? region.documentBox;
     const useRelativeBox = Boolean(anchorElement && relativeBox);
+    const missingStoredAnchor = region.anchor.kind !== "document" && !anchorElement;
 
     if (anchorElement && window.getComputedStyle(anchorElement).position === "static") {
       anchorElement.style.position = "relative";
@@ -179,6 +189,10 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       zIndex: "2147483645",
       transition: "box-shadow 0.2s ease, background-color 0.2s ease"
     });
+
+    if (missingStoredAnchor) {
+      marker.style.display = "none";
+    }
 
     if (label) {
       const badge = document.createElement("span");
@@ -246,6 +260,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function refreshIntentDraftMarkers(): void {
+    collaborationPanel?.refreshDrafts();
     const visualPlan = buildIntentDraftVisualPlan(
       intentDrafts.map(draft => ({
         id: draft.operation.id,
@@ -462,11 +477,12 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function isPanelCollapsed(): boolean {
-    return panel?.element.classList.contains("clickdeck-panel--collapsed") ?? false;
+    return Boolean(panel?.element.classList.contains("clickdeck-panel--collapsed") || panel?.element.classList.contains("clickdeck-panel--reviewing"));
   }
 
   function syncCollapsedBrowsingMode(): void {
     if (isPanelCollapsed()) {
+      stopEditing();
       hoveredElement = null;
     }
     updateOutline();
@@ -474,6 +490,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
   function refreshHistoryButtons(): void {
     panel?.setHistoryAvailability(history.undoStack.length > 0, history.redoStack.length > 0);
+    collaborationPanel?.refreshDrafts();
   }
 
   function popPatchGroup(stack: EditorPatch[]): EditorPatch[] {
@@ -600,6 +617,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function handleClick(event: MouseEvent): void {
+    if (!(event.target instanceof Element && event.target.closest(".clickdeck-collab-overlay"))) document.dispatchEvent(new Event("clickdeck:before-edit"));
     if (!active || intentOverlay || isPanelCollapsed()) {
       return;
     }
@@ -1230,6 +1248,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function handlePanelAction(action: PanelAction): void {
+    document.dispatchEvent(new Event("clickdeck:before-edit"));
     // Commit any active text editing before handling other actions
     stopEditing();
 
@@ -1246,6 +1265,60 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
 
     if (action === "copy-ai-prompt") {
       void showAiEditPrompt();
+      return;
+    }
+
+    if (action === "team-collaboration") {
+      if (!panel) return;
+      intentEditorOpen = false;
+      clearSelection("team review");
+      collaborationPanel ??= createCollaborationPanel({
+        host: panel.element,
+        pageFingerprint: Promise.resolve(initialPageFingerprint),
+        onSourceVerified: fingerprint => { initialPageFingerprint = fingerprint; },
+        sourceVerification: true,
+        onAnnotationsChange: (active) => {
+          const wasActive = collaborationAnnotations;
+          collaborationAnnotations = active && !intentEditorOpen;
+          intentDrafts.forEach(draft => { draft.sourceMarker.hidden = collaborationAnnotations; if (draft.targetMarker) draft.targetMarker.hidden = collaborationAnnotations; });
+          if (collaborationAnnotations) intentDraftPanel?.hide();
+          else if (wasActive) intentDraftPanel?.show();
+        },
+        onEditIntent: (id) => {
+          intentEditorOpen = true;
+          collaborationAnnotations = false;
+          intentDrafts.forEach(draft => { draft.sourceMarker.hidden = false; if (draft.targetMarker) draft.targetMarker.hidden = false; });
+          intentDraftPanel?.editDraft(id);
+        },
+        getTasks: (participation) => {
+          const result = createSharedSubmission({
+            id: crypto.randomUUID(),
+            projectId: participation.projectId,
+            memberId: participation.memberId,
+            memberDisplayName: "Team member",
+            pageFingerprint: "",
+            patches: serializePatches(getEffectivePatches()),
+            intents: intentDrafts.flatMap(draft => draft.collaborationInput && (draft.collaborationInput.operation.action !== "move" || draft.collaborationInput.targetContext) ? [draft.collaborationInput] : []),
+            submittedAt: Date.now()
+          });
+          return result.ok ? { ok: true, tasks: result.submission.tasks } : { ok: false, error: result.reason };
+        },
+        onTeamPrompt: (snapshot) => {
+          const result = buildTeamPrompt(snapshot);
+          if (!result.ok) {
+            logger.warn("Unable to build Team Prompt", result);
+            return;
+          }
+          panel?.showPromptPreview({
+            title: "ClickDeck Team Prompt",
+            promptEn: result.prompt,
+            promptZh: result.prompt,
+            hasMediaReplacement: false,
+            onCopy: (value) => void navigator.clipboard.writeText(value)
+          });
+        }
+      });
+      void collaborationPanel.open();
       return;
     }
 
@@ -1578,6 +1651,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             intentDrafts.map(draft => draft.color),
             intentColors
           );
+          intentEditorOpen = true;
           const sourceMarker = createIntentMarker(region, color, "");
           
           intentDrafts.push({ operation, context, color, sourceMarker });
@@ -1587,12 +1661,14 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
             intentDraftPanel = createIntentDraftPanel(
               (op) => {
                 // saved
+                intentEditorOpen = false;
                 const idx = intentDrafts.findIndex(d => d.operation.id === op.id);
                 if (idx !== -1) {
                   if (op.action === "move" && intentDrafts[idx].targetContext) {
                     op.target = intentDrafts[idx].targetContext.region;
                   }
                   intentDrafts[idx].operation = op;
+                  collaborationPanel?.refreshDrafts();
                   
                   if (moveTargetBox && op.action === "move") {
                     moveTargetBox.destroy();
@@ -1607,10 +1683,19 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
                     intentDrafts[idx].targetMarker = undefined;
                     intentDrafts[idx].targetContext = undefined;
                   }
+                  const draft = intentDrafts[idx];
+                  // Only an explicit local Save replaces the team's pending request.
+                  // Geometry/wording still being edited must not leak into a submission.
+                  draft.collaborationInput = {
+                    operation: structuredClone(draft.operation),
+                    sourceContext: { ...draft.context, region: structuredClone(draft.context.region) },
+                    targetContext: draft.targetContext ? { ...draft.targetContext, region: structuredClone(draft.targetContext.region) } : undefined
+                  };
                 }
               },
               (opId) => {
                 // canceled
+                intentEditorOpen = false;
                 const draft = intentDrafts.find(d => d.operation.id === opId);
                 if (draft) removeIntentDraftMarkers(draft);
                 intentDrafts = intentDrafts.filter(d => d.operation.id !== opId);
@@ -1625,6 +1710,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
               },
               (opId) => {
                 // deleted
+                intentEditorOpen = false;
                 const draft = intentDrafts.find(d => d.operation.id === opId);
                 if (draft) removeIntentDraftMarkers(draft);
                 intentDrafts = intentDrafts.filter(d => d.operation.id !== opId);
@@ -1639,6 +1725,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
               },
               (op) => {
                 // highlight source
+                intentEditorOpen = true;
                 const docBox = op.source.documentBox;
                 window.scrollTo({
                   top: docBox.top - window.innerHeight / 2 + docBox.height / 2,
@@ -1826,6 +1913,7 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
   }
 
   function handleHistoryShortcut(event: KeyboardEvent): void {
+    document.dispatchEvent(new Event("clickdeck:before-edit"));
     if (!active || !event.ctrlKey || event.altKey || event.metaKey || event.code !== "KeyZ") {
       return;
     }
@@ -1921,6 +2009,9 @@ export function createController(logger: ClickDeckLogger, rootId: string): Click
       visibilityCheckInterval = null;
     }
 
+    collaborationPanel?.destroy();
+    collaborationPanel = null;
+    intentEditorOpen = false;
     panel?.destroy();
     panel = null;
     overlay?.destroy();

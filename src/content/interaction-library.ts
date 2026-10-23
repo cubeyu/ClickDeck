@@ -1223,7 +1223,7 @@ export function createInteractionLibrary(
   const close = (): void => {
     clearPreviewTimers();
     clearCopyFeedbackTimer();
-    document.removeEventListener("keydown", handleKeydown);
+    document.removeEventListener("keydown", handleOutsideKeydown);
     element.remove();
   };
 
@@ -1568,6 +1568,10 @@ export function createInteractionLibrary(
     }
   }
 
+  function handleOutsideKeydown(event: KeyboardEvent): void {
+    if (event.key === "Escape" && !element.contains(event.target as Node)) close();
+  }
+
   const handleDemoStageEnter = (event: MouseEvent): void => {
     const target = event.target as HTMLElement;
     const stage = target.closest<HTMLElement>("[data-library-demo-stage]");
@@ -1590,7 +1594,8 @@ export function createInteractionLibrary(
   element.addEventListener("input", handleInput);
   element.addEventListener("mouseover", handleDemoStageEnter);
   element.addEventListener("mouseout", handleDemoStageLeave);
-  document.addEventListener("keydown", handleKeydown);
+  element.addEventListener("keydown", handleKeydown);
+  document.addEventListener("keydown", handleOutsideKeydown);
   render();
 
   return {

@@ -9,6 +9,7 @@ export type PanelAction =
   | "close"
   | "copy-diagnostics"
   | "copy-ai-prompt"
+  | "team-collaboration"
   | "export-html"
   | "export-image-pdf-long"
   | "export-image-pdf-a4"
@@ -26,6 +27,7 @@ export type PanelAction =
   | `color:${string}`;
 
 export type PromptPreviewOptions = {
+  title?: string;
   promptEn: string;
   promptZh: string;
   hasMediaReplacement: boolean;
@@ -95,15 +97,15 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
   element.className = "clickdeck-panel";
   element.dataset.clickdeck = "true";
   element.innerHTML = `
-    <div class="clickdeck-panel__floating-button" data-internal-action="restore" title="${labels.restorePanel}" aria-label="${labels.restorePanel}">
+    <div class="clickdeck-panel__floating-button" role="button" tabindex="0" data-internal-action="restore" title="${labels.restorePanel}" aria-label="${labels.restorePanel}">
       <img src="${collapsedLogoUrl}" alt="ClickDeck" />
+      <span>${getPanelLanguage() === "zh" ? "浏览中" : "Browsing"}</span>
     </div>
     <div class="clickdeck-panel__content-wrapper">
       <div class="clickdeck-panel__header">
         <span class="clickdeck-panel__title">
           <img class="clickdeck-panel__logo" src="${panelLogoUrl}" alt="" />
-          <span>ClickDeck</span>
-          <span class="clickdeck-panel__status">${labels.active}</span>
+          <span class="clickdeck-panel__brand-meta"><span>ClickDeck</span><span class="clickdeck-panel__status">${labels.active}</span></span>
         </span>
         <span class="clickdeck-panel__header-actions">
           <button class="clickdeck-button clickdeck-button--icon" data-internal-action="transparency" type="button" aria-label="${labels.transparency}" title="${labels.transparency}">◐</button>
@@ -259,6 +261,7 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
       <div class="clickdeck-panel__section-title">${labels.aiPromptSection}</div>
       <div class="clickdeck-panel__group" style="grid-template-columns: 1fr;">
         ${buttonMarkup("copy-ai-prompt", labels.copyAiPrompt)}
+        ${buttonMarkup("team-collaboration", labels.teamCollaboration, false, labels.teamCollaborationTooltip, "clickdeck-button--secondary")}
       </div>
     </div>
 
@@ -295,7 +298,7 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
       </div>
     </div>
     <div class="clickdeck-panel__footer">
-      <span>v1.3.6</span>
+      <span>v1.3.7</span>
       <a href="https://github.com/ningsiii/ClickDeck/issues" target="_blank" rel="noopener noreferrer">Feedback</a>
       <a href="https://github.com/ningsiii/ClickDeck" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>
@@ -341,6 +344,14 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
     }
 
     onAction(button.dataset.action as PanelAction);
+  });
+
+  element.querySelector<HTMLElement>('[data-internal-action="restore"]')?.addEventListener("keydown", event => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    element.classList.remove("clickdeck-panel--collapsed");
+    options.onCollapsedChange?.(false);
+    emitLayoutChange();
   });
 
   const colorPicker = element.querySelector<HTMLInputElement>(".clickdeck-color-picker");
@@ -472,6 +483,7 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
       "close",
       "copy-diagnostics",
       "copy-ai-prompt",
+      "team-collaboration",
       "ask-gemini-flow",
       "ask-gemini-focus",
       "ask-gemini-interaction",
@@ -580,9 +592,9 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
         const promptNote = currentLang === "zh" ? labels.promptChineseReferenceNote : labels.promptEnglishPrimaryNote;
         
         overlay.innerHTML = `
-          <div class="clickdeck-prompt-modal">
+          <div class="clickdeck-prompt-modal" role="dialog" aria-modal="${!overlay.classList.contains("clickdeck-prompt-overlay--inline")}" aria-label="${escapeHtml(options.title ?? labels.promptPreviewTitle)}">
             <div class="clickdeck-prompt-modal__header">
-              <span class="clickdeck-prompt-modal__title">${labels.promptPreviewTitle}</span>
+              <span class="clickdeck-prompt-modal__title">${escapeHtml(options.title ?? labels.promptPreviewTitle)}</span>
               <div class="clickdeck-prompt-modal__lang">
                 <button class="clickdeck-button${currentLang === "en" ? " clickdeck-button--active" : ""}" data-lang="en" type="button">${labels.promptLangEn}</button>
                 <button class="clickdeck-button${currentLang === "zh" ? " clickdeck-button--active" : ""}" data-lang="zh" type="button">${labels.promptLangZh}</button>
@@ -590,10 +602,10 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
             </div>
             <div class="clickdeck-prompt-modal__note">${promptNote}</div>
             ${options.hasMediaReplacement ? `<div class="clickdeck-prompt-modal__warning">${labels.promptMediaUIReminder}</div>` : ""}
-            <textarea class="clickdeck-prompt-modal__textarea" spellcheck="false">${promptText}</textarea>
+            <textarea class="clickdeck-prompt-modal__textarea" spellcheck="false">${escapeHtml(promptText)}</textarea>
             <div class="clickdeck-prompt-modal__footer">
               <button class="clickdeck-button clickdeck-button--primary" data-prompt-action="copy" type="button">${labels.promptCopy}</button>
-              <button class="clickdeck-button" data-prompt-action="close" type="button">${labels.promptClose}</button>
+              <button class="clickdeck-button" data-prompt-action="close" type="button">${overlay.classList.contains("clickdeck-prompt-overlay--inline") ? (getPanelLanguage() === "zh" ? "返回建议" : "Back to suggestions") : labels.promptClose}</button>
             </div>
           </div>
         `;
@@ -637,6 +649,15 @@ export function createPanel(onAction: (action: PanelAction) => void, options: Pa
 
       render();
       element.appendChild(overlay);
+      overlay.querySelector("textarea")?.focus();
+      overlay.addEventListener("keydown", event => {
+        if (event.key === "Escape") { event.preventDefault(); overlay.remove(); return; }
+        if (event.key !== "Tab") return;
+        const controls = Array.from(overlay.querySelectorAll<HTMLElement>("button, textarea"));
+        const first = controls[0], last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      });
     },
     showSavedEditsNotice: (options: SavedEditsNoticeOptions) => {
       let notice = element.querySelector(".clickdeck-notice");

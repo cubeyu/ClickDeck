@@ -11,6 +11,7 @@ export type IntentDraftPanel = {
   addDraft: (operation: IntentOperation, color?: string) => void;
   hide: () => void;
   show: () => void;
+  editDraft: (id: string) => boolean;
   setAnchorLayout: (layout: PanelLayout) => void;
 };
 
@@ -39,6 +40,7 @@ export function createIntentDraftPanel(
         <span class="clickdeck-intent-draft__sheet-title">${labels.intentSection}</span>
         <button class="clickdeck-button clickdeck-button--icon clickdeck-intent-draft__collapse" type="button" aria-label="${labels.collapse}" title="${labels.collapse}">⇤</button>
       </div>
+      <p class="clickdeck-intent-draft__status">${getPanelLanguage() === "zh" ? "保存为本次会话的意见；不执行移动或删除，不自动提交团队。刷新前请提交或导出。" : "Saves a request for this session, without moving/deleting or auto-submitting. Submit or export before reloading."}</p>
     </div>
   `;
 
@@ -319,6 +321,13 @@ export function createIntentDraftPanel(
         updateContainerVisibility();
       }
     },
+    editDraft: (id) => {
+      const card = cards.get(id);
+      if (!card) return false;
+      manuallyHidden = false; expanded = true; updateContainerVisibility();
+      card.querySelector<HTMLElement>(".clickdeck-intent-draft__saved")?.click();
+      return true;
+    },
     setAnchorLayout: (layout) => {
       currentLayout = layout;
       updateContainerVisibility();
@@ -358,6 +367,7 @@ function injectBaseStyles(): void {
       justify-content: center;
       min-height: 96px;
     }
+    .clickdeck-intent-draft__status { margin: 8px 10px; color: #64736a; font: 400 11px/1.5 system-ui, sans-serif; }
     .clickdeck-intent-draft--left .clickdeck-intent-draft__rail {
       order: 2;
       border-left: none;

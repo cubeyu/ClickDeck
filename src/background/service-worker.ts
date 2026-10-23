@@ -1,5 +1,12 @@
 import type { SourceLocationTarget } from "../shared/messages";
 import { fetchAndResolveSourceLocations } from "../export/source-location";
+import { createCollaborationClient } from "./collaboration-client";
+import { createCollaborationSecurity, isSecureCollaborationSender } from "./collaboration-security";
+import { readSourceFingerprint } from "./source-fingerprint";
+import { createGoogleOAuthFlow } from './collaboration-oauth';
+import { getCollaborationConfig } from '../shared/collaboration-config';
+import { collaborationProtocolOptions } from '../shared/collaboration-protocol';
+import { createPrivateCollaborationStorage } from './private-collaboration-storage';
 
 const DEFAULT_ACTION_TITLE = "Toggle ClickDeck";
 // Keep these constants local so Vite does not create a shared ESM chunk for the
@@ -7,8 +14,29 @@ const DEFAULT_ACTION_TITLE = "Toggle ClickDeck";
 const CLICKDECK_TOGGLE_MESSAGE = "CLICKDECK_TOGGLE";
 const CLICKDECK_CAPTURE_VISIBLE_TAB = "CLICKDECK_CAPTURE_VISIBLE_TAB";
 const CLICKDECK_RESOLVE_SOURCE_LOCATIONS = "CLICKDECK_RESOLVE_SOURCE_LOCATIONS";
+const CLICKDECK_COLLABORATION_REQUEST = "CLICKDECK_COLLABORATION_REQUEST";
 const FILE_ACCESS_HELP = "ClickDeck needs file access for local HTML. Open chrome://extensions, find ClickDeck, click Details, then enable \"Allow access to file URLs\" / \"允许访问文件网址\" and reload the file.";
 const RESTRICTED_PAGE_HELP = "ClickDeck cannot run on this browser page. Open a normal website page, localhost page, or local HTML file with file access enabled.";
+const loginConfig = getCollaborationConfig();
+let googleFlow: ReturnType<typeof createGoogleOAuthFlow> | undefined;
+const privateStorage = createPrivateCollaborationStorage();
+// Do not block core listener registration; collaboration operations await migration themselves.
+void privateStorage.initialize().catch(() => undefined);
+const collaborationClient = createCollaborationClient({ ...collaborationProtocolOptions(import.meta.env.VITE_CLICKDECK_COLLABORATION_PROTOCOL), storage: privateStorage, recoveryStorage: chrome.storage?.session, googleLogin: loginConfig ? async link => {
+  // Optional login capability must never prevent the core background handlers
+  // from registering after an upgrade with missing/unapproved permissions.
+  if (!chrome.identity?.getRedirectURL || !chrome.identity?.launchWebAuthFlow) {
+    throw new Error('oauth-permission-required');
+  }
+  googleFlow ??= createGoogleOAuthFlow({
+    projectUrl: loginConfig.projectUrl, publicKey: loginConfig.publishableKey,
+    redirect: chrome.identity.getRedirectURL('collaboration'),
+    storage: chrome.storage.session,
+    launch: url => chrome.identity.launchWebAuthFlow({ url, interactive: true })
+  });
+  return googleFlow(link);
+} : undefined });
+const collaborationSecurity = createCollaborationSecurity(collaborationClient, privateStorage);
 
 export type ActivationTargetKind = "injectable" | "file" | "restricted";
 
@@ -123,6 +151,26 @@ export async function resolveSourceLocationRequest(
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg?.type === "CLICKDECK_SECURE_COLLABORATION" && isSecureCollaborationSender(sender)) {
+    collaborationSecurity.secure(msg, sender).then(sendResponse).catch(() => sendResponse({ ok: false, error: "network-error" }));
+    return true;
+  }
+  if (sender.id !== chrome.runtime.id || !sender.tab || sender.frameId !== 0 || !msg || typeof msg !== "object") return false;
+  if (msg.type === CLICKDECK_COLLABORATION_REQUEST) {
+    if (msg.request?.action === "verify-source") {
+      readSourceFingerprint(sender.tab.url).then(result => sendResponse(result.ok ? { ok: true, data: { fingerprint: result.fingerprint } } : result));
+      return true;
+    }
+    if (msg.request?.action === "secure-window") {
+      collaborationSecurity.open(msg.request, sender).then(sendResponse).catch(() => sendResponse({ ok: false, error: "network-error" }));
+      return true;
+    }
+    if (!["status", "read"].includes(msg.request?.action)) { sendResponse({ ok: false, error: "confirmation-required" }); return false; }
+    collaborationClient.handle(msg.request).then(sendResponse).catch(() => {
+      sendResponse({ ok: false, error: "network-error" });
+    });
+    return true;
+  }
   if (msg.type === CLICKDECK_RESOLVE_SOURCE_LOCATIONS) {
     resolveSourceLocationRequest(sender.tab?.url, msg.targets)
       .then(sendResponse)

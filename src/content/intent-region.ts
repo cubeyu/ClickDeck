@@ -93,15 +93,49 @@ export function toRelativeRect(box: RectLike, anchorRect: RectLike): RectLike {
 }
 
 export function isVisibleAnchorCandidate(element: HTMLElement): boolean {
-  if (element.hasAttribute("hidden")) return false;
-  if (element.getAttribute("aria-hidden") === "true") return false;
-  
-  const style = window.getComputedStyle(element);
-  if (style.display === "none") return false;
-  if (style.visibility === "hidden") return false;
-  if (parseFloat(style.opacity) < 0.01) return false;
+  let current: HTMLElement | null = element;
+  while (current) {
+    if (current.hasAttribute("hidden")) return false;
+    if (current.getAttribute("aria-hidden") === "true") return false;
+
+    const style = window.getComputedStyle(current);
+    if (style.display === "none") return false;
+    if (style.visibility === "hidden" || style.visibility === "collapse") return false;
+    const opacity = parseFloat(style.opacity);
+    if (Number.isFinite(opacity) && opacity < 0.01) return false;
+
+    current = current.parentElement;
+  }
   
   return true;
+}
+
+const CONTEXTUAL_ANCHOR_TAGS = new Set([
+  "DIV", "SECTION", "ARTICLE", "MAIN", "ASIDE", "NAV", "HEADER", "FOOTER", "FIGURE", "LI"
+]);
+
+function collectContextualAnchorCandidates(box: RectLike, root: ParentNode): HTMLElement[] {
+  if (typeof document.elementsFromPoint !== "function") return [];
+
+  const centerX = box.left + box.width / 2;
+  const centerY = box.top + box.height / 2;
+  const candidates = new Set<HTMLElement>();
+
+  for (const hit of document.elementsFromPoint(centerX, centerY)) {
+    let current: HTMLElement | null = hit instanceof HTMLElement ? hit : hit.parentElement;
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (
+        CONTEXTUAL_ANCHOR_TAGS.has(current.tagName) &&
+        !current.closest("[data-clickdeck='true']") &&
+        (!(root instanceof Node) || root.contains(current))
+      ) {
+        candidates.add(current);
+      }
+      current = current.parentElement;
+    }
+  }
+
+  return Array.from(candidates);
 }
 
 export function getAnchorPriority(element: HTMLElement): number {
@@ -187,11 +221,15 @@ export function findRegionAnchor(box: RectLike, root: ParentNode = document.body
     }
   }
 
-  const containers = Array.from(root.querySelectorAll('section, article, main, [class*="container"], [class*="wrapper"]')) as HTMLElement[];
+  const containers = Array.from(new Set([
+    ...(Array.from(root.querySelectorAll('section, article, main, [class*="container"], [class*="wrapper"]')) as HTMLElement[]),
+    ...collectContextualAnchorCandidates(box, root)
+  ]));
   let bestContainer: HTMLElement | null = null;
   let minArea = Infinity;
 
   for (const container of containers) {
+    if (!isVisibleAnchorCandidate(container)) continue;
     const rect = container.getBoundingClientRect();
     const { overlapArea } = calculateOverlap(rect, box);
     

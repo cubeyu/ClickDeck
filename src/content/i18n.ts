@@ -76,6 +76,8 @@ export type PanelLabels = {
   replaceVideo: string;
   ai: string;
   copyAiPrompt: string;
+  teamCollaboration: string;
+  teamCollaborationTooltip: string;
   noEdits: string;
   left: string;
   center: string;
@@ -172,9 +174,9 @@ export type PanelLabels = {
 }
 
 const englishLabels: PanelLabels = {
-  active: "Active",
+  active: "Editing",
   close: "Close",
-  selectHint: "Select an element on the page.",
+  selectHint: "Click to edit. Collapse the editor to browse and use page navigation.",
   selectedHintPrefix: "Selected:",
   typography: "Typography",
   weight: "Weight",
@@ -249,6 +251,8 @@ const englishLabels: PanelLabels = {
   replaceVideo: "Replace video",
   ai: "AI",
   copyAiPrompt: "Copy AI edit prompt",
+  teamCollaboration: "Collaborative review Beta",
+  teamCollaborationTooltip: "Share structured review notes for the same HTML file in a temporary 48-hour project.",
   noEdits: "No edits to summarize yet.",
   left: "Left",
   center: "Center",
@@ -275,8 +279,8 @@ const englishLabels: PanelLabels = {
   restore: "Restore",
   dismiss: "Dismiss",
   clear: "Clear",
-  collapse: "Collapse",
-  restorePanel: "Restore panel",
+  collapse: "Collapse to browse (keeps edits and collaboration)",
+  restorePanel: "Browsing · expand to edit",
   transparency: "Transparency",
   promptMediaAIHint: "If this prompt does not include an image/video file or asset path, please ask the user for the replacement media before changing this src.",
   promptMediaUIReminder: "Media reminder: This prompt references a replaced image or video. When sending it to AI, attach the media file or provide the asset path.",
@@ -345,9 +349,9 @@ const englishLabels: PanelLabels = {
 };
 
 const chineseLabels: PanelLabels = {
-  active: "已启用",
+  active: "编辑中",
   close: "关闭",
-  selectHint: "选择页面中的元素。",
+  selectHint: "点击页面可编辑；收起编辑器后可正常浏览、翻页。",
   selectedHintPrefix: "当前选中：",
   typography: "字号",
   weight: "字重",
@@ -422,6 +426,8 @@ const chineseLabels: PanelLabels = {
   replaceVideo: "替换视频",
   ai: "AI",
   copyAiPrompt: "复制 AI edit prompt",
+  teamCollaboration: "协作审阅 Beta",
+  teamCollaborationTooltip: "围绕同一份 HTML 创建或加入一个 48 小时临时审阅项目。",
   noEdits: "当前没有可总结的修改。",
   left: "左",
   center: "居中",
@@ -448,8 +454,8 @@ const chineseLabels: PanelLabels = {
   restore: "恢复",
   dismiss: "忽略",
   clear: "清除",
-  collapse: "折叠",
-  restorePanel: "展开",
+  collapse: "收起以浏览（保留修改与协作）",
+  restorePanel: "浏览中 · 展开以编辑",
   transparency: "透明度",
   promptMediaAIHint: "如果这份 prompt 没有同时提供媒体文件或资源路径，请先向用户索要替换文件，再修改这个 src。",
   promptMediaUIReminder: "媒体提醒：这份 prompt 提到了替换媒体文件。发送给 AI 时，请额外附上媒体文件，或提供项目中的资源路径。",

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Intent transform pages fixture</title>
+    <style>
+      html, body { margin: 0; overflow: hidden; }
+      .viewport { width: 800px; height: 500px; overflow: hidden; }
+      .track { display: flex; width: 1600px; height: 500px; transition: transform 120ms linear; }
+      .page { flex: 0 0 800px; height: 500px; box-sizing: border-box; padding: 80px; background: #f7e7c6; }
+      .page:nth-child(2) { background: #cce7df; }
+      .target { width: 260px; height: 140px; background: #fff; border: 2px solid #333; }
+      #next, #previous { position: fixed; top: 20px; z-index: 2; }
+      #next { left: 720px; }
+      #previous { left: 640px; }
+    </style>
+  </head>
+  <body>
+    <div class="viewport">
+      <div class="track" id="track">
+        <div class="page"><div class="target" id="page-one-target"></div></div>
+        <div class="page"><h1>Page 2</h1></div>
+      </div>
+    </div>
+    <button id="previous" type="button">Previous</button>
+    <button id="next" type="button">Next</button>
+    <script>
+      const track = document.getElementById("track");
+      document.getElementById("next").addEventListener("click", () => { track.style.transform = "translateX(-800px)"; });
+      document.getElementById("previous").addEventListener("click", () => { track.style.transform = "translateX(0)"; });
+    </script>
+  </body>
+</html>

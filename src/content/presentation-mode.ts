@@ -1,4 +1,26 @@
 import type { ClickDeckLogger } from "../diagnostics/logger";
+import { isClickDeckUiElement, isElementVisible } from "./dom-utils";
+
+function fromPluginUi(event: Event): boolean {
+  return event.target instanceof Element && isClickDeckUiElement(event.target);
+}
+
+function initialSlideIndex(slides: HTMLElement[]): number {
+  const candidates = slides.flatMap((slide, index) => {
+    const rect = slide.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0 || slide.closest('[hidden], [aria-hidden="true"]') || !isElementVisible(slide)) return [];
+    const left = rect.left || 0, top = rect.top || 0;
+    return [{ index, active: slide.matches('.active, .present, [aria-current="page"], [aria-current="true"]'),
+      inViewport: left < window.innerWidth && left + rect.width > 0 && top < window.innerHeight && top + rect.height > 0,
+      distance: Math.abs(top) + Math.abs(left) }];
+  });
+  const inViewport = candidates.filter(candidate => candidate.inViewport);
+  const active = inViewport.filter(candidate => candidate.active);
+  // Only trust an unambiguous, visible host state. Scroll documents use geometry.
+  const eligible = active.length === 1 ? active : inViewport.length ? inViewport : candidates;
+  return eligible.reduce<(typeof candidates)[number] | undefined>((best, candidate) =>
+    !best || candidate.distance < best.distance ? candidate : best, undefined)?.index ?? 0;
+}
 
 export function detectPresentationSlides(root: ParentNode = document): HTMLElement[] {
   // 1. Check for .slide
@@ -320,10 +342,10 @@ export function createPresentationController(options: {
   }
 
   function onKeyDown(e: KeyboardEvent) {
-    if (!isPresenting) return;
+    if (!isPresenting || fromPluginUi(e)) return;
     
     // Ignore events from input fields
-    if ((e.target as HTMLElement).closest("input, textarea, [contenteditable='true']")) {
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, [contenteditable='true']")) {
       return;
     }
 
@@ -362,7 +384,7 @@ export function createPresentationController(options: {
   }
 
   function onDocumentClick(e: MouseEvent) {
-    if (!isPresenting) return;
+    if (!isPresenting || fromPluginUi(e)) return;
 
     const target = e.target as HTMLElement | null;
     const dot = target?.closest<HTMLElement>("#nav .dot, .nav-dot");
@@ -389,7 +411,7 @@ export function createPresentationController(options: {
 
   let wheelTimeout: number | null = null;
   function onWheel(e: WheelEvent) {
-    if (!isPresenting) return;
+    if (!isPresenting || fromPluginUi(e)) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -408,15 +430,20 @@ export function createPresentationController(options: {
 
   let touchStartX = 0;
   let touchStartY = 0;
+  let pageTouchStarted = false;
 
   function onTouchStart(e: TouchEvent) {
-    if (!isPresenting || e.touches.length === 0) return;
+    pageTouchStarted = false;
+    if (!isPresenting || fromPluginUi(e) || e.touches.length === 0) return;
+    pageTouchStarted = true;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }
 
   function onTouchEnd(e: TouchEvent) {
-    if (!isPresenting || e.changedTouches.length === 0) return;
+    const started = pageTouchStarted;
+    pageTouchStarted = false;
+    if (!isPresenting || !started || fromPluginUi(e) || e.changedTouches.length === 0) return;
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
     
@@ -453,18 +480,8 @@ export function createPresentationController(options: {
     hasSyncedInitialState = false;
     originalScrollY = window.scrollY;
 
-    // Determine current slide based on scroll position
-    let bestIndex = 0;
-    let minDistance = Infinity;
-    slides.forEach((slide, index) => {
-      const rect = slide.getBoundingClientRect();
-      const distance = Math.abs(rect.top) + Math.abs(rect.left);
-      if (distance < minDistance) {
-        minDistance = distance;
-        bestIndex = index;
-      }
-    });
-    currentIndex = bestIndex;
+    // Read host state before staging; display:none slides report misleading zero coordinates.
+    currentIndex = initialSlideIndex(slides);
 
     // Capture original dimensions before any staging classes are applied
     originalDimensions = slides.map(slide => {
@@ -476,6 +493,10 @@ export function createPresentationController(options: {
     });
     transformedAncestorStates = collectTransformedAncestors(slides);
 
+    // Fullscreen can be refused on rapid re-entry. Do not leave keyboard focus
+    // on the soon-hidden plugin trigger, whose input is isolated from navigation.
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && isClickDeckUiElement(focused)) focused.blur();
     document.documentElement.classList.add("clickdeck-presenting");
     neutralizeTransformedAncestors(transformedAncestorStates);
     
@@ -542,10 +563,12 @@ function collectTransformedAncestors(slides: HTMLElement[]): Array<{ element: HT
     let current = slide.parentElement;
     while (current && current !== document.body && current !== document.documentElement) {
       const computed = window.getComputedStyle(current);
+      const hintedProperties = computed.willChange.split(',').map(property => property.trim());
       const createsFixedContainingBlock =
         computed.transform !== "none" ||
         computed.perspective !== "none" ||
-        computed.filter !== "none";
+        computed.filter !== "none" ||
+        hintedProperties.some(property => ["transform", "perspective", "filter"].includes(property));
 
       if (createsFixedContainingBlock && !states.has(current)) {
         states.set(current, current.getAttribute("style"));
@@ -560,9 +583,13 @@ function collectTransformedAncestors(slides: HTMLElement[]): Array<{ element: HT
 
 function neutralizeTransformedAncestors(states: Array<{ element: HTMLElement; style: string | null }>): void {
   for (const { element } of states) {
-    element.style.transform = "none";
-    element.style.perspective = "none";
-    element.style.filter = "none";
+    // A transitioning identity transform and will-change can still establish
+    // the fixed containing block. Preserve the whole inline style for exit.
+    element.style.setProperty("transition", "none", "important");
+    element.style.setProperty("will-change", "auto", "important");
+    element.style.setProperty("transform", "none", "important");
+    element.style.setProperty("perspective", "none", "important");
+    element.style.setProperty("filter", "none", "important");
   }
 }
 

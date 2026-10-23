@@ -1,0 +1,360 @@
+[
+  {
+    "name": "basic",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": true
+  },
+  {
+    "name": "locator",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "locator": {
+        "tagName": "h1",
+        "cssPath": "h1"
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "region",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "move",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "source": {
+        "userIntent": "move",
+        "pageMode": "long",
+        "anchor": {
+          "kind": "section",
+          "confidence": "high"
+        },
+        "contents": [
+          "A"
+        ],
+        "nearby": [
+          {
+            "direction": "above",
+            "summary": "B"
+          }
+        ],
+        "confidence": "medium",
+        "relativeBox": {
+          "left": 1,
+          "top": 2,
+          "right": 3,
+          "bottom": 4,
+          "width": 2,
+          "height": 2
+        }
+      },
+      "target": {
+        "userIntent": "move",
+        "pageMode": "long",
+        "anchor": {
+          "kind": "section",
+          "confidence": "high"
+        },
+        "contents": [
+          "A"
+        ],
+        "nearby": [
+          {
+            "direction": "above",
+            "summary": "B"
+          }
+        ],
+        "confidence": "medium",
+        "relativeBox": {
+          "left": 1,
+          "top": 2,
+          "right": 3,
+          "bottom": 4,
+          "width": 2,
+          "height": 2
+        }
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "missing-tag",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "locator": {
+        "cssPath": "h1"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "bad-region",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "source": {
+        "anchor": {},
+        "contents": [
+          {}
+        ],
+        "nearby": [],
+        "userIntent": "move"
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "bad-nearby",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "source": {
+        "userIntent": "move",
+        "pageMode": "long",
+        "anchor": {
+          "kind": "section",
+          "confidence": "high"
+        },
+        "contents": [
+          "A"
+        ],
+        "nearby": [
+          {
+            "direction": "above",
+            "summary": {}
+          }
+        ],
+        "confidence": "medium",
+        "relativeBox": {
+          "left": 1,
+          "top": 2,
+          "right": 3,
+          "bottom": 4,
+          "width": 2,
+          "height": 2
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "extra-field",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "unknown": "x"
+    },
+    "valid": false
+  },
+  {
+    "name": "null-text",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": null
+    },
+    "valid": false
+  },
+  {
+    "name": "negative-sequence",
+    "task": {
+      "id": "t",
+      "sequence": -1,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": false
+  },
+  {
+    "name": "fractional-sequence",
+    "task": {
+      "id": "t",
+      "sequence": 1.1,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": false
+  },
+  {
+    "name": "huge-sequence",
+    "task": {
+      "id": "t",
+      "sequence": 1000000000,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown-kind",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "eval",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": false
+  },
+  {
+    "name": "unknown-attribute",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "attribute": "onload"
+    },
+    "valid": false
+  },
+  {
+    "name": "bad-rect",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "source": {
+        "userIntent": "move",
+        "pageMode": "long",
+        "anchor": {
+          "kind": "section",
+          "confidence": "high"
+        },
+        "contents": [
+          "A"
+        ],
+        "nearby": [
+          {
+            "direction": "above",
+            "summary": "B"
+          }
+        ],
+        "confidence": "medium",
+        "relativeBox": {
+          "left": 0
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "bad-confidence",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B",
+      "source": {
+        "userIntent": "move",
+        "pageMode": "long",
+        "anchor": {
+          "kind": "section",
+          "confidence": "high"
+        },
+        "contents": [
+          "A"
+        ],
+        "nearby": [
+          {
+            "direction": "above",
+            "summary": "B"
+          }
+        ],
+        "confidence": "highest",
+        "relativeBox": {
+          "left": 1,
+          "top": 2,
+          "right": 3,
+          "bottom": 4,
+          "width": 2,
+          "height": 2
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "unicode-at-limit",
+    "task": {
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": true
+  },
+  {
+    "name": "unicode-over-limit",
+    "task": {
+      "id": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "B"
+    },
+    "valid": false
+  },
+  {
+    "name": "inert-html",
+    "task": {
+      "id": "t",
+      "sequence": 0,
+      "kind": "content",
+      "summary": "A",
+      "before": "A",
+      "after": "<img src=x onerror=alert(1)>"
+    },
+    "valid": true
+  }
+]

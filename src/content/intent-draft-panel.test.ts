@@ -237,4 +237,22 @@ describe("intent-draft-panel", () => {
     panel.setAnchorLayout({ ...mockLayout, collapsed: true });
     expect(panel.element.classList.contains("clickdeck-intent-draft--hidden")).toBe(true);
   });
+
+  it("reopens the same saved request instead of creating a duplicate editor or operation", () => {
+    const onSave = vi.fn(), onHighlight = vi.fn();
+    const panel = createIntentDraftPanel(onSave, vi.fn(), vi.fn(), onHighlight);
+    panel.setAnchorLayout(mockLayout);
+    const op = createMockOperation(); panel.addDraft(op);
+    const textarea = panel.element.querySelector<HTMLTextAreaElement>("textarea")!;
+    textarea.value = "Use Tabs here";
+    panel.element.querySelector<HTMLButtonElement>('[data-action="save"]')!.click();
+    panel.hide();
+    expect(panel.editDraft(op.id)).toBe(true);
+    expect(panel.element.querySelectorAll('.clickdeck-intent-draft__card')).toHaveLength(1);
+    expect(textarea.value).toBe("Use Tabs here");
+    expect(panel.element.classList.contains('clickdeck-intent-draft--hidden')).toBe(false);
+    expect(onHighlight).toHaveBeenCalledWith(op);
+    expect(panel.editDraft("missing")).toBe(false);
+    panel.destroy();
+  });
 });

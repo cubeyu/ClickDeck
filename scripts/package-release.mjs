@@ -20,6 +20,12 @@ if (!existsSync(manifestPath)) {
   process.exit(1);
 }
 
+const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+if (manifest.version_name?.endsWith('-local-diagnostics')) {
+  console.error('Refusing to package a local diagnostic build. Run a normal build without VITE_CLICKDECK_SOURCE_DIAGNOSTICS first. No release files were changed.');
+  process.exit(1);
+}
+
 rmSync(stageDir, { recursive: true, force: true });
 rmSync(zipPath, { force: true });
 mkdirSync(stageDir, { recursive: true });

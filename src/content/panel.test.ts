@@ -3,6 +3,22 @@ import { describe, expect, it } from "vitest";
 import { createPanel } from "./panel";
 
 describe("createPanel selection context", () => {
+  it("labels collapsed browsing and restores editing with keyboard", () => {
+    const changes: boolean[] = [];
+    const panel = createPanel(() => undefined, { onCollapsedChange: value => changes.push(value) });
+    document.body.append(panel.element);
+    const collapse = panel.element.querySelector<HTMLButtonElement>('[data-internal-action="collapse"]')!;
+    expect(collapse.title).toMatch(/browse|浏览/i);
+    collapse.click();
+    expect(panel.element.classList.contains('clickdeck-panel--collapsed')).toBe(true);
+    const restore = panel.element.querySelector<HTMLElement>('[data-internal-action="restore"]')!;
+    expect(restore.textContent).toMatch(/Browsing|浏览中/);
+    restore.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(panel.element.classList.contains('clickdeck-panel--collapsed')).toBe(false);
+    expect(changes).toEqual([true, false]);
+    panel.destroy();
+  });
+
   it("enables image tools for image context", () => {
     const panel = createPanel(() => undefined);
     document.body.appendChild(panel.element);
@@ -60,6 +76,18 @@ describe("createPanel selection context", () => {
 
     expect(sections.indexOf("intent")).toBeLessThan(sections.indexOf("ai-prompt"));
     expect(sections.indexOf("ai-prompt")).toBeLessThan(sections.indexOf("finish"));
+
+    panel.destroy();
+  });
+
+  it("places the secondary collaboration entry directly after the AI prompt action", () => {
+    const panel = createPanel(() => undefined);
+    document.body.appendChild(panel.element);
+
+    const aiSection = panel.element.querySelector<HTMLElement>("[data-section='ai-prompt']");
+    const actions = Array.from(aiSection?.querySelectorAll<HTMLButtonElement>("[data-action]") ?? []).map((button) => button.dataset.action);
+    expect(actions).toEqual(["copy-ai-prompt", "team-collaboration"]);
+    expect(aiSection?.querySelector("[data-action='team-collaboration']")?.classList.contains("clickdeck-button--secondary")).toBe(true);
 
     panel.destroy();
   });
@@ -318,6 +346,14 @@ describe("createPanel interaction dictionary", () => {
 });
 
 describe("createPanel prompt preview language roles", () => {
+  it("keeps collaborator markup literal in the prompt textarea", () => {
+    const panel = createPanel(() => undefined); document.body.appendChild(panel.element);
+    const text = '</textarea><img src="x" onerror="alert(1)">';
+    panel.showPromptPreview({ promptEn: text, promptZh: text, hasMediaReplacement: false, onCopy: () => undefined });
+    expect(panel.element.querySelector(".clickdeck-prompt-overlay img")).toBeNull();
+    expect(panel.element.querySelector("textarea")?.value).toBe(text);
+    panel.destroy();
+  });
   it("shows English as the primary execution view and Chinese as reference", () => {
     const panel = createPanel(() => undefined);
     document.body.appendChild(panel.element);

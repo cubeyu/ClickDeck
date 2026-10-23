@@ -56,6 +56,27 @@ async function loadServiceWorker() {
 }
 
 describe("service-worker action activation", () => {
+  it('registers core handlers when configured collaboration has no identity API', async () => {
+    vi.stubEnv('VITE_CLICKDECK_SUPABASE_URL', 'https://example.supabase.co');
+    vi.stubEnv('VITE_CLICKDECK_SUPABASE_PUBLISHABLE_KEY', 'sb_publishable_test_only_not_a_real_credential');
+    try {
+      const mock = installChromeMock();
+      await loadServiceWorker();
+      expect(mock.runtime.onMessage.addListener).toHaveBeenCalledTimes(1);
+      expect(mock.action.onClicked.addListener).toHaveBeenCalledTimes(1);
+    } finally { vi.unstubAllEnvs(); }
+  });
+  it("rejects direct collaboration writes from a content script", async () => {
+    const mock = installChromeMock();
+    Object.assign(mock.runtime, { id: "ext" });
+    await loadServiceWorker();
+    const listener = mock.runtime.onMessage.addListener.mock.calls[0][0];
+    for (const action of ["create", "join", "submit"]) {
+      const reply = vi.fn();
+      listener({ type: "CLICKDECK_COLLABORATION_REQUEST", request: { action } }, { id: "ext", frameId: 0, tab: { id: 1 } }, reply);
+      expect(reply).toHaveBeenCalledWith({ ok: false, error: "confirmation-required" });
+    }
+  });
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();

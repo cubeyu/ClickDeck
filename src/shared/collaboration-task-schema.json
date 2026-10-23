@@ -1,0 +1,607 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999999999
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "style",
+        "content",
+        "attribute",
+        "intent",
+        "move",
+        "remove"
+      ],
+      "maxLength": 80
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 4000,
+      "minLength": 1
+    },
+    "locator": {
+      "type": "object",
+      "properties": {
+        "descriptor": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "tagName": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "roleHint": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "textSnippet": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "imageHint": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "classHint": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "idHint": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "cssPath": {
+          "type": "string",
+          "maxLength": 1000,
+          "minLength": 1
+        },
+        "nthOfTypePath": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "siblingIndex": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        },
+        "parentDescriptor": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "semanticRole": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "semanticAncestor": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "previousSiblingDescriptor": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "nextSiblingDescriptor": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "selectorStability": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "maxLength": 80
+        },
+        "selectorStabilityReason": {
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "tagName",
+        "cssPath"
+      ],
+      "additionalProperties": false
+    },
+    "before": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "after": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "property": {
+      "type": "string",
+      "maxLength": 100
+    },
+    "attribute": {
+      "type": "string",
+      "enum": [
+        "src"
+      ],
+      "maxLength": 80
+    },
+    "source": {
+      "type": "object",
+      "properties": {
+        "userIntent": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "pageMode": {
+          "type": "string",
+          "enum": [
+            "slide",
+            "long",
+            "unknown"
+          ],
+          "maxLength": 80
+        },
+        "relativeBox": {
+          "type": "object",
+          "properties": {
+            "left": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "top": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "right": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "bottom": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "width": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "height": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "left",
+            "top",
+            "right",
+            "bottom",
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "anchor": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "slide",
+                "section",
+                "container",
+                "document"
+              ],
+              "maxLength": 80
+            },
+            "label": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "locator": {
+              "type": "object",
+              "properties": {
+                "descriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "tagName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "roleHint": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "textSnippet": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "imageHint": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "classHint": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "idHint": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "cssPath": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "minLength": 1
+                },
+                "nthOfTypePath": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "siblingIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000
+                },
+                "parentDescriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "semanticRole": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "semanticAncestor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "previousSiblingDescriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "nextSiblingDescriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "selectorStability": {
+                  "type": "string",
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ],
+                  "maxLength": 80
+                },
+                "selectorStabilityReason": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "tagName",
+                "cssPath"
+              ],
+              "additionalProperties": false
+            },
+            "confidence": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "contents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "maxItems": 3
+        },
+        "nearby": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "above",
+                  "below",
+                  "left",
+                  "right"
+                ],
+                "maxLength": 80
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "direction",
+              "summary"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 8
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "userIntent",
+        "pageMode",
+        "anchor",
+        "contents",
+        "nearby"
+      ],
+      "additionalProperties": false
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "userIntent": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "pageMode": {
+          "type": "string",
+          "enum": [
+            "slide",
+            "long",
+            "unknown"
+          ],
+          "maxLength": 80
+        },
+        "relativeBox": {
+          "type": "object",
+          "properties": {
+            "left": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "top": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "right": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "bottom": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "width": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            },
+            "height": {
+              "type": "number",
+              "minimum": -1000000000,
+              "maximum": 1000000000
+            }
+          },
+          "required": [
+            "left",
+            "top",
+            "right",
+            "bottom",
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "anchor": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "slide",
+                "section",
+                "container",
+                "document"
+              ],
+              "maxLength": 80
+            },
+            "label": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "locator": {
+              "type": "object",
+              "properties": {
+                "descriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "tagName": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "roleHint": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "textSnippet": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "imageHint": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "classHint": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "idHint": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "cssPath": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "minLength": 1
+                },
+                "nthOfTypePath": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "siblingIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000
+                },
+                "parentDescriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "semanticRole": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "semanticAncestor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "previousSiblingDescriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "nextSiblingDescriptor": {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                "selectorStability": {
+                  "type": "string",
+                  "enum": [
+                    "high",
+                    "medium",
+                    "low"
+                  ],
+                  "maxLength": 80
+                },
+                "selectorStabilityReason": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "tagName",
+                "cssPath"
+              ],
+              "additionalProperties": false
+            },
+            "confidence": {
+              "type": "string",
+              "enum": [
+                "high",
+                "medium",
+                "low"
+              ],
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        "contents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "maxItems": 3
+        },
+        "nearby": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "above",
+                  "below",
+                  "left",
+                  "right"
+                ],
+                "maxLength": 80
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "direction",
+              "summary"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 8
+        },
+        "confidence": {
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ],
+          "maxLength": 80
+        }
+      },
+      "required": [
+        "userIntent",
+        "pageMode",
+        "anchor",
+        "contents",
+        "nearby"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "sequence",
+    "kind",
+    "summary"
+  ],
+  "additionalProperties": false
+}

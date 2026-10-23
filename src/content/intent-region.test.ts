@@ -192,6 +192,28 @@ describe("Intent Region Core Functions", () => {
     expect(anchor.locator?.descriptor).toContain("#slide1");
   });
 
+  it("findRegionAnchor should ignore hidden generic containers", () => {
+    document.body.innerHTML = `
+      <main id="visible-main"></main>
+      <div class="hidden-container" style="visibility: hidden;"></div>
+    `;
+
+    const main = document.querySelector("#visible-main") as HTMLElement;
+    const hidden = document.querySelector(".hidden-container") as HTMLElement;
+    window.getComputedStyle = (element) => ({
+      display: (element as HTMLElement).style.display || "block",
+      visibility: (element as HTMLElement).style.visibility || "visible",
+      opacity: (element as HTMLElement).style.opacity || "1"
+    }) as CSSStyleDeclaration;
+    (main as any).getBoundingClientRect = () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 });
+    (hidden as any).getBoundingClientRect = () => ({ left: 50, top: 50, width: 300, height: 200, right: 350, bottom: 250 });
+
+    const anchor = findRegionAnchor(normalizeRect({ left: 80, top: 80, width: 200, height: 100 }), document.body);
+
+    expect(anchor.kind).toBe("container");
+    expect(anchor.locator?.descriptor).toContain("#visible-main");
+  });
+
   it("createIntentRegion should preserve userIntent and compute correct properties", () => {
     document.body.innerHTML = `
       <section class="slide" id="slide1" style="width: 800px; height: 600px;"></section>

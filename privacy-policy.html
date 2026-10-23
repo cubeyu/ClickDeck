@@ -13,30 +13,44 @@
 </style>
 </head>
 <body>
-<p class="date">Effective date: July 6, 2026</p>
+<p class="date">Updated: October 23, 2026</p>
 <h1>Privacy Policy for ClickDeck</h1>
 
 <h2>Overview</h2>
 <p>ClickDeck is a browser extension that allows users to visually select, edit, refine, and export HTML elements on the current page. This privacy policy explains how the extension handles user data.</p>
 
 <h2>Data Collection</h2>
-<p><strong>ClickDeck does not collect, store, or transmit personal page content to external servers.</strong></p>
-<p>All core operations — including element selection, style editing, text modification, visual edit suggestions, and page export — are performed locally in the user's browser.</p>
+<p><strong>Ordinary editing and export run locally. Optional cloud collaboration sends the information needed for the collaboration actions you explicitly request.</strong></p>
+<p>Creating a project requires Google sign-in. Google and Supabase process the basic account identity authorized during sign-in, which may include an account identifier, email address, name and profile image. ClickDeck does not receive your Google password or request access to Gmail, Drive or Calendar. Invited collaborators do not need Google sign-in; they receive a service-managed guest identity.</p>
+<p>Creating or joining a project sends its name or invitation, a page fingerprint, a display name and the relevant account or guest identity to the configured collaboration service. Submitting selected changes sends structured proposals, which can include page text excerpts, before/after values, target locations and resource references. Other authorized project members can read shared proposals, their author display names and membership information; Google profile information is not used as the shared proposal author profile. Reviewing or refreshing a joined project contacts the service; local edits are not automatically submitted.</p>
+<p>ClickDeck does not automatically upload the complete HTML document or page screenshots. Do not share sensitive content in a proposal unless you intend project members and the collaboration provider to receive it.</p>
 
 <h2>Data Storage</h2>
-<p>The extension uses <code>chrome.storage</code> to save local preferences such as language or interface state. This data stays on the user's device.</p>
+<p>The extension uses <code>chrome.storage</code> for preferences, saved local edits and project associations. Collaboration credentials and saved invitations are stored in extension-origin IndexedDB; temporary login state and guest-session recovery data may use extension session storage. Authentication credentials are sent to the configured authentication/collaboration service as needed, not included in exported HTML or proposal text. Clearing extension data or uninstalling can remove a guest identity, which is not guaranteed to be recoverable. A local project-history entry is not a cloud backup.</p>
+<p>Hosted collaboration projects expire 48 hours after creation; joining or submitting does not extend that deadline. Access ends at expiry, and scheduled cleanup removes expired project records and related proposals. Physical deletion may occur after the deadline. Exported files and local records are separate and are not deleted by cloud cleanup.</p>
+<p>The project deadline is not an account or login-session deletion deadline. Google-linked accounts and provider operational records may remain after a project expires. Anonymous accounts are subject to separate cleanup rules. Contact the maintainer for account-data requests; do not post credentials, invitations or private page content in a public issue.</p>
 
 <h2>Third-Party Services</h2>
-<p>ClickDeck does not integrate with, transmit data to, or rely on any third-party services.</p>
+<p>Configured cloud collaboration uses Supabase for authentication and database services. The provider receives collaboration requests and connection metadata needed to deliver and secure the service, such as IP addresses. The installed build contains public service connection configuration, not administrator credentials. Source builds without collaboration configuration remain usable for local editing.</p>
+<p>ClickDeck does not automatically send page content to an AI service. Copying a prompt to the clipboard is a local action; if you paste it into another service, that service's own policies apply. Local diagnostic logs are copied only when requested; review them before sharing publicly.</p>
+
+<h2>Sharing and choices</h2>
+<p>Share invitation codes only with intended collaborators. Selecting or deselecting an unsubmitted proposal does not withdraw an earlier cloud submission. Stop using collaboration to stop future requests, and export information you need before expiry. Local removal of a project-history entry does not delete its cloud project. This policy describes extension behavior; it does not guarantee that a third-party provider immediately erases its operational logs.</p>
+
+<h2>中文摘要</h2>
+<p>创建项目需要 Google 登录，Google 与 Supabase 会处理授权的基本账号信息（可能包括账号标识、邮箱、姓名和头像）；插件不接收 Google 密码，不请求 Gmail、云盘或日历权限。受邀成员无需 Google 登录，使用服务分配的访客身份。团队提案展示填写的显示名，不以 Google 个人资料作为作者资料。</p>
+<p>普通编辑和导出在本机完成。主动创建、加入、刷新协作项目会联系配置的 Supabase 服务；只有核对并确认提交后，选中的结构化提案才会分享给团队，可能包含原文片段、修改前后值及定位信息。不自动上传完整 HTML 或页面截图。项目从创建起固定48小时有效，到期停止访问，再由计划任务清理；本地记录和导出文件不会随云端清理删除。邀请码只发给预期成员，移除本地历史或取消选择不等于撤回已分享内容。</p>
+<p>协作凭据与已保存的邀请码存放在扩展自身的 IndexedDB，登录过程与临时恢复信息可能使用扩展会话存储。清除扩展数据或卸载可能导致访客身份无法恢复。项目到期不等于 Google 关联账号、登录会话及服务日志同时删除；账号数据请求请联系维护者，不要在公开 issue 中发送私密资料。</p>
 
 <h2>Permissions</h2>
 <p>The extension currently requests the following browser permissions:</p>
 <ul>
   <li><strong>activeTab</strong> — to access the current page when the user activates the extension</li>
   <li><strong>scripting</strong> — to inject the editor UI into the active page</li>
-  <li><strong>storage</strong> — to save user preferences locally</li>
+  <li><strong>storage</strong> — to save preferences, local edits and collaboration sessions locally</li>
+  <li><strong>identity</strong> — to open the user-requested Google authorization flow and receive its callback through the browser</li>
 </ul>
-<p>ClickDeck also declares host access so it can run on the page the user chooses to edit. These permissions are used only for the extension's core functionality and not for user-data collection or transmission.</p>
+<p>ClickDeck also declares host access so it can run on pages the user chooses to edit and contact the configured collaboration service. These permissions support the local editor and optional collaboration described above, not advertising or cross-site activity tracking.</p>
 
 <h2>Changes</h2>
 <p>If this privacy policy is updated, the changes will be reflected on this page with an updated effective date.</p>
